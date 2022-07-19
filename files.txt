@@ -1,0 +1,9 @@
+/home/ubuntu/anaconda3/envs/casa/lib/python3.6/site-packages/dsa_110_pol_dev-1.0.0-py3.6.egg
+/home/ubuntu/anaconda3/envs/casa/bin/cal_pol.py
+/home/ubuntu/anaconda3/envs/casa/bin/plot_pol.py
+/home/ubuntu/anaconda3/envs/casa/bin/f2py
+/home/ubuntu/anaconda3/envs/casa/bin/f2py3
+/home/ubuntu/anaconda3/envs/casa/bin/f2py3.6
+/home/ubuntu/anaconda3/envs/casa/bin/tqdm
+/home/ubuntu/anaconda3/envs/casa/bin/pygmentize
+/home/ubuntu/anaconda3/envs/casa/bin/cmark
