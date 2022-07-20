@@ -227,5 +227,5 @@ dependencies:
     - rich==12.4.4
     - rsa==4.8
     - scipy==1.7.3
-    - git+https://github.com/FRBs/sigpyproc3
+    - git+https://github.com/telegraphic/sigpyproc@8f3f05335caeb386c9d6d32db97135145b96ab81 
 prefix: /home/ubuntu/anaconda3/envs/casa38
