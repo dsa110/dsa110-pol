@@ -227,5 +227,5 @@ dependencies:
     - rich==12.4.4
     - rsa==4.8
     - scipy==1.7.3
-    - sigpyproc==0.2.0
+    - sigpyproc==0.5.5
 prefix: /home/ubuntu/anaconda3/envs/casa38
