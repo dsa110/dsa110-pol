@@ -213,7 +213,6 @@ dependencies:
     - babel==2.9.1
     - backports-shutil-get-terminal-size==1.0.0
     - bdsf==1.10.1
-    - bidict==0.22.0
     - burstfit==0.2.1-2-g99c306c-dirty
     - cachetools==5.2.0
     - casadata==2022.1.17

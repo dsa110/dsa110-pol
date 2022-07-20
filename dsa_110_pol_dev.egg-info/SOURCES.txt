@@ -1,14 +1,17 @@
 README.md
 README.txt
+environment.yml
 files.txt
 requirements.txt
 setup.py
 test.fil
+.github/workflows/workflow.yaml
 .ipynb_checkpoints/Calibrator_UpperLimit_Testing-checkpoint.ipynb
 .ipynb_checkpoints/Mark_RM_Testing-V2-checkpoint.ipynb
 .ipynb_checkpoints/Mark_RM_Testing-checkpoint.ipynb
 .ipynb_checkpoints/dsapol_unit_testing-checkpoint.ipynb
 dist/dsa_110_pol_dev-1.0.0-py3.6.egg
+dist/dsa_110_pol_dev-1.0.0-py3.8.egg
 dsa_110_pol_dev.egg-info/PKG-INFO
 dsa_110_pol_dev.egg-info/SOURCES.txt
 dsa_110_pol_dev.egg-info/dependency_links.txt
