@@ -206,6 +206,7 @@ dependencies:
     - casatools==6.4.4.31
     - import-ipynb==0.1.4
     - importlib-resources==5.7.1
+    - matplotlib==3.5.1
     - numpy==1.21.0
     - py==1.11.0
     - pyasn1==0.4.8
@@ -225,9 +226,9 @@ dependencies:
     - pytz==2022.1
     - rich==12.4.4
     - rsa==4.8
+    - scipy==1.7.3
     - scikit-image==0.19.3
     - setoptconf-tmp==0.3.1
-    - setuptools-scm==6.4.2
     - sigpyproc==0.2.0
     - wheel==0.37.1
 prefix: /home/ubuntu/anaconda3/envs/casa38
