@@ -227,7 +227,5 @@ dependencies:
     - rich==12.4.4
     - rsa==4.8
     - scipy==1.7.3
-    - scikit-image==0.19.3
     - sigpyproc==0.2.0
-    - wheel==0.37.1
 prefix: /home/ubuntu/anaconda3/envs/casa38
