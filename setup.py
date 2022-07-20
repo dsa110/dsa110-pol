@@ -25,8 +25,8 @@ setup(name='dsa-110_pol-dev',
           ],
       scripts = [
           'scripts/plot_pol.py',
-          'scripts/cal_pol.py'
-          'FRB_upper_limits.py',
-          'process_all_FRBs.py']
+          'scripts/cal_pol.py',
+          'scripts/FRB_upper_limits.py',
+          'scripts/process_all_FRBs.py']
 
      )
