@@ -170,4 +170,5 @@ dependencies:
     - tenacity==8.0.1
     - tomli==2.0.1
     - urllib3==1.26.9
+    - git+https://github.com/telegraphic/sigpyproc@8f3f05335caeb386c9d6d32db97135145b96ab81
 prefix: /home/ubuntu/anaconda3/envs/casa38
