@@ -62,5 +62,5 @@ dependencies:
     - python-casacore==3.4.0
     - rsa==4.8
     - scikit-image==0.19.3
-    - sigpyproc==0.5.6
-prefix: /home/ubuntu/anaconda3/envs/casa38
+    - git+https://github.com/telegraphic/sigpyproc@8f3f05335caeb386c9d6d32db97135145b96ab81
+prefix: /home/ubuntu/anaconda3/envs/casa38-TEST
