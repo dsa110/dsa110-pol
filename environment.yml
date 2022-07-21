@@ -3,9 +3,11 @@ channels:
   - pyviz
   - conda-forge
   - defaults
+  - eumetsat
 dependencies:
   - _libgcc_mutex=0.1=main
   - _openmp_mutex=4.5=1_gnu
+  - fftw3
   - h5py=3.6.0
   - hdf5=1.10.6=hb1b8bf9_0
   - importlib-metadata=4.11.3
