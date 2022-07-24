@@ -524,6 +524,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
              pol_t --> 1D array, time dependent polarization
              avg --> float, frequency and time averaged polarization fraction
     """
+    allowed_err = 0.1 #allowed error above 100 %
     if pre_calc_tf:
         (I_t,I_f) = I
         (Q_t,Q_f) = Q
@@ -540,37 +541,59 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     else:
         peak,timestart,timestop = find_peak(I,width_native,t_samp,pre_calc_tf=pre_calc_tf,buff=buff)
 
+    #total polarization
     pol_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2)/(np.array(I_f)**2))
     pol_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
-    
+    #linear polarization
+    L_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2)/(np.array(I_f)**2))
+    L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2)/(np.array(I_t)**2))
+    #circular polarization
+    C_f = V_f/I_f
+    C_t = V_t/I_t
+
     if plot:
         f=plt.figure(figsize=(12,6))
-        plt.plot(freq_test[0],pol_f)
+        plt.plot(freq_test[0],pol_f,label=r'Time Averaged Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)')
+        plt.plot(freq_test[0],L_f,label=r'Time Averaged Linear Polarization ($\sqrt{Q^2 + U^2}/I$)')
+        plt.plot(freq_test[0],C_f,label=r'Time Averaged Circular Polarization ($V/I$)')
         plt.grid()
         plt.xlabel("Frequency (Hz)")
         plt.ylabel("Polarization Fraction")
-        plt.ylim(-1,1)
+        plt.ylim(-1-allowed_err,1+allowed_err)
         plt.title(label)
+        plt.legend()
         plt.savefig(datadir + label + "_polfraction_frequency_"  + calstr  + str(n_f) + "_binned" + ext)
         if show:
             plt.show()
         plt.close(f)
     
         f=plt.figure(figsize=(12,6))
-        plt.plot(np.arange(timestart,timestop),pol_t[timestart:timestop])
+        plt.plot(np.arange(timestart,timestop),pol_t[timestart:timestop],label=r'Frequency Averaged Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)')
+        plt.plot(np.arange(timestart,timestop),L_t[timestart:timestop],label=r'Frequency Averaged Linear Polarization ($\sqrt{Q^2 + U^2}/I$)')
+        plt.plot(np.arange(timestart,timestop),C_t[timestart:timestop],label=r'Frequency Averaged Circular Polarization ($V/I$)')
         plt.grid()
         plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
         plt.ylabel("Polarization Fraction")
-        plt.ylim(-1,1)
+        plt.ylim(-1-allowed_err,1+allowed_err)
         plt.title(label)
+        plt.legend()
         plt.savefig(datadir + label + "_polfraction_time_" + calstr + str(n_t) + "_binned" + ext)
         if show:
             plt.show()
         plt.close(f)
 
+    allowed_err = 0.1 #allowed error above 100 %
     #avg_frac = (np.mean(pol_t[timestart:timestop][pol_t[timestart:timestop]<1]))
-    avg_frac = (np.mean(pol_t[timestart:timestop]))
-    return pol_f,pol_t,avg_frac
+    #avg_frac = (np.mean(pol_t[timestart:timestop]))
+    avg_frac = np.nanmean((pol_t[timestart:timestop])[pol_t[timestart:timestop]<=1+allowed_err])
+    avg_L = np.nanmean((L_t[timestart:timestop])[L_t[timestart:timestop]<=1+allowed_err])
+    avg_C = np.nanmean((C_t[timestart:timestop])[np.abs(C_t)[timestart:timestop]<=1+allowed_err])
+
+    #RMS error
+    sigma_frac = np.nanstd((pol_t[timestart:timestop])[pol_t[timestart:timestop]<=1+allowed_err])
+    sigma_L = np.nanstd((L_t[timestart:timestop])[L_t[timestart:timestop]<=1+allowed_err])
+    sigma_C = np.nanstd((C_t[timestart:timestop])[np.abs(C_t)[timestart:timestop]<=1+allowed_err])
+    return [(pol_f,pol_t,avg_frac,sigma_frac),(L_f,L_t,avg_L,sigma_L),(C_f,C_t,avg_C,sigma_C)]
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
 def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0):
@@ -1224,6 +1247,17 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
     #SNR matrix
     SNRs = np.zeros((len(trial_RM),len(trial_phi)))
 
+    #get snr at RM =0  to estimate significance
+    L0_t = np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)
+    sig0 = np.mean(np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)[timestart:timestop])
+    L_trial_cut1 = L0_t[timestart%(timestop-timestart):]
+    L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
+    L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
+    sigbin = np.argmax(L_trial_binned)
+    noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
+    snr0 = sig0/noise
+
+
     for i in range(len(trial_RM)):
         for j in range(len(trial_phi)):
             RM_i = trial_RM[i]
@@ -1252,7 +1286,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             noise = np.sqrt(np.mean(L_trial_binned_offp**2))
             print(noise)
             #print(sig,noise)
-            """
+            
             if i == 0:
 
                 L_trial_cut1 = L_trial_t[timestart%(timestop-timestart):]
@@ -1263,12 +1297,15 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
             else:
                 noise = noise
+            """
             SNRs[i,j] = sig/noise#np.abs(np.sum(P_trial))
 
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
     print(max_RM_idx)
     
+    significance = ((np.max(SNRs)-snr0)/snr0)
+
     if err:
         #lower = trial_RM[max_RM_idx - np.argmin(np.abs((SNRs[:max_RM_idx,0])-(np.max(SNRs[:,0]) - 1))[::-1])]
         #upper = trial_RM[max_RM_idx]-trial_RM[np.argmin(np.abs((SNRs[max_RM_idx:,0])-(np.max(SNRs[:,0]) - 1)))] + trial_RM[max_RM_idx]
@@ -1297,12 +1334,12 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 plt.show()
     else:
         RMerr = None
-    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr)
+    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,significance)
 
 #Calculate initial estimate of RM from dispersion function, then get SNR spectrum to get true estimate and error
-def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,buff=0):
+def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,buff=0,normalize=True):
     if len(I.shape) == 2:
-        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,plot=False)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,plot=False,normalize=normalize,buff=buff)
     else:
         (I_f,Q_f,U_f,V_f) = (I,Q,U,V)
 
@@ -1313,11 +1350,11 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     if len(I.shape)==2:
         #narrow down search
         trial_RM_zoom = np.linspace(RM-zoom_window,RM+zoom_window,n_trial_RM_zoom)
-        (RM,phi,SNRs,RMerr) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
+        (RM,phi,SNRs,RMerr,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
         print(r'Refined Estimate: '  + str(RM) + r'$\pm$' + str(RMerr) + r' rad/m^2')
     else:
         print("Need 2D spectra for fine estimate")
-    return (RM,phi,SNRs,RMerr)
+    return (RM,phi,SNRs,RMerr,significance)
 
 #Apply faraday calibration
 def calibrate_RM(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,RM,phi,freq_test,stokes=True):
@@ -1536,7 +1573,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff) 
         
             if get_RM:# RM_cal:
-                (RM,phi,SNRs,RMerr) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff)
+                (RM,phi,SNRs,RMerr,significance) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True)
                 if RM_cal:
                     (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM,phi,freq_test,stokes=True)
                 (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
@@ -1548,6 +1585,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
                 outdata["calibration"]["RM cal"]["trial RM"] = arr_to_list_check(trial_RM)
                 outdata["calibration"]["RM cal"]["trial phi"] = arr_to_list_check(trial_phi)
                 outdata["calibration"]["RM cal"]["SNRs"] = arr_to_list_check(SNRs)
+                outdata["calibration"]["RM cal"]["significance"] = float(significance)
                 #hdr_dict["RM"] = float(np.real(RM))
                 #hdr_dict["RMerr"] = float(np.real(RMerr))
                 #hdr_dict["phi"] = float(np.real(phi))
@@ -1559,7 +1597,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate(I_f,Q_f,U_f,V_f,(gxx,gyy),stokes=True)
             
             if get_RM:#RM_cal: 
-                (RM,phi,SNRs,RMerr) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff)
+                (RM,phi,SNRs,RMerr,significance) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff)
                 if RM_cal:
                     (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate_RM(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,RM,phi,freq_test,stokes=True)
                 outdata["calibration"]["RM cal"] = dict()
@@ -1569,6 +1607,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
                 outdata["calibration"]["RM cal"]["trial phi"] =arr_to_list_check(trial_phi)
                 outdata["calibration"]["RM cal"]["SNRs"] = arr_to_list_check(SNRs)
                 outdata["calibration"]["RM cal"]["RM error"] = float(np.real(RM_err))
+                outdata["calibration"]["RM cal"]["significance"] = float(significance)
                 #hdr_dict["RM"] = float(np.real(RM))
                 #hdr_dict["RMerr"] = float(np.real(RMerr))
                 #hdr_dict["phi"] = float(np.real(phi))
@@ -1610,24 +1649,42 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     #Dynamic Spectra
     plot_spectra_2D(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,n_f,freq_test,datadir=datadir,label=label,calstr='calstr',ext=ext,window=window,lim=lim,buff=buff)
 
-    #Polarization Angle
+    #Polarization Angle and fraction
     PA_f,PA_t,avg_PA=get_pol_angle((I_t_cal,I_f_cal),(Q_t_cal,Q_f_cal),(U_t_cal,U_f_cal),(V_t_cal,V_f_cal),width_native,t_samp,n_t,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,pre_calc_tf=True,buff=buff)
-    pol_f,pol_t,avg_pol=get_pol_fraction((I_t_cal,I_f_cal),(Q_t_cal,Q_f_cal),(U_t_cal,U_f_cal),(V_t_cal,V_f_cal),width_native,t_samp,n_t,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,pre_calc_tf=True,buff=buff)
+    (total,linear,circular)=get_pol_fraction((I_t_cal,I_f_cal),(Q_t_cal,Q_f_cal),(U_t_cal,U_f_cal),(V_t_cal,V_f_cal),width_native,t_samp,n_t,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,pre_calc_tf=True,buff=buff)
     outdata["PA"] = dict()
     outdata["PA"]["frequency"] = arr_to_list_check(PA_f)
     outdata["PA"]["time"] = arr_to_list_check(PA_t)
     outdata["PA"]["average"] = float(avg_PA)
     #hdr_dict["PA"] = float(avg_PA)
 
+
+    (pol_f,pol_t,avg_pol,sigma_pol) = total
+    (L_f,L_t,avg_L,sigma_L) = linear
+    (C_f,C_t,avg_C,sigma_C) = circular
     outdata["polarization"] = dict()
     outdata["polarization"]["frequency"] = arr_to_list_check(pol_f)
     outdata["polarization"]["time"] = arr_to_list_check(pol_t)
     outdata["polarization"]["average"] = float(avg_pol)
+    outdata["polarization"]["error"] = float(sigma_pol)
+
+    outdata["linear polarization"] = dict()
+    outdata["linear polarization"]["frequency"] = arr_to_list_check(L_f)
+    outdata["linear polarization"]["time"] = arr_to_list_check(L_t)
+    outdata["linear polarization"]["average"] = float(avg_L)
+    outdata["linear polarization"]["error"] = float(sigma_L)
+
+    outdata["circular polarization"] = dict()
+    outdata["circular polarization"]["frequency"] = arr_to_list_check(C_f)
+    outdata["circular polarization"]["time"] = arr_to_list_check(C_t)
+    outdata["circular polarization"]["average"] = float(avg_C)
+    outdata["circular polarization"]["error"] = float(sigma_C)
+
     #hdr_dict["polarization"] = float(avg_pol)
 
     #print(outdata)
     #Save to json
-    fname_json = datadir + label + "_polanalysis_out.json"
+    fname_json = datadir + label + calstr + "_polanalysis_out.json"
     print("Writing output data to " + fname_json)
     with open(fname_json, "w") as outfile:
         json.dump(outdata, outfile)
@@ -1666,7 +1723,3 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
 
     
     return outdata,fname_json,fnameI,fnameQ,fnameU,fnameV
-"""
-{'telescope_id': 66, 'az_start': 0.0, 'nbits': 32, 'source_name': 'source', 'data_type': 1, 'nchans': 6144, 'machine_id': 99, 'tsamp': 0.000131072, 'foff': -0.03051757812, 'nbeams': 172, 'fch1': 1498.75, 'tstart': 59657.932757, 'nifs': 1, 'hdrlen': 250, 'filelen': 125829370, 'nbytes': 125829120, 'nsamples': 5120, 'filename': '/home/ubuntu/sherman/scratch_weights_update_2022-06-03/220319aaeb_mark/220319aaeb_dev_0.fil', 'basename': '/home/ubuntu/sherman/scratch_weights_update_2022-06-03/220319aaeb_mark/220319aaeb_dev_0', 'hdrlens': [250], 'datalens': [125829120], 'nsamples_list': [5120], 'tstart_list': [59657.932757], 'filenames': ['/home/ubuntu/sherman/scratch_weights_update_2022-06-03/220319aaeb_mark/220319aaeb_dev_0.fil'], 'extension': '.fil', 'bandwidth': 187.49999996928, 'ftop': 1498.76525878906, 'fbottom': 1311.26525881978, 'fcenter': 1405.01525880442, 'tobs': 0.67108864, 'src_raj': 0, 'src_dej': 0, 'ra': '00:00:00.0000', 'dec': '00:00:00.0000', 'ra_rad': 0.0, 'dec_rad': 0.0, 'ra_deg': 0.0, 'dec_deg': 0.0, 'obs_date': '19/03/2022', 'obs_time': '22:23:10.20480', 'dtype': dtype('float32')}
-
-"""
