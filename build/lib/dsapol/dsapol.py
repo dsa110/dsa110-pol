@@ -497,7 +497,7 @@ def find_peak(I,width_native,t_samp,peak_range=None,pre_calc_tf=False,buff=0):
 
     offset = np.argmax(snr)
     timestart = peak-offset-buff
-    timestop = peak+width-offset+buff
+    timestop = peak+width-offset+buff+1
     return (peak, timestart, timestop)
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays

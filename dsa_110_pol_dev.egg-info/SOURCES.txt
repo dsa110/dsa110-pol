@@ -4,7 +4,6 @@ environment.yml
 files.txt
 requirements.txt
 setup.py
-test.fil
 .github/workflows/workflow.yml
 .ipynb_checkpoints/Calibrator_UpperLimit_Testing-checkpoint.ipynb
 .ipynb_checkpoints/Mark_RM_Testing-V2-checkpoint.ipynb

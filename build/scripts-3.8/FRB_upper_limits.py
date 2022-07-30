@@ -9,15 +9,16 @@ from scipy.optimize import curve_fit
 def gaussian(x,amp,mean,sigma):
     return amp*np.exp(-0.5*((x-mean)**2)/sigma**2)
 
-ids=["220121aaat", "220204aaai", "220207aabh", "220208aaaa", "220307aaae", "220310aaam", "220319aaeb", "220330aaan", "220418aaai", "220424aabq", "220506aabd", "220426aaaw"]
-nicknames=["clare", "fen", "zach", "ishita" ,"alex", "whitney" ,"mark", "erdos", "quincy" ,"davina", "oran", "jackie"]
-widths=[8,4,2,16,2,4,1,32,4,2,2,2]
-plot=True
+ids=["220319aaeb"]#["220121aaat", "220204aaai", "220207aabh", "220208aaaa", "220307aaae", "220310aaam", "220319aaeb", "220330aaan", "220418aaai", "220424aabq", "220506aabd", "220426aaaw"]
+nicknames=["mark"]#["clare", "fen", "zach", "ishita" ,"alex", "whitney" ,"mark", "erdos", "quincy" ,"davina", "oran", "jackie"]
+widths=[1]#[8,4,2,16,2,4,1,32,4,2,2,2]
+plot=False
 
 #Get gain and phase cal errors and generate sample |gxx|/|gyy| and phi_xx-phi_yy
 
 trials = 1000
 conf = 0.95
+extra = "_NOPADDING"
 
 #gain (default 3C48ane)
 datadir_gain = '/home/ubuntu/sherman/scratch_weights_update_2022-06-03/3C48/'
@@ -147,7 +148,7 @@ if plot:
     #plt.xlim(3812,3816)
     plt.ylim(0,2)
     plt.legend()
-    plt.savefig(datadir_gain + "/UPPERLIMIT_TRIALS_GAIN_" + IMAGELABEL_GAIN + ".pdf")
+    plt.savefig(datadir_gain + "/UPPERLIMIT_TRIALS_GAIN_" + IMAGELABEL_GAIN + extra + ".pdf")
     plt.close(f)
 
     f=plt.figure()
@@ -167,7 +168,7 @@ if plot:
     #plt.xlim(3812,3816)
     plt.ylim(-2*np.pi,2*np.pi)
     plt.legend()
-    plt.savefig(datadir_phase + "/UPPERLIMIT_TRIALS_PHASE_" + IMAGELABEL_PHASE + "--2.pdf")
+    plt.savefig(datadir_phase + "/UPPERLIMIT_TRIALS_PHASE_" + IMAGELABEL_PHASE + extra + "--2.pdf")
     plt.close(f)
 
 
@@ -203,7 +204,7 @@ if plot:
     #plt.plot(b[:-1] + (b[2]-b[1])/2,hist,label)
     plt.xlabel(r'$|g_{xx}|/|g_{yy}|$')
     plt.legend()
-    plt.savefig(datadir_gain + "/UPPERLIMIT_GAIN_" + IMAGELABEL_GAIN + ".pdf")
+    plt.savefig(datadir_gain + "/UPPERLIMIT_GAIN_" + IMAGELABEL_GAIN + extra + ".pdf")
     plt.close(f)
 
 
@@ -266,7 +267,7 @@ for i in range(len(nicknames)):
     n_f=32
     nsamps=5120
     deg=10  
-    buff = 1
+    buff = 0
 
     #Calculate polarization fraction estimates
     (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = dsapol.get_stokes_2D(datadir,ids[i] + '_dev',nsamps,n_t=n_t,n_f=n_f,n_off=3000,sub_offpulse_mean=True)#("/home/ubuntu/sherman/scratch_weights_update_2022-06-03/220319aaeb_mark/","220319aaeb_dev",5120,n_f=32)
@@ -285,7 +286,7 @@ for i in range(len(nicknames)):
         (I_cal_f_sim,Q_cal_f_sim,U_cal_f_sim,V_cal_f_sim) = dsapol.get_stokes_vs_freq(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_f,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
         (I_cal_t_sim,Q_cal_t_sim,U_cal_t_sim,V_cal_t_sim) = dsapol.get_stokes_vs_time(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_t,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
 
-        p_f,p_t,avg = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True)
+        [(p_f,p_t,avg,sigma_frac),tmp_L,tmp_C] = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True)
         #p_t = np.sqrt(Q_cal_t_sim**2 + U_cal_t_sim**2)/I_cal_t_sim
         #avg = np.mean(p_t[timestart:timestop])
 
@@ -297,7 +298,7 @@ for i in range(len(nicknames)):
         (I_cal_f_sim,Q_cal_f_sim,U_cal_f_sim,V_cal_f_sim) = dsapol.get_stokes_vs_freq(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_f,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
         (I_cal_t_sim,Q_cal_t_sim,U_cal_t_sim,V_cal_t_sim) = dsapol.get_stokes_vs_time(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_t,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
 
-        p_f,p_t,avg = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True)
+        [(p_f,p_t,avg,sigma_frac),tmp_L,tmp_C] = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True)
         #p_t = np.sqrt(Q_cal_t_sim**2 + U_cal_t_sim**2)/I_cal_t_sim
         #avg = np.mean(p_t[timestart:timestop])
 
@@ -307,6 +308,9 @@ for i in range(len(nicknames)):
     p_t_trials = np.array(p_t_trials)
     p_t_trials_fit = np.array(p_t_trials_fit)
 
+    print(p_t_trials.shape)
+    print(p_t_trials[0,:].shape)
+    print(p_t_trials[:,0].shape)
 
     if plot:
         f = plt.figure()
@@ -325,7 +329,7 @@ for i in range(len(nicknames)):
         plt.xlim(timestart,timestop)
         plt.ylim(0,1.5)
         plt.legend()
-        plt.savefig(datadir + "/UPPERLIMIT_TRIALS_" + IMAGELABEL + ".pdf")
+        plt.savefig(datadir + "/UPPERLIMIT_TRIALS_" + IMAGELABEL + extra + ".pdf")
         plt.close(f)
 
 
@@ -366,11 +370,11 @@ for i in range(len(nicknames)):
         plt.axvline(Upperlimit_fit,ls='--',color=p1[0].get_color(),label="95% Confidence Level (fit)")
         plt.xlabel("Polarization Fraction")
         plt.legend()
-        plt.savefig(datadir + "/UPPERLIMIT_" + IMAGELABEL + ".pdf")
+        plt.savefig(datadir + "/UPPERLIMIT_" + IMAGELABEL + extra + ".pdf")
         #plt.show()
         plt.close(f)
     #save to json
-    fname_json = datadir + label + "_upperlimit_out.json"
+    fname_json = datadir + label + "_upperlimit_out" + extra + ".json"
     print("Writing output data to " + fname_json)
     with open(fname_json, "w") as outfile:
         json.dump(outdict, outfile)
