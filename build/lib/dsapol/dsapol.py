@@ -3,7 +3,7 @@ Library of functions for polarization analysis of
 DSA-110 data. 
 """
 
-
+import copy
 import numpy as np
 from sigpyproc import FilReader
 from sigpyproc.Filterbank import FilterbankBlock
@@ -129,6 +129,27 @@ def avg_freq(arr,n): #averages freq axis over n samples
         return
     return ((arr).reshape(-1,n,arr.shape[1]).mean(1))
 
+def find_bad_channels(I):
+    bad_chans = []
+    for chan in range(I.shape[0]):
+        if np.all(I[chan,:] == 0):
+            bad_chans.append(chan)
+    return bad_chans
+
+def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
+    Ifix = copy.deepcopy(I)
+    Qfix = copy.deepcopy(Q)
+    Ufix = copy.deepcopy(U)
+    Vfix = copy.deepcopy(V)
+    for i in range(iters):
+        for bad_chan in bad_chans:
+            Ifix[bad_chan,:] = np.mean(Ifix[bad_chan-10:bad_chan+10,:],axis=0)
+            Qfix[bad_chan,:] = np.mean(Qfix[bad_chan-10:bad_chan+10,:],axis=0)
+            Ufix[bad_chan,:] = np.mean(Ufix[bad_chan-10:bad_chan+10,:],axis=0)
+            Vfix[bad_chan,:] = np.mean(Vfix[bad_chan-10:bad_chan+10,:],axis=0)
+            
+    return (Ifix,Qfix,Ufix,Vfix)
+
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
 def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True):
     """
@@ -160,6 +181,11 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     I,Q,U,V = avg_time(sarr[0],n_t),avg_time(sarr[1],n_t),avg_time(sarr[2],n_t),avg_time(sarr[3],n_t)
     I,Q,U,V = avg_freq(I,n_f),avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
     
+    bad_chans = find_bad_channels(I)
+    (I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
+
+
+
     #Subtract off-pulse mean
     if sub_offpulse_mean:
         offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=True) 
@@ -219,7 +245,7 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         timestop = I.shape[1]
         #suboffp = 0
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,buff=buff) 
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff) 
         #suboffp = 1
     
     if normalize:
@@ -253,7 +279,7 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
     return (I_t,Q_t,U_t,V_t)
 
 #Get time averaged (over given width) stokes params vs freq; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=False,buff=0):
+def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=False,buff=0,weighted=False):
     """
     This function calculates the time averaged (over width of pulse) frequency spectra for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -272,6 +298,7 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,n_off=3000,plot
             show --> bool, if True, displays images with matplotlib
             normalize --> bool, if True subtracts off-pulse mean on each channel and divides by off-pulse standard deviation
             buff --> int, number of samples to buffer either side of pulse if needed
+            weigthed --> bool, if True, obtains optimal spectrum by weighting by frequency averaged SNR
     Outputs: (I_f,Q_f,U_f,V_f) --> 1D frequency spectra of each stokes parameter, IQUV respectively
 
 
@@ -281,8 +308,21 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,n_off=3000,plot
         timestart = 0
         timestop = I.shape[1]
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,buff=buff)
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
+
+    #optimal weighting
+    if weighted:
+        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off,normalize=True,buff=buff) #note normalization always used to get SNR
+        I_t_weights = np.array([I_t]*I.shape[0])
+        Q_t_weights = np.array([Q_t]*Q.shape[0])
+        U_t_weights = np.array([U_t]*U.shape[0])
+        V_t_weights = np.array([V_t]*V.shape[0])
     
+        I = I*I_t_weights
+        Q = Q*Q_t_weights
+        U = U*U_t_weights
+        V = V*V_t_weights
+
     if normalize:
         I_f = (I[:,timestart:timestop].mean(1) - I[:,:n_off].mean(1))/np.std(np.mean(I[:,:n_off],axis=0))#I[:,:n_off].std(1)
         Q_f = (Q[:,timestart:timestop].mean(1) - Q[:,:n_off].mean(1))/np.std(np.mean(Q[:,:n_off],axis=0))#Q[:,:n_off].std(1)
@@ -340,7 +380,7 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,datadir=DEFAUL
         timestop = I.shape[1]
         window = 0
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,buff=buff)    
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
 
     #Dynamic Spectra
     f=plt.figure(figsize=(25,15))
@@ -432,7 +472,7 @@ def plot_timestream_1D(I_t,Q_t,U_t,V_t,width_native,t_samp,n_t,datadir='',label=
         timestart = 0
         timestop = I.shape[1]
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,buff=buff)
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
 
 
     f=plt.figure(figsize=(12,6))
@@ -453,24 +493,26 @@ def plot_timestream_1D(I_t,Q_t,U_t,V_t,width_native,t_samp,n_t,datadir='',label=
 
 
 #Convert width from 256 us samples to fil file native sampling rate (sampling time in seconds)
-def convert_width(width_native,t_samp):
+def convert_width(width_native,t_samp,n_t):
     """
     This function converts the given pulse width in 256 us samples to samples in 
     the fil file native sampling rate given
     Inputs: width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
             t_samp --> float, sampling time
+            n_t --> int, number of time samples binned by
     Outputs: width --> int, width in samples of given sample rate
     """
-    return int(np.ceil(width_native*(256e-6)/t_samp))
+    return int(np.ceil(width_native*(256e-6)/(n_t*t_samp)))
 
 #Find peak, start sample, stop sample from I (frequency averaged)
-def find_peak(I,width_native,t_samp,peak_range=None,pre_calc_tf=False,buff=0):
+def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0):
     """
     This function finds the peak sample in the intensity dynamic spectrum and the 
     start and end sample such that the SNR within the start and end is maximized.
     Inputs: I --> 2D array or 1D array, dynamic spectrum of I generated with get_stokes_2D() or 1D spectrum generated with get_stokes_vs_freq()
             width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
             t_samp --> float, sampling time
+            n_t --> int, number of time samples binned by
             peak_range --> tuple, optionally specify time sample range in which to search for the peak
             pre_calc_tf --> bool, set if I is frequency averaged time series
             buff --> int, number of samples to buffer either side of pulse if needed
@@ -479,7 +521,7 @@ def find_peak(I,width_native,t_samp,peak_range=None,pre_calc_tf=False,buff=0):
             timestop --> int, time sample at end of pulse
     """
     #get width
-    width = convert_width(width_native,t_samp)
+    width = convert_width(width_native,t_samp,n_t)
 
     #frequency averaged
     if pre_calc_tf:
@@ -501,7 +543,7 @@ def find_peak(I,width_native,t_samp,peak_range=None,pre_calc_tf=False,buff=0):
     return (peak, timestart, timestop)
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
-def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0):
+def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False):
     """
     This function calculates and plots the polarization fraction averaged over both time and 
     frequency, and the average polarization fraction within the peak.
@@ -520,6 +562,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
             ext --> str, image file extension (png, pdf, etc.)
             show --> bool, if True, displays images with matplotlib
             buff --> int, number of samples to buffer either side of pulse if needed
+            full --> bool, if True, calculates polarization vs frequency and time before averaging
     Outputs: pol_f --> 1D array, frequency dependent polarization
              pol_t --> 1D array, time dependent polarization
              avg --> float, frequency and time averaged polarization fraction
@@ -532,24 +575,37 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         (V_t,V_f) = V
     else:
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize)
-        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,n_off=n_off,plot=False,normalize=normalize)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=n_off,plot=False,normalize=normalize)
     
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0
         timestop = len(I_t)#I.shape[1]
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,pre_calc_tf=pre_calc_tf,buff=buff)
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,pre_calc_tf=pre_calc_tf,buff=buff)
 
-    #total polarization
-    pol_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2)/(np.array(I_f)**2))
-    pol_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
-    #linear polarization
-    L_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2)/(np.array(I_f)**2))
-    L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2)/(np.array(I_t)**2))
-    #circular polarization
-    C_f = V_f/I_f
-    C_t = V_t/I_t
+    if full:
+        #total polarization
+        pol = np.sqrt(Q**2 + U**2 + V**2)
+        pol_f = np.nanmean(pol,axis=1)/I_f
+        pol_t = np.nanmean(pol,axis=0)/I_t
+        #linear polarization
+        L = np.sqrt(Q**2 + U**2)
+        L_f = np.nanmean(L,axis=1)/I_f
+        L_t = np.nanmean(L,axis=0)/I_t
+        #circular polarization
+        C_f = np.nanmean(V,axis=1)/I_f
+        C_t = np.nanmean(V,axis=0)/I_t
+    else:
+        #total polarization
+        pol_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2)/(np.array(I_f)**2))
+        pol_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
+        #linear polarization
+        L_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2)/(np.array(I_f)**2))
+        L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2)/(np.array(I_t)**2))
+        #circular polarization
+        C_f = V_f/I_f
+        C_t = V_t/I_t
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -626,14 +682,14 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
         (V_t,V_f) = V
     else:
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize)
-        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,n_off=n_off,plot=False,normalize=normalize)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=n_off,plot=False,normalize=normalize)
 
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0
         timestop = len(I_t)#I.shape[1]
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,pre_calc_tf=pre_calc_tf,buff=buff)
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,pre_calc_tf=pre_calc_tf,buff=buff)
 
     PA_f = np.angle(Q_f +1j*U_f)#np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2)/(np.array(I_f)**2))
     PA_t = np.angle(Q_t +1j*U_t)#np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
@@ -890,7 +946,7 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
         label = source_name + obs_names[i] + suffix
         sdir = datadir + label
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
-        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,freq_test,plot=plot,datadir=datadir,label=label)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,plot=plot,datadir=datadir,label=label)
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,-1,fobj.header.tsamp,n_t,plot=plot,datadir=datadir,label=label,normalize=False)
         ratio,fit_params = gaincal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label)
         
@@ -936,7 +992,7 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
         label = source_name + obs_names[i] + suffix
         sdir = datadir + label
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
-        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,freq_test,plot=plot,datadir=datadir,label=label)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,plot=plot,datadir=datadir,label=label)
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,-1,fobj.header.tsamp,n_t,plot=plot,datadir=datadir,label=label,normalize=False)
         phase_diff,fit_params = phasecal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label)
         phase_diff_all.append(phase_diff)
@@ -1238,7 +1294,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         timestart = 0
         timestop = I.shape[1]
     else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,buff=buff)
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
 
 
     #Calculate polarization
@@ -1312,11 +1368,17 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         
         check_lower = (SNRs[:max_RM_idx,0])[::-1]
         lower_idx = max_RM_idx - 1 - np.argmin(np.abs(check_lower-(SNRs[max_RM_idx] - 1)))
-        lower = trial_RM[lower_idx]
+        if SNRs[lower_idx] > SNRs[max_RM_idx] - 1:
+            lower = 0
+        else:
+            lower = trial_RM[lower_idx]
 
         check_upper = (SNRs[max_RM_idx:,0])
         upper_idx = max_RM_idx + np.argmin(np.abs(check_upper-(SNRs[max_RM_idx] - 1)))
-        upper = trial_RM[upper_idx]
+        if SNRs[upper_idx] > SNRs[max_RM_idx] - 1:
+            upper = len(SNRs)-1
+        else:
+            upper = trial_RM[upper_idx]
         RMerr = (upper-lower)/2
     
         if plot:
@@ -1339,12 +1401,12 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 #Calculate initial estimate of RM from dispersion function, then get SNR spectrum to get true estimate and error
 def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,buff=0,normalize=True):
     if len(I.shape) == 2:
-        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,plot=False,normalize=normalize,buff=buff)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=False,normalize=normalize,buff=buff)
     else:
         (I_f,Q_f,U_f,V_f) = (I,Q,U,V)
 
     #run initial faraday peak finding
-    (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window)
+    (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window,err=False)
     print(r'Initial Estimate: ' + str(RM) + r'$\pm$' + str(RMerr) + ' rad/m^2')
     print("SHAPE:" + str(I.shape))   
     if len(I.shape)==2:
@@ -1488,6 +1550,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     cal1str = ''
     RM_calstr = ''
     cal_2Dstr = ''
+    cal_fitstr = ''
     if cal:
         cal1str = 'calibrated'
         hdr_dict["calibrated"] = True
@@ -1497,7 +1560,9 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     if cal_2D:
         cal_2Dstr = '2D_calibrated'
         hdr_dict["2D calibrated"] = True
-
+    if not use_fit:
+        cal_fitstr = 'nocalfit'
+    
     #Modify header parameters
     hdr_dict["tsamp"] = hdr_dict["tsamp"]*n_t
     hdr_dict["nsamples"] = int(hdr_dict["nsamples"]/n_t)
@@ -1505,7 +1570,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     hdr_dict["nchans"] = int(hdr_dict["nchans"]/n_f)
 
 
-    calstr = "_" + cal1str + "_" + RM_calstr + "_" + cal_2Dstr + "_"
+    calstr = "_" + cal1str + "_" + RM_calstr + "_" + cal_2Dstr + "_" + cal_fitstr + "_"
     
     outdata =dict()
     outdata["calibration"]=dict()
@@ -1569,14 +1634,14 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
         if cal_2D:
             outdata["calibration"]["2D cal"] = True
             (I_cal,Q_cal,U_cal,V_cal) = calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
-            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
+            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
             (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff) 
         
             if get_RM:# RM_cal:
                 (RM,phi,SNRs,RMerr,significance) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True)
                 if RM_cal:
                     (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM,phi,freq_test,stokes=True)
-                (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
+                (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
                 (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
                 outdata["calibration"]["RM cal"] = dict()
                 outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM))
@@ -1593,7 +1658,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             outdata["calibration"]["2D cal"] = False
             (I_cal,Q_cal,U_cal,V_cal) = (I,Q,U,V)#calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
             (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
-            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
+            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
             (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate(I_f,Q_f,U_f,V_f,(gxx,gyy),stokes=True)
             
             if get_RM:#RM_cal: 
@@ -1633,7 +1698,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     else:
         (I_cal,Q_cal,U_cal,V_cal) = (I,Q,U,V)
         (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
-        (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
+        (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
         outdata["pre-cal"]["time"] = dict()
         outdata["pre-cal"]["time"]["I_t"] = arr_to_list_check(I_t_cal)
         outdata["pre-cal"]["time"]["Q_t"] = arr_to_list_check(Q_t_cal)
