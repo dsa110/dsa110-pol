@@ -13,7 +13,7 @@ import pylab
 import pickle
 import json
 
-ext= ".png"
+ext= ".pdf"
 DEFAULT_DATADIR = "/home/ubuntu/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
 
 #Reads in stokes parameter data from specified directory
@@ -313,10 +313,10 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
     #optimal weighting
     if weighted:
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off,normalize=True,buff=buff) #note normalization always used to get SNR
-        I_t_weights = np.array([I_t]*I.shape[0])
-        Q_t_weights = np.array([Q_t]*Q.shape[0])
-        U_t_weights = np.array([U_t]*U.shape[0])
-        V_t_weights = np.array([V_t]*V.shape[0])
+        I_t_weights = np.abs(np.array([I_t]*I.shape[0]))
+        Q_t_weights = np.abs(np.array([Q_t]*Q.shape[0]))
+        U_t_weights = np.abs(np.array([U_t]*U.shape[0]))
+        V_t_weights = np.abs(np.array([V_t]*V.shape[0]))
     
         I = I*I_t_weights
         Q = Q*Q_t_weights
@@ -333,6 +333,12 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
         Q_f = Q[:,timestart:timestop].mean(1)
         U_f = U[:,timestart:timestop].mean(1)
         V_f = V[:,timestart:timestop].mean(1)
+
+    if weighted:
+        I_f = I_f*(timestop-timestart)/np.sum(I_t_weights[0,timestart:timestop])
+        Q_f = Q_f*(timestop-timestart)/np.sum(Q_t_weights[0,timestart:timestop])
+        U_f = U_f*(timestop-timestart)/np.sum(U_t_weights[0,timestart:timestop])
+        V_f = V_f*(timestop-timestart)/np.sum(V_t_weights[0,timestart:timestop])
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -1399,7 +1405,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
     return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,significance)
 
 #Calculate initial estimate of RM from dispersion function, then get SNR spectrum to get true estimate and error
-def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,buff=0,normalize=True):
+def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,n_off=3000,show=False,fit_window=100,buff=0,normalize=True,DM=-1):
     if len(I.shape) == 2:
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=False,normalize=normalize,buff=buff)
     else:
@@ -1407,7 +1413,16 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
 
     #run initial faraday peak finding
     (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window,err=False)
-    print(r'Initial Estimate: ' + str(RM) + r'$\pm$' + str(RMerr) + ' rad/m^2')
+
+    #estimate p-value
+    sigma_Q = np.std(Q[:,:n_off])
+    sigma_U = np.std(U[:,:n_off])
+    sigma = (sigma_Q + sigma_U)/2
+
+    peak_chi2 = (np.max(SNRs)**2)/((Q.shape[0]/Q.shape[1])*(sigma**2))
+
+    p_val = chi2.sf(peak_chi2,df=2)
+    print(r'Initial Estimate: ' + str(RM) + r'$\pm$' + str(RMerr) + ' rad/m^2, p-value: ' + str(p_val))
     print("SHAPE:" + str(I.shape))   
     if len(I.shape)==2:
         #narrow down search
@@ -1416,7 +1431,14 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
         print(r'Refined Estimate: '  + str(RM) + r'$\pm$' + str(RMerr) + r' rad/m^2')
     else:
         print("Need 2D spectra for fine estimate")
-    return (RM,phi,SNRs,RMerr,significance)
+
+    #Estimate B field
+    if DM != -1:
+        B = RM/((0.81)*DM) #uG
+    else:
+        B = None
+
+    return (RM,phi,SNRs,RMerr,p_val,B)
 
 #Apply faraday calibration
 def calibrate_RM(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,RM,phi,freq_test,stokes=True):
@@ -1539,7 +1561,7 @@ def arr_to_list_check(x):
 
 
 #Plotting Functions
-def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0):
+def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1):
     if n_trial_RM_zoom == -1:
         n_trial_RM_zoom = len(trial_RM)
     
@@ -1638,7 +1660,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff) 
         
             if get_RM:# RM_cal:
-                (RM,phi,SNRs,RMerr,significance) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True)
+                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True,DM=DM)
                 if RM_cal:
                     (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM,phi,freq_test,stokes=True)
                 (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
@@ -1650,7 +1672,9 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
                 outdata["calibration"]["RM cal"]["trial RM"] = arr_to_list_check(trial_RM)
                 outdata["calibration"]["RM cal"]["trial phi"] = arr_to_list_check(trial_phi)
                 outdata["calibration"]["RM cal"]["SNRs"] = arr_to_list_check(SNRs)
-                outdata["calibration"]["RM cal"]["significance"] = float(significance)
+                outdata["calibration"]["RM cal"]["p-value"] = float(significance)
+                if DM != -1:
+                    outdata["calibration"]["RM cal"]["B field (uG)"] = float(B)
                 #hdr_dict["RM"] = float(np.real(RM))
                 #hdr_dict["RMerr"] = float(np.real(RMerr))
                 #hdr_dict["phi"] = float(np.real(phi))
@@ -1662,7 +1686,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate(I_f,Q_f,U_f,V_f,(gxx,gyy),stokes=True)
             
             if get_RM:#RM_cal: 
-                (RM,phi,SNRs,RMerr,significance) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff)
+                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,DM=DM)
                 if RM_cal:
                     (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate_RM(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,RM,phi,freq_test,stokes=True)
                 outdata["calibration"]["RM cal"] = dict()
@@ -1672,7 +1696,9 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
                 outdata["calibration"]["RM cal"]["trial phi"] =arr_to_list_check(trial_phi)
                 outdata["calibration"]["RM cal"]["SNRs"] = arr_to_list_check(SNRs)
                 outdata["calibration"]["RM cal"]["RM error"] = float(np.real(RM_err))
-                outdata["calibration"]["RM cal"]["significance"] = float(significance)
+                outdata["calibration"]["RM cal"]["p-value"] = float(significance)
+                if DM != -1:
+                    outdata["calibration"]["RM cal"]["B field (uG)"] = float(B)
                 #hdr_dict["RM"] = float(np.real(RM))
                 #hdr_dict["RMerr"] = float(np.real(RMerr))
                 #hdr_dict["phi"] = float(np.real(phi))
