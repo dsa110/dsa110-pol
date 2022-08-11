@@ -182,7 +182,10 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     print("Binning by " + str(n_t)  + " in time")
     print("Binning by " + str(n_f) + " in frequency")
     #timeaxis = np.arange(fobj.header.tstart*86400, fobj.header.tstart*86400 + fobj.header.tsamp*fobj.header.nsamples/n_t, fobj.header.tsamp*n_t)
-    timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//n_t)
+    if fobj.header.nsamples == 5120:
+        timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//n_t)
+    else:
+        timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//n_t)
     I,Q,U,V = avg_time(sarr[0],n_t),avg_time(sarr[1],n_t),avg_time(sarr[2],n_t),avg_time(sarr[3],n_t)
     I,Q,U,V = avg_freq(I,n_f),avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
     
@@ -366,9 +369,9 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
         (I_t_weights,Q_t_weights,U_t_weights,V_t_weights) = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight)
 
         I = I*I_t_weights
-        Q = Q*Q_t_weights
-        U = U*U_t_weights
-        V = V*V_t_weights
+        Q = Q*I_t_weights
+        U = U*I_t_weights
+        V = V*I_t_weights
 
     if normalize:
         I_f = (I[:,timestart:timestop].mean(1) - I[:,:n_off].mean(1))/np.std(np.mean(I[:,:n_off],axis=0))#I[:,:n_off].std(1)
