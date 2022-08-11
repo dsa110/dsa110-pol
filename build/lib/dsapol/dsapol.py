@@ -114,6 +114,7 @@ def avg_time(arr,n): #averages time axis over n samples
         print("array size must be divisible by n")
         return
     return ((arr.transpose()).reshape(-1,n,arr.shape[0]).mean(1)).transpose()
+    #return ((arr.transpose()).reshape(-1,n,arr.shape[0]).mean(1)).transpose()
 
 
 #Bin 2d (n_f x n_t) array by n samples on n_f axis
@@ -288,7 +289,10 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
 
     #Bin to optimal time binning
     Ib,Qb,Ub,Vb = avg_time(I,n_t_weight),avg_time(Q,n_t_weight),avg_time(U,n_t_weight),avg_time(V,n_t_weight)
-    timeaxisb = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//(n_t*n_t_weight))
+    if fobj.header.nsamples == 5120:
+        timeaxisb = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//(n_t*n_t_weight))
+    else:
+        timeaxisb = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//(n_t*n_t_weight))
 
     #Calculate weights
     (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(Ib,Qb,Ub,Vb,width_native,t_samp,n_t*n_t_weight,n_off//n_t_weight,normalize=True,buff=buff) #note normalization always used to get SNR
@@ -299,10 +303,11 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
     fU = interp1d(timeaxisb,U_t,kind="quadratic",fill_value="extrapolate")
     fV = interp1d(timeaxisb,V_t,kind="quadratic",fill_value="extrapolate")
 
-    I_t_weight = fI(timeaxis)
-    Q_t_weight = fQ(timeaxis)
-    U_t_weight = fU(timeaxis)
-    V_t_weight = fV(timeaxis)
+    #divide by sum to normalize to 1
+    I_t_weight = fI(timeaxis)/np.sum(fI(timeaxis))
+    Q_t_weight = fQ(timeaxis)/np.sum(fQ(timeaxis))
+    U_t_weight = fU(timeaxis)/np.sum(fU(timeaxis))
+    V_t_weight = fV(timeaxis)/np.sum(fV(timeaxis))
 
     #repeat over frequency
     I_weight = np.abs(np.array([I_t_weight]*I.shape[0]))
@@ -376,11 +381,11 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
         U_f = U[:,timestart:timestop].mean(1)
         V_f = V[:,timestart:timestop].mean(1)
 
-    if weighted:
-        I_f = I_f*(timestop-timestart)/np.sum(I_t_weights[0,timestart:timestop])
-        Q_f = Q_f*(timestop-timestart)/np.sum(Q_t_weights[0,timestart:timestop])
-        U_f = U_f*(timestop-timestart)/np.sum(U_t_weights[0,timestart:timestop])
-        V_f = V_f*(timestop-timestart)/np.sum(V_t_weights[0,timestart:timestop])
+    #if weighted:
+    #    I_f = I_f*np.sum(I_t_weights[0,timestart:timestop])
+    #    Q_f = Q_f*np.sum(Q_t_weights[0,timestart:timestop])
+    #    U_f = U_f*np.sum(U_t_weights[0,timestart:timestop])
+    #    V_f = V_f*np.sum(V_t_weights[0,timestart:timestop])
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -1416,17 +1421,41 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         
         check_lower = (SNRs[:max_RM_idx,0])[::-1]
         lower_idx = max_RM_idx - 1 - np.argmin(np.abs(check_lower-(SNRs[max_RM_idx] - 1)))
+        """
         if SNRs[lower_idx] > SNRs[max_RM_idx] - 1:
             lower = 0
         else:
-            lower = trial_RM[lower_idx]
+        """
+        lower = trial_RM[lower_idx]
 
         check_upper = (SNRs[max_RM_idx:,0])
         upper_idx = max_RM_idx + np.argmin(np.abs(check_upper-(SNRs[max_RM_idx] - 1)))
+        """
         if SNRs[upper_idx] > SNRs[max_RM_idx] - 1:
             upper = len(SNRs)-1
         else:
-            upper = trial_RM[upper_idx]
+        """
+        upper = trial_RM[upper_idx]
+        
+        check_lower = SNRs[:np.argmax(SNRs)][::-1]
+
+        lower_idx = len(check_lower)-1
+        for i in range(len(check_lower)):#ts in testsnrs:
+            if check_lower[i] < np.max(SNRs) -1:
+                lower_idx = np.argmax(SNRs) - i
+                break
+        lower = trial_RM[lower_idx]
+
+
+        check_upper = SNRs[np.argmax(SNRs):]
+
+        upper_idx = len(check_upper)-1
+        for i in range(len(check_upper)):#ts in testsnrs:
+            if check_upper[i] < np.max(SNRs) -1:
+                upper_idx = np.argmax(SNRs) - i
+                break
+        upper = trial_RM[upper_idx]
+
         RMerr = (upper-lower)/2
     
         if plot:
@@ -1454,7 +1483,7 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
         (I_f,Q_f,U_f,V_f) = (I,Q,U,V)
 
     #run initial faraday peak finding
-    (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window,err=False)
+    (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window,err=True)
 
     #estimate p-value
     sigma_Q = np.std(Q[:,:n_off])

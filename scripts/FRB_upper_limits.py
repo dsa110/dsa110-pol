@@ -28,13 +28,13 @@ IMAGELABEL_GAIN=source_name + obs_name + "TEST"
 suffix='_dev'
 n_t=1
 n_f=32
-nsamps=5120
+nsamps=20480
 deg=10
 
 label = source_name + obs_name + suffix
 sdir = datadir_gain + label
 (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = dsapol.get_stokes_2D(datadir_gain,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
-(I_f,Q_f,U_f,V_f) = dsapol.get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,freq_test,datadir=datadir_gain,label=label,plot=False,show=False,normalize=False)
+(I_f,Q_f,U_f,V_f) = dsapol.get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,datadir=datadir_gain,label=label,plot=False,show=False,normalize=False)
 
 #errors in stokes parameters
 I_err_f = I.std(1)/np.sqrt(I.shape[1])
@@ -83,13 +83,13 @@ IMAGELABEL_PHASE=source_name + obs_name + "TEST"
 suffix='_dev'
 n_t=1
 n_f=32
-nsamps=5120
+nsamps=20480
 deg=10
 
 label = source_name + obs_name + suffix
 sdir = datadir_phase + label
 (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = dsapol.get_stokes_2D(datadir_phase,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
-(I_f,Q_f,U_f,V_f) = dsapol.get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,freq_test,datadir=datadir_phase,label=label,plot=False,show=False,normalize=False)
+(I_f,Q_f,U_f,V_f) = dsapol.get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,datadir=datadir_phase,label=label,plot=False,show=False,normalize=False)
 
 #errors in stokes parameters
 I_err_f = I.std(1)/np.sqrt(I.shape[1])
@@ -245,7 +245,7 @@ if plot:
 
 
 #Loop through FRBs
-for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
+for i in [6]:#[0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
     outdict = dict() #for saving data to json file
     outdict["trials"] = trials
     outdict["gain_avg"] = MEANGAIN
@@ -265,14 +265,15 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
     suffix='_dev'
     n_t=1
     n_f=32
-    nsamps=5120
+    nsamps=20480
     deg=10  
     buff = 0
+    width = widths[i]
 
     #Calculate polarization fraction estimates
-    (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = dsapol.get_stokes_2D(datadir,ids[i] + '_dev',nsamps,n_t=n_t,n_f=n_f,n_off=3000,sub_offpulse_mean=True)#("/home/ubuntu/sherman/scratch_weights_update_2022-06-03/220319aaeb_mark/","220319aaeb_dev",5120,n_f=32)
-    (I_cal_f_sim,Q_cal_f_sim,V_cal_f_sim,U_cal_f_sim) = dsapol.get_stokes_vs_freq(I,Q,U,V,1,fobj.header.tsamp,n_f,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
-    peak,timestart,timestop=dsapol.find_peak(I, 1, fobj.header.tsamp,buff=buff)
+    (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = dsapol.get_stokes_2D(datadir,ids[i] + '_dev',nsamps,n_t=n_t,n_f=n_f,n_off=12000,sub_offpulse_mean=True)#("/home/ubuntu/sherman/scratch_weights_update_2022-06-03/220319aaeb_mark/","220319aaeb_dev",5120,n_f=32)
+    (I_cal_f_sim,Q_cal_f_sim,V_cal_f_sim,U_cal_f_sim) = dsapol.get_stokes_vs_freq(I,Q,U,V,width,fobj.header.tsamp,n_f,n_t,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True,weighted=True,n_t_weight=2,timeaxis=timeaxis,fobj=fobj,n_off=12000)
+    peak,timestart,timestop=dsapol.find_peak(I, width, fobj.header.tsamp,n_t,buff=buff)
 
     p_all = []
     p_t_trials = []
@@ -291,10 +292,10 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
     for i in range(trials):
         (gxx,gyy) = dsapol.get_calmatrix_from_ratio_phasediff(ratio_samps[i,:],phase_samps[i,:]%(2*np.pi))
         (I_cal_sim,Q_cal_sim,V_cal_sim,U_cal_sim) = dsapol.calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
-        (I_cal_f_sim,Q_cal_f_sim,U_cal_f_sim,V_cal_f_sim) = dsapol.get_stokes_vs_freq(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_f,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
-        (I_cal_t_sim,Q_cal_t_sim,U_cal_t_sim,V_cal_t_sim) = dsapol.get_stokes_vs_time(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_t,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
+        (I_cal_f_sim,Q_cal_f_sim,U_cal_f_sim,V_cal_f_sim) = dsapol.get_stokes_vs_freq(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,width,fobj.header.tsamp,n_f,n_t,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True,weighted=True,n_t_weight=2,timeaxis=timeaxis,fobj=fobj,n_off=12000)
+        (I_cal_t_sim,Q_cal_t_sim,U_cal_t_sim,V_cal_t_sim) = dsapol.get_stokes_vs_time(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,width,fobj.header.tsamp,n_t,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True,n_off=12000)
 
-        [(p_f,p_t,avg,sigma_frac),(L_f,L_t,avg_L,sigma_L),(C_f,C_t,avg_C,sigma_C)] = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True)
+        [(p_f,p_t,avg,sigma_frac),(L_f,L_t,avg_L,sigma_L),(C_f,C_t,avg_C,sigma_C)] = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,width,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True,weighted=True,n_t_weight=2,timeaxis=timeaxis,fobj=fobj,n_off=12000)
         #p_t = np.sqrt(Q_cal_t_sim**2 + U_cal_t_sim**2)/I_cal_t_sim
         #avg = np.mean(p_t[timestart:timestop])
 
@@ -307,10 +308,10 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
 
         (gxx,gyy) = dsapol.get_calmatrix_from_ratio_phasediff(ratio_samps_fit[i,:],phase_samps_fit[i,:]%(2*np.pi))
         (I_cal_sim,Q_cal_sim,V_cal_sim,U_cal_sim) = dsapol.calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
-        (I_cal_f_sim,Q_cal_f_sim,U_cal_f_sim,V_cal_f_sim) = dsapol.get_stokes_vs_freq(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_f,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
-        (I_cal_t_sim,Q_cal_t_sim,U_cal_t_sim,V_cal_t_sim) = dsapol.get_stokes_vs_time(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,n_t,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True)
+        (I_cal_f_sim,Q_cal_f_sim,U_cal_f_sim,V_cal_f_sim) = dsapol.get_stokes_vs_freq(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,width,fobj.header.tsamp,n_f,n_t,freq_test,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True,weighted=True,n_t_weight=2,timeaxis=timeaxis,fobj=fobj,n_off=12000)
+        (I_cal_t_sim,Q_cal_t_sim,U_cal_t_sim,V_cal_t_sim) = dsapol.get_stokes_vs_time(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,width,fobj.header.tsamp,n_t,datadir=datadir,label=label,plot=False,show=False,buff=buff,normalize=True,n_off=12000)
 
-        [(p_f,p_t,avg,sigma_frac),(L_f,L_t,avg_L,sigma_L),(C_f,C_t,avg_C,sigma_C)] = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,1,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True)
+        [(p_f,p_t,avg,sigma_frac),(L_f,L_t,avg_L,sigma_L),(C_f,C_t,avg_C,sigma_C)] = dsapol.get_pol_fraction(I_cal_sim,Q_cal_sim,U_cal_sim,V_cal_sim,width,fobj.header.tsamp,1,32,freq_test,pre_calc_tf=False,show=False,buff=buff,normalize=True,weighted=True,n_t_weight=2,timeaxis=timeaxis,fobj=fobj,n_off=12000)
         #p_t = np.sqrt(Q_cal_t_sim**2 + U_cal_t_sim**2)/I_cal_t_sim
         #avg = np.mean(p_t[timestart:timestop])
 
@@ -408,7 +409,7 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
     outdict["upper_lim"] = Upperlimit
 
     minbin_fit=0
-    maxbin_fit=1#(np.nanmax(p_all_fit))
+    maxbin_fit=0.3#(np.nanmax(p_all_fit))
     nbins_fit=int(100*(maxbin_fit-minbin_fit))
     (hist_fit,b_fit) = np.histogram(p_all_fit,np.linspace(minbin_fit,maxbin_fit,nbins_fit))
     popt_fit,pcov_fit = curve_fit(gaussian,b_fit[:-1] + (b_fit[2]-b_fit[1])/2, hist_fit,p0=[trials/4,np.mean(p_all_fit),np.std(p_all_fit)])
@@ -430,7 +431,7 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
         plt.axvline(Upperlimit_fit,ls='--',color=p1[0].get_color(),label="95% Confidence Level (fit)")
         plt.xlabel("Polarization Fraction")
         plt.legend()
-        plt.xlim(0,1)
+        plt.xlim(0,0.4)
         plt.savefig(datadir + "/UPPERLIMIT_" + IMAGELABEL + extra + ".pdf")
         #plt.show()
         plt.close(f)
@@ -472,7 +473,7 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
         plt.axvline(Upperlimit_fit,ls='--',color=p1[0].get_color(),label="95% Confidence Level (fit)")
         plt.xlabel("Linear Polarization Fraction")
         plt.legend()
-        plt.xlim(0,1)
+        plt.xlim(0,0.4)
         plt.savefig(datadir + "/UPPERLIMIT_LIN_" + IMAGELABEL + extra + ".pdf")
         #plt.show()
         plt.close(f)
@@ -515,7 +516,7 @@ for i in [0,1,3,5,6,7,8,10,13]:#range(len(nicknames)):
         plt.axvline(Upperlimit_fit,ls='--',color=p1[0].get_color(),label="95% Confidence Level (fit)")
         plt.xlabel("Circular Polarization Fraction")
         plt.legend()
-        plt.xlim(-1,1)
+        plt.xlim(-0.4,0.4)
         plt.savefig(datadir + "/UPPERLIMIT_CIRC_" + IMAGELABEL + extra + ".pdf")
         #plt.show()
         plt.close(f)
