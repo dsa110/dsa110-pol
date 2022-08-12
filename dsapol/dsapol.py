@@ -15,7 +15,7 @@ import json
 from scipy.interpolate import interp1d
 from scipy.stats import chi2
 from scipy.stats import chi
-
+from scipy.signal import savgol_filter as sf
 ext= ".pdf"
 DEFAULT_DATADIR = "/home/ubuntu/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
 
@@ -907,7 +907,7 @@ def compute_fit(data,xaxis,deg):
 
 #Takes observed data products for unpolarized calibrator and calculates ratio of complex gain magnitudes
 #Inputs are either stokes parameters IQUV (set stokes=True) or xx,yy,xy,yx (set stokes=False)
-def gaincal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False):#xx_obs,yy_obs,xy_obs,yx_obs):
+def gaincal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False,sfwindow=-1):
     """
     This function takes observed IQUV for unpolarized gain calibrator (e.g. 3C48) and computes 
     |gxx|/|gyy| for Jones matrix. Optionall fits with deg degree polynomial vs frequency
@@ -926,6 +926,7 @@ def gaincal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plo
             ext --> str, image file extension (png, pdf, etc.)
             show --> bool, if True, displays images with matplotlib
             buff --> int, number of samples to buffer either side of pulse if needed
+            sfwindow --> int, width of savgol filter window, must be odd
     """
 
     if stokes:
@@ -943,11 +944,18 @@ def gaincal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plo
     ratio = np.nan_to_num(ratio,nan=np.nanmedian(ratio))
     ratio_fit,fit_params = compute_fit(ratio,freq_test[0],deg)
     
+    #mask and savgol filter
+    if sfwindow != -1:
+        ratio_masked = np.ma.masked_outside(ratio,np.mean(ratio)-3*np.std(ratio),np.mean(ratio)+3*np.std(ratio))
+        ratio_sf = sf(ratio_masked,sfwindow,3)
+
     if plot:
         f= plt.figure()
         plt.title(r'Gain Ratio ($g_{xx}/g_{yy}$) ' + label)
         plt.plot(freq_test[0],ratio,label="Calculated")
         plt.plot(freq_test[0],ratio_fit,label="Fit")
+        if sfwindow != -1:
+            plt.plot(freq_test[0],ratio_sf,label="Savgol Filter, " + str(sfwindow) + " sample window")
         plt.axhline(np.nanmedian(ratio),color="black",label="median")
         plt.legend()
         plt.xlabel("Frequency (MHz)")
@@ -956,10 +964,13 @@ def gaincal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plo
         if show:
             plt.show()
         plt.close(f) 
-    return ratio,fit_params
+
+    if sfwindow != -1:
+        return ratio,fit_params,ratio_sf
+    return ratio,fit_params,None
 
 #Takes observed data products for linear polarized calibrator and calculates phase difference
-def phasecal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False):#xx_obs,yy_obs,xy_obs,yx_obs):
+def phasecal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False,sfwindow=-1):
     
     if stokes:
         I_obs = xx_I_obs
@@ -976,11 +987,18 @@ def phasecal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,pl
     phase_diff = np.nan_to_num(phase_diff,nan=np.nanmedian(phase_diff))
     phase_diff_fit,fit_params = compute_fit(phase_diff,freq_test[0],deg)
 
+    #mask and savgol filter
+    if sfwindow != -1:
+        phase_masked = np.ma.masked_outside(phase_diff,np.mean(phase_diff)-3*np.std(phase_diff),np.mean(phase_diff)+3*np.std(phase_diff))
+        phase_sf = sf(phase_masked,sfwindow,3)
+
     if plot:
         f= plt.figure()
         plt.title(r'Phase Difference ($\phi_{xx} - \phi_{yy}$) ' + label )
         plt.plot(freq_test[0],phase_diff,label="Calculated")
         plt.plot(freq_test[0],phase_diff_fit,label="Fit")
+        if sfwindow != -1:
+            plt.plot(freq_test[0],phase_sf,label="Savgol Filter, " + str(sfwindow) + " sample window")
         plt.axhline(np.nanmedian(phase_diff),color="black",label="median")
         plt.legend()
         plt.xlabel("Frequency (MHz)")
@@ -990,13 +1008,16 @@ def phasecal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,pl
             plt.show()
         plt.close(f)
 
-
-    return phase_diff,fit_params
+    if sfwindow != -1:
+        return phase_diff,fit_params,phase_sf
+    return phase_diff,fit_params,None
 
 #Takes directory with all unpolarized calibrator observations and calibrator name and computes average gain ratio
 #vs frequency
-def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False):
+def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False,sfwindow=-1):
     ratio_all = []
+    if sfwindow != -1:
+        ratio_sf_all = []
     fit_params_all = []
     for i in range(len(obs_names)):
         label = source_name + obs_names[i] + suffix
@@ -1004,17 +1025,21 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,plot=plot,datadir=datadir,label=label)
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,-1,fobj.header.tsamp,n_t,plot=plot,datadir=datadir,label=label,normalize=False)
-        ratio,fit_params = gaincal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label)
+        ratio,fit_params,ratio_sf = gaincal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label,sfwindow=sfwindow)
         
         ratio_all.append(ratio)
         if not average:
             fit_params_all.append(fit_params)
-
+        if sfwindow != -1:
+            ratio_sf_all.append(ratio_sf)
 
     #average together
     if average:
         avg_ratio = np.nanmean(np.array(ratio_all),axis=0)
         avg_ratio_fit,avg_fit_params = compute_fit(avg_ratio,freq_test[0],deg)#np.nanmean(np.array(fit_params_all),axis=0)
+        if sfwindow != -1:
+            ratio_masked = np.ma.masked_outside(avg_ratio,np.mean(avg_ratio)-3*np.std(avg_ratio),np.mean(avg_ratio)+3*np.std(avg_ratio))
+            ratio_sf = sf(ratio_masked,sfwindow,3)
 
         if plot:
             f= plt.figure()
@@ -1023,6 +1048,8 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
                 plt.plot(freq_test[0],ratio_all[i],'--',label="Calculated, " + obs_names[i])
             p=plt.plot(freq_test[0],avg_ratio,'-',color="red",label="Averaged Over Observations")
             plt.plot(freq_test[0],avg_ratio_fit,'-',color="gray",label="Fit")
+            if sfwindow != -1:
+                plt.plot(freq_test[0],ratio_sf,'-',color="green",label="Savgol Filter")
             plt.axhline(np.nanmedian(avg_ratio),color="black",label="median")
             plt.legend()
             plt.xlabel("Frequency (MHz)")
@@ -1031,18 +1058,29 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
             if show:
                 plt.show()
             plt.close(f)
-        return avg_ratio,avg_fit_params
+        if sfwindow != -1:
+            return avg_ratio,avg_fit_params,ratio_sf
+        else:
+            return avg_ratio,avg_fit_params,None
     elif len(ratio_all) == 1:
-        return ratio_all[0],fit_params_all[0]
+        if sfwindow != -1:
+            return ratio_all[0],fit_params_all[0],ratio_sf
+        else:
+            return ratio_all[0],fit_params_all[0],None
     else:
-        return ratio_all,fit_params_all
+        if sfwindow != -1:
+            return ratio_all,fit_params_all,ratio_sf
+        else:
+            return ratio_all,fit_params_all,None
 
 
 
 #Takes directory with all linear calibrator observations and calibrator name and computes average phase difference
 #vs frequency
-def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False):
+def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False,sfwindow=-1):
     phase_diff_all = []
+    if sfwindow != -1:
+        phase_sf_all = []
     fit_params_all = []
     for i in range(len(obs_names)):
         label = source_name + obs_names[i] + suffix
@@ -1050,16 +1088,20 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,plot=plot,datadir=datadir,label=label)
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,-1,fobj.header.tsamp,n_t,plot=plot,datadir=datadir,label=label,normalize=False)
-        phase_diff,fit_params = phasecal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label)
+        phase_diff,fit_params,phase_sf = phasecal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label)
         phase_diff_all.append(phase_diff)
         if not average:
             fit_params_all.append(fit_params)
-
+        if sfwindow != -1:
+            phase_sf_all.append(phase_sf)
 
     #average together
     if average:
         avg_phase_diff = np.nanmean(np.array(phase_diff_all),axis=0)
         avg_phase_diff_fit,avg_fit_params = compute_fit(avg_phase_diff,freq_test[0],deg)#np.nanmean(np.array(fit_params_all),axis=0)
+        if sfwindow != -1:
+            phase_masked = np.ma.masked_outside(avg_phase_diff,np.mean(avg_phase_diff)-3*np.std(avg_phase_diff),np.mean(avg_phase_diff)+3*np.std(avg_phase_diff))
+            phase_sf = sf(phase_masked,sfwindow,3)
 
         if plot:
             f= plt.figure()
@@ -1068,6 +1110,8 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
                 plt.plot(freq_test[0],phase_diff_all[i],'--',label="Calculated, " + obs_names[i])
             p=plt.plot(freq_test[0],avg_phase_diff,'-',color="red",label="Averaged Over Observations")
             plt.plot(freq_test[0],avg_phase_diff_fit,'-',color="gray",label="Fit")
+            if sfwindow != -1:
+                plt.plot(freq_test[0],phase_sf,'-',color="green",label="Savgol Filter")
             plt.axhline(np.nanmedian(avg_phase_diff),color="black",label="median")
             plt.legend()
             plt.xlabel("Frequency (MHz)")
@@ -1076,11 +1120,23 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
             if show:
                 plt.show()
             plt.close(f)
-        return avg_phase_diff,avg_fit_params
+
+        if sfwindow != -1:
+            return avg_phase_diff,avg_fit_params,phase_sf
+        else:
+            return avg_phase_diff,avg_fit_params,None
     elif len(phase_diff_all) == 1:
-        return phase_diff_all[0],fit_params_all[0]
+        if sfwindow != -1:
+            return phase_diff_all[0],fit_params_all[0],phase_sf
+        else:
+            return phase_diff_all[0],fit_params_all[0],None
     else:
-        return phase_diff_all,fit_params_all 
+        if sfwindow != -1:
+            return phase_diff_all,fit_params_all,phase_sf
+        else:
+            return phase_diff_all,fit_params_all,None
+
+
 
 #Takes datx a products for unpolarized calibrator and linearly polarized calibrator and returns Jones matrix 
 # assuming gxy = gyx = 0 and given gxx
@@ -1636,7 +1692,7 @@ def arr_to_list_check(x):
 
 
 #Plotting Functions
-def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1):
+def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1):
     if n_trial_RM_zoom == -1:
         n_trial_RM_zoom = len(trial_RM)
     
@@ -1690,12 +1746,14 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
         outdata["calibration"] = dict()
         outdata["calibration"]["use fit"] = True
         #Get calibrator solutions
-        ratio,ratio_fit_params = gaincal_full(datadir=gain_dir,source_name=gain_source_name,obs_names=gain_obs_names,n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix=suffix,average=True,plot=True)
+        ratio,ratio_fit_params,ratio_sf = gaincal_full(datadir=gain_dir,source_name=gain_source_name,obs_names=gain_obs_names,n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix=suffix,average=True,plot=True,sfwindow=sfwindow)
         if use_fit:
             ratio_fit = np.zeros(np.shape(freq_test[0]))
             for i in range(deg+1):
                 ratio_fit += ratio_fit_params[i]*(freq_test[0]**(deg-i))
             ratio_use = ratio_fit
+        elif use_sf:
+            ratio_use = ratio_sf
         else:
             ratio_use = ratio
         outdata["calibration"]["gain cal"] = dict()
@@ -1703,15 +1761,18 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
         outdata["calibration"]["gain cal observations"] = arr_to_list_check(gain_obs_names)
         outdata["calibration"]["gain cal"]["ratio"] = arr_to_list_check(ratio)
         outdata["calibration"]["gain cal"]["fit params"] = arr_to_list_check(ratio_fit_params)
+        outdata["calibration"]["gain cal"]["savgol ratio"] = arr_to_list_check(ratio_sf)
         #hdr_dict["gain_cal_source"] = gain_source_name
         #hdr_dict["gain_cal_observations"] = arr_to_list_check(gain_obs_names)
 
-        phase_diff,phase_fit_params = phasecal_full(datadir=phase_dir,source_name=phase_source_name,obs_names=phase_obs_names,n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix=suffix,average=True,plot=True) 
+        phase_diff,phase_fit_params,phase_sf = phasecal_full(datadir=phase_dir,source_name=phase_source_name,obs_names=phase_obs_names,n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix=suffix,average=True,plot=True,sfwindow=sfwindow) 
         if use_fit:
             phase_fit = np.zeros(np.shape(freq_test[0]))
             for i in range(deg+1):
                 phase_fit += phase_fit_params[i]*(freq_test[0]**(deg-i))
             phase_use = phase_fit
+        elif use_sf:
+            phase_use = phase_sf
         else:
             phase_use = phase_diff
         outdata["calibration"]["phase cal"] = dict()
@@ -1719,6 +1780,7 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
         outdata["calibration"]["phase cal observations"] = arr_to_list_check(phase_obs_names)
         outdata["calibration"]["phase cal"]["phase diff"] = arr_to_list_check(phase_diff)
         outdata["calibration"]["phase cal"]["fit params"] = arr_to_list_check(phase_fit_params)
+        outdata["calibration"]["phase cal"]["savgol phase diff"] = arr_to_list_check(phase_sf)
         #hdr_dict["phase_cal_source"] = phase_source_name
         #hdr_dict["phase_cal_observations"] = arr_to_list_check(phase_obs_names)
 
