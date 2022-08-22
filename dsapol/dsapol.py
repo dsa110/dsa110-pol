@@ -1479,30 +1479,22 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
+    max_RM_idx = np.argmax(SNRs)
     print(max_RM_idx)
     
     significance = ((np.max(SNRs)-snr0)/snr0)
 
     if err:
+        """
         #lower = trial_RM[max_RM_idx - np.argmin(np.abs((SNRs[:max_RM_idx,0])-(np.max(SNRs[:,0]) - 1))[::-1])]
         #upper = trial_RM[max_RM_idx]-trial_RM[np.argmin(np.abs((SNRs[max_RM_idx:,0])-(np.max(SNRs[:,0]) - 1)))] + trial_RM[max_RM_idx]
         
         check_lower = (SNRs[:max_RM_idx,0])[::-1]
         lower_idx = max_RM_idx - 1 - np.argmin(np.abs(check_lower-(SNRs[max_RM_idx] - 1)))
-        """
-        if SNRs[lower_idx] > SNRs[max_RM_idx] - 1:
-            lower = 0
-        else:
-        """
         lower = trial_RM[lower_idx]
 
         check_upper = (SNRs[max_RM_idx:,0])
         upper_idx = max_RM_idx + np.argmin(np.abs(check_upper-(SNRs[max_RM_idx] - 1)))
-        """
-        if SNRs[upper_idx] > SNRs[max_RM_idx] - 1:
-            upper = len(SNRs)-1
-        else:
-        """
         upper = trial_RM[upper_idx]
         
         check_lower = SNRs[:np.argmax(SNRs)][::-1]
@@ -1525,7 +1517,8 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         upper = trial_RM[upper_idx]
 
         RMerr = (upper-lower)/2
-    
+        """
+        RMerr,upper,lower = faraday_error_snr(SNRs,trial_RM,trial_RM[max_RM_idx])
         if plot:
 
             f=plt.figure(figsize=(12,6))
@@ -1541,7 +1534,24 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 plt.show()
     else:
         RMerr = None
-    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,significance)
+    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance)
+
+#Calculate Error for SNR method
+def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):
+    tmp = SNRs[np.argmax(SNRs):]   
+    for i in range(len(tmp)):
+        if tmp[i] < (np.max(SNRs)-1):
+            break
+    upperRM = trial_RM_zoom[np.argmax(SNRs)+i]
+
+    tmp = SNRs[:np.argmax(SNRs)]
+    tmp = tmp[::-1]
+    for i in range(len(tmp)):
+        if tmp[i] < (np.max(SNRs)-1):
+            break
+    lowerRM = trial_RM_zoom[np.argmax(SNRs)-i]
+
+    return ((upperRM-lowerRM)/2),upperRM,lowerRM
 
 #Calculate initial estimate of RM from dispersion function, then get SNR spectrum to get true estimate and error
 def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,n_off=3000,show=False,fit_window=100,buff=0,normalize=True,DM=-1,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,RM_tools=False):
@@ -1586,7 +1596,7 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     if len(I.shape)==2:
         #narrow down search
         trial_RM_zoom = np.linspace(RM-zoom_window,RM+zoom_window,n_trial_RM_zoom)
-        (RM,phi,SNRs,RMerr,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
+        (RM,phi,SNRs,RMerr,upper,lower,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
         print(r'Refined Estimate: '  + str(RM) + r'$\pm$' + str(RMerr) + r' rad/m^2')
     else:
         print("Need 2D spectra for fine estimate")
@@ -1606,8 +1616,8 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
         f=plt.figure(figsize=(12,6))
         plt.grid()
         plt.plot(trial_RM_zoom,SNRs)#,label="RM synthesis")
-        plt.axvline(RM + RMerr,color="red",label=r'$1\sigma$ Error')
-        plt.axvline(RM - RMerr,color="red")
+        plt.axvline(upper,color="red",label=r'$1\sigma$ Error')
+        plt.axvline(lower,color="red")
         plt.axvline(RM + RMerr2,color="green",label="Brentjens/deBruyn Error")
         plt.axvline(RM - RMerr2,color="green")
         plt.legend()
