@@ -1530,7 +1530,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 
 #Calculate Error for SNR method
 def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):
-    tmp = SNRs[np.argmax(SNRs):]
+    tmp = SNRs[np.argmax(SNRs):]   
     for i in range(len(tmp)):
         if tmp[i] < (np.max(SNRs)-1):
             break
