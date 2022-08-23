@@ -1626,7 +1626,7 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     else:
         B = None
 
-    return (RM,phi,SNRs,RMerr22,p_val,B)
+    return (RM,phi,SNRs,RMerr2,p_val,B)
 
 #Apply faraday calibration
 def calibrate_RM(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,RM,phi,freq_test,stokes=True):

@@ -1409,7 +1409,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
     wavall = np.array([wav]*np.shape(I)[1]).transpose()
-    #print(np.any(np.isnan(wavall))) 
+    #print(np.any(np.isnan(wavall)))
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0
@@ -1439,7 +1439,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         for j in range(len(trial_phi)):
             RM_i = trial_RM[i]
             phi_j = trial_phi[j]
-            
+
             P_trial = P*np.exp(-1j*((2*RM_i*((wavall)**2)) + phi_j))
             Q_trial_t = np.mean(np.real(P_trial),axis=0)
             U_trial_t = np.mean(np.imag(P_trial),axis=0)
@@ -1450,7 +1450,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             L_trial_t = np.sqrt(Q_trial_t**2 + U_trial_t**2)
 
             sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
-            
+
             """
             L_trial_offp = np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])
             L_trial_offp = L_trial_offp[:len(L_trial_offp) - (len(L_trial_offp)%(timestop-timestart))]
@@ -1458,17 +1458,15 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             L_trial_binned_offp = np.mean(L_trial_offp.reshape(len(L_trial_offp)//(timestop-timestart),timestop-timestart))
             #print(L_trial_offp)
             #print(L_trial_binned_offp)
-
             #binned_off_pulse =  #dsapol.avg_time(np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])[:4096],timestop-timestart)
             noise = np.sqrt(np.mean(L_trial_binned_offp**2))
             print(noise)
             #print(sig,noise)
-            
-            if i == 0:
 
+            if i == 0:
                 L_trial_cut1 = L_trial_t[timestart%(timestop-timestart):]
                 L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
-            
+
                 L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
                 sigbin = np.argmax(L_trial_binned)
                 noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
@@ -1479,53 +1477,40 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
+    max_RM_idx = np.argmax(SNRs)
     print(max_RM_idx)
-    
+
     significance = ((np.max(SNRs)-snr0)/snr0)
 
     if err:
+        """
         #lower = trial_RM[max_RM_idx - np.argmin(np.abs((SNRs[:max_RM_idx,0])-(np.max(SNRs[:,0]) - 1))[::-1])]
         #upper = trial_RM[max_RM_idx]-trial_RM[np.argmin(np.abs((SNRs[max_RM_idx:,0])-(np.max(SNRs[:,0]) - 1)))] + trial_RM[max_RM_idx]
-        
+
         check_lower = (SNRs[:max_RM_idx,0])[::-1]
         lower_idx = max_RM_idx - 1 - np.argmin(np.abs(check_lower-(SNRs[max_RM_idx] - 1)))
-        """
-        if SNRs[lower_idx] > SNRs[max_RM_idx] - 1:
-            lower = 0
-        else:
-        """
         lower = trial_RM[lower_idx]
-
         check_upper = (SNRs[max_RM_idx:,0])
         upper_idx = max_RM_idx + np.argmin(np.abs(check_upper-(SNRs[max_RM_idx] - 1)))
-        """
-        if SNRs[upper_idx] > SNRs[max_RM_idx] - 1:
-            upper = len(SNRs)-1
-        else:
-        """
         upper = trial_RM[upper_idx]
-        
-        check_lower = SNRs[:np.argmax(SNRs)][::-1]
 
+        check_lower = SNRs[:np.argmax(SNRs)][::-1]
         lower_idx = len(check_lower)-1
         for i in range(len(check_lower)):#ts in testsnrs:
             if check_lower[i] < np.max(SNRs) -1:
                 lower_idx = np.argmax(SNRs) - i
                 break
         lower = trial_RM[lower_idx]
-
-
         check_upper = SNRs[np.argmax(SNRs):]
-
         upper_idx = len(check_upper)-1
         for i in range(len(check_upper)):#ts in testsnrs:
             if check_upper[i] < np.max(SNRs) -1:
                 upper_idx = np.argmax(SNRs) - i
                 break
         upper = trial_RM[upper_idx]
-
         RMerr = (upper-lower)/2
-    
+        """
+        RMerr,upper,lower = faraday_error_snr(SNRs,trial_RM,trial_RM[max_RM_idx])
         if plot:
 
             f=plt.figure(figsize=(12,6))
@@ -1541,7 +1526,24 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 plt.show()
     else:
         RMerr = None
-    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,significance)
+    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance)
+
+#Calculate Error for SNR method
+def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):
+    tmp = SNRs[np.argmax(SNRs):]
+    for i in range(len(tmp)):
+        if tmp[i] < (np.max(SNRs)-1):
+            break
+    upperRM = trial_RM_zoom[np.argmax(SNRs)+i]
+
+    tmp = SNRs[:np.argmax(SNRs)]
+    tmp = tmp[::-1]
+    for i in range(len(tmp)):
+        if tmp[i] < (np.max(SNRs)-1):
+            break
+    lowerRM = trial_RM_zoom[np.argmax(SNRs)-i]
+
+    return ((upperRM-lowerRM)/2),upperRM,lowerRM
 
 #Calculate initial estimate of RM from dispersion function, then get SNR spectrum to get true estimate and error
 def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,n_off=3000,show=False,fit_window=100,buff=0,normalize=True,DM=-1,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,RM_tools=False):
@@ -1557,7 +1559,7 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     if RM_tools:
         out=run_rmsynth([freq_test[0]*1e6,I_f,Q_f,U_f,np.std(I[:,:n_off],axis=1),np.std(Q[:,:n_off],axis=1),np.std(U[:,:n_off],axis=1)],phiMax_radm2=np.max(trial_RM),dPhi_radm2=np.abs(trial_RM[1]-trial_RM[0]))
         print("RM Tools estimate: " + str(out[0]["phiPeakPIchan_rm2"]) + "\pm" + str(out[0]["dPhiPeakPIchan_rm2"]) + " rad/m^2")
-    
+
         if plot:
             f=plt.figure(figsize=(12,6))
             plt.grid()
@@ -1577,20 +1579,20 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     sigma_U = np.std(U[:,:n_off])
     sigma = (sigma_Q + sigma_U)/2
 
-    (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff) 
+    (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff)
     peak_chi2 = (np.max(SNRs)**2)/((Q.shape[0]/(timestop-timestart))*(sigma**2))
 
     p_val = chi2.sf(peak_chi2,df=2)
     print(r'Initial Estimate: ' + str(RM) + r'$\pm$' + str(RMerr) + ' rad/m^2, p-value: ' + str(p_val))
-    print("SHAPE:" + str(I.shape))   
+    print("SHAPE:" + str(I.shape))
     if len(I.shape)==2:
         #narrow down search
         trial_RM_zoom = np.linspace(RM-zoom_window,RM+zoom_window,n_trial_RM_zoom)
-        (RM,phi,SNRs,RMerr,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
+        (RM,phi,SNRs,RMerr,upper,lower,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
         print(r'Refined Estimate: '  + str(RM) + r'$\pm$' + str(RMerr) + r' rad/m^2')
     else:
         print("Need 2D spectra for fine estimate")
-    
+
     #Estimate true error from Brentjens/deBruyn eqn 52 and 61
     sigma_q = np.mean(np.std(Q[:,:n_off],axis=1))
     sigma_u = np.mean(np.std(U[:,:n_off],axis=1))
@@ -1606,8 +1608,8 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
         f=plt.figure(figsize=(12,6))
         plt.grid()
         plt.plot(trial_RM_zoom,SNRs)#,label="RM synthesis")
-        plt.axvline(RM + RMerr,color="red",label=r'$1\sigma$ Error')
-        plt.axvline(RM - RMerr,color="red")
+        plt.axvline(upper,color="red",label=r'$1\sigma$ Error')
+        plt.axvline(lower,color="red")
         plt.axvline(RM + RMerr2,color="green",label="Brentjens/deBruyn Error")
         plt.axvline(RM - RMerr2,color="green")
         plt.legend()
@@ -1627,6 +1629,7 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
         B = None
 
     return (RM,phi,SNRs,RMerr22,p_val,B)
+
 
 #Apply faraday calibration
 def calibrate_RM(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,RM,phi,freq_test,stokes=True):
