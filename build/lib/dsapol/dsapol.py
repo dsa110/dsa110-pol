@@ -16,10 +16,12 @@ from scipy.interpolate import interp1d
 from scipy.stats import chi2
 from scipy.stats import chi
 from scipy.signal import savgol_filter as sf
-from RMtools_1D.do_RMsynth_1D import run_rmsynth
 
+from scipy.ndimage import convolve1d
+from RMtools_1D.do_RMsynth_1D import run_rmsynth
+from RMtools_1D.do_RMclean_1D import run_rmclean
 ext= ".pdf"
-DEFAULT_DATADIR = "/home/ubuntu/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
+DEFAULT_DATADIR = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
 
 #Reads in stokes parameter data from specified directory
 #(Liam Connor)
@@ -191,9 +193,9 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     I,Q,U,V = avg_time(sarr[0],n_t),avg_time(sarr[1],n_t),avg_time(sarr[2],n_t),avg_time(sarr[3],n_t)
     I,Q,U,V = avg_freq(I,n_f),avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
     
-    #bad_chans = find_bad_channels(I)
-    #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
-
+    bad_chans = find_bad_channels(I)
+    (I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
+    print("Bad Channels: " + str(bad_chans))
 
 
     #Subtract off-pulse mean
@@ -227,7 +229,7 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
 
 #Get frequency averaged stokes params vs time; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0):
+def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,window=10):
     """
     This function calculates the frequency averaged time series for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -269,6 +271,31 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         U_t = (np.mean(U,axis=0))
         V_t = (np.mean(V,axis=0))
 
+    #optimal weighting
+    if weighted:
+        I,Q,U,V = weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+
+        """
+        I_t_weights = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+
+        I_rolled = np.roll(I,-np.argmax(I.mean(0)),axis=1)
+        Q_rolled = np.roll(Q,-np.argmax(Q.mean(0)),axis=1)
+        U_rolled = np.roll(U,-np.argmax(U.mean(0)),axis=1)
+        V_rolled = np.roll(V,-np.argmax(V.mean(0)),axis=1)
+        I_t_weights_rolled = np.roll(I_t_weights,-np.argmax(I_t_weights))
+
+        I = convolve1d(I_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        Q = convolve1d(Q_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        U = convolve1d(U_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        V = convolve1d(V_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+
+
+        #I = I*I_t_weights
+        #Q = Q*I_t_weights
+        #U = U*I_t_weights
+        #V = V*I_t_weights
+        """
+
     if plot:
         f=plt.figure(figsize=(12,6))
         plt.plot(I_t,label="I")
@@ -277,7 +304,7 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         plt.plot(V_t,label="V")
         plt.grid()
         plt.legend()
-        plt.xlim(timestart,timestop)
+        plt.xlim(timestart-window,timestop+window)
         plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
         plt.title(label)
         plt.savefig(datadir +label + "_time_"+ calstr + str(n_t) + "_binned" + ext)
@@ -290,8 +317,8 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
 
 
 #Get optimal SNR weights using binning that maximizes SNR
-def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1):
-
+def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45,padded=True):
+    (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff)
     #Bin to optimal time binning
     Ib,Qb,Ub,Vb = avg_time(I,n_t_weight),avg_time(Q,n_t_weight),avg_time(U,n_t_weight),avg_time(V,n_t_weight)
     if fobj.header.nsamples == 5120:
@@ -303,10 +330,10 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
     (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(Ib,Qb,Ub,Vb,width_native,t_samp,n_t*n_t_weight,n_off//n_t_weight,normalize=True,buff=buff) #note normalization always used to get SNR
     
     #Interpolate to original sample rate
-    fI = interp1d(timeaxisb,I_t,kind="quadratic",fill_value="extrapolate")
-    fQ = interp1d(timeaxisb,Q_t,kind="quadratic",fill_value="extrapolate")
-    fU = interp1d(timeaxisb,U_t,kind="quadratic",fill_value="extrapolate")
-    fV = interp1d(timeaxisb,V_t,kind="quadratic",fill_value="extrapolate")
+    fI = interp1d(timeaxisb,I_t,kind="linear",fill_value="extrapolate")
+    fQ = interp1d(timeaxisb,Q_t,kind="linear",fill_value="extrapolate")
+    fU = interp1d(timeaxisb,U_t,kind="linear",fill_value="extrapolate")
+    fV = interp1d(timeaxisb,V_t,kind="linear",fill_value="extrapolate")
 
     #divide by sum to normalize to 1
     I_t_weight = fI(timeaxis)/np.sum(fI(timeaxis))
@@ -314,16 +341,58 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
     U_t_weight = fU(timeaxis)/np.sum(fU(timeaxis))
     V_t_weight = fV(timeaxis)/np.sum(fV(timeaxis))
 
-    #repeat over frequency
-    I_weight = np.abs(np.array([I_t_weight]*I.shape[0]))
-    Q_weight = np.abs(np.array([Q_t_weight]*Q.shape[0]))
-    U_weight = np.abs(np.array([U_t_weight]*U.shape[0]))
-    V_weight = np.abs(np.array([V_t_weight]*V.shape[0]))
+    #savgol filter
+    I_t_weight = sf(I_t_weight,sf_window_weights,3)
+    Q_t_weight = sf(Q_t_weight,sf_window_weights,3)
+    U_t_weight = sf(U_t_weight,sf_window_weights,3)
+    V_t_weight = sf(V_t_weight,sf_window_weights,3)
 
-    return I_weight,Q_weight,U_weight,V_weight
+    #repeat over frequency
+    #I_weight = np.abs(np.array([I_t_weight]*I.shape[0]))
+    #Q_weight = np.abs(np.array([Q_t_weight]*Q.shape[0]))
+    #U_weight = np.abs(np.array([U_t_weight]*U.shape[0]))
+    #V_weight = np.abs(np.array([V_t_weight]*V.shape[0]))
+    
+    #I_weight = (np.array([I_t_weight]*I.shape[0]))
+    #Q_weight = (np.array([Q_t_weight]*Q.shape[0]))
+    #U_weight = (np.array([U_t_weight]*U.shape[0]))
+    #V_weight = (np.array([V_t_weight]*V.shape[0]))
+
+    #zero outside of window
+    #(peak,timestart,timestop) = find_peak(I_t_weight,width_native,t_samp,n_t,buff=buff)
+    if padded: 
+        I_t_weight[:np.argmax(I_t_weight)-buff] = 0
+        I_t_weight[np.argmax(I_t_weight)+buff:] = 0
+    if not padded:
+        I_t_weight = I_t_weight[timestart:timestop]
+    print(I_t_weight.shape)    
+
+    return I_t_weight#,Q_weight,U_weight,V_weight
+
+#Weight dynamic spectrum using get_weights
+def weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45):
+    peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
+    I_t_weights = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+
+    I_rolled = np.roll(I,-peak,axis=1)
+    Q_rolled = np.roll(Q,-peak,axis=1)
+    U_rolled = np.roll(U,-peak,axis=1)
+    V_rolled = np.roll(V,-peak,axis=1)
+    I_t_weights_rolled = np.roll(I_t_weights,-np.argmax(I_t_weights))
+
+    Iwr = convolve1d(I_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+    Qwr = convolve1d(Q_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+    Uwr = convolve1d(U_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+    Vwr = convolve1d(V_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+    I = np.roll(Iwr,peak,axis=1)
+    Q = np.roll(Qwr,peak,axis=1)
+    U = np.roll(Uwr,peak,axis=1)
+    V = np.roll(Vwr,peak,axis=1)
+    return I,Q,U,V
+
 
 #Get time averaged (over given width) stokes params vs freq; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None):
+def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45):
     """
     This function calculates the time averaged (over width of pulse) frequency spectra for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -354,32 +423,45 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
     else:
         peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
 
+    I_copy = copy.deepcopy(I)
+    Q_copy = copy.deepcopy(Q)
+    U_copy = copy.deepcopy(U)
+    V_copy = copy.deepcopy(V)
+    
     #optimal weighting
     if weighted:
+        #I,Q,U,V = weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
         """
-        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off,normalize=True,buff=buff) #note normalization always used to get SNR
-        I_t_weights = np.abs(np.array([I_t]*I.shape[0]))
-        Q_t_weights = np.abs(np.array([Q_t]*Q.shape[0]))
-        U_t_weights = np.abs(np.array([U_t]*U.shape[0]))
-        V_t_weights = np.abs(np.array([V_t]*V.shape[0]))
-    
-        I = I*I_t_weights
-        Q = Q*Q_t_weights
-        U = U*U_t_weights
-        V = V*V_t_weights
+        I_t_weights = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        
+        I_rolled = np.roll(I,-peak,axis=1)
+        Q_rolled = np.roll(Q,-peak,axis=1)
+        U_rolled = np.roll(U,-peak,axis=1)
+        V_rolled = np.roll(V,-peak,axis=1)
+        I_t_weights_rolled = np.roll(I_t_weights,-np.argmax(I_t_weights))
+
+        Iwr = convolve1d(I_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        Qwr = convolve1d(Q_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        Uwr = convolve1d(U_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        Vwr = convolve1d(V_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        I = np.roll(Iwr,peak,axis=1)
+        Q = np.roll(Qwr,peak,axis=1)
+        U = np.roll(Uwr,peak,axis=1)
+        V = np.roll(Vwr,peak,axis=1)
         """
-        (I_t_weights,Q_t_weights,U_t_weights,V_t_weights) = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight)
+        I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        I_t_weights_2D = np.array([I_t_weights]*I.shape[0])        
 
-        I = I*I_t_weights
-        Q = Q*I_t_weights
-        U = U*I_t_weights
-        V = V*I_t_weights
-
+        I = I*I_t_weights_2D
+        Q = Q*I_t_weights_2D
+        U = U*I_t_weights_2D
+        V = V*I_t_weights_2D
+        
     if normalize:
-        I_f = (I[:,timestart:timestop].mean(1) - I[:,:n_off].mean(1))/np.std(np.mean(I[:,:n_off],axis=0))#I[:,:n_off].std(1)
-        Q_f = (Q[:,timestart:timestop].mean(1) - Q[:,:n_off].mean(1))/np.std(np.mean(Q[:,:n_off],axis=0))#Q[:,:n_off].std(1)
-        U_f = (U[:,timestart:timestop].mean(1) - U[:,:n_off].mean(1))/np.std(np.mean(U[:,:n_off],axis=0))#U[:,:n_off].std(1)
-        V_f = (V[:,timestart:timestop].mean(1) - V[:,:n_off].mean(1))/np.std(np.mean(V[:,:n_off],axis=0))#V[:,:n_off].std(1)
+        I_f = (I[:,timestart:timestop].mean(1) - I_copy[:,:n_off].mean(1))/np.std(np.mean(I_copy[:,:n_off],axis=0))#I[:,:n_off].std(1)
+        Q_f = (Q[:,timestart:timestop].mean(1) - Q_copy[:,:n_off].mean(1))/np.std(np.mean(Q_copy[:,:n_off],axis=0))#Q[:,:n_off].std(1)
+        U_f = (U[:,timestart:timestop].mean(1) - U_copy[:,:n_off].mean(1))/np.std(np.mean(U_copy[:,:n_off],axis=0))#U[:,:n_off].std(1)
+        V_f = (V[:,timestart:timestop].mean(1) - V_copy[:,:n_off].mean(1))/np.std(np.mean(V_copy[:,:n_off],axis=0))#V[:,:n_off].std(1)
     else:
         I_f = I[:,timestart:timestop].mean(1)
         Q_f = Q[:,timestart:timestop].mean(1)
@@ -413,7 +495,7 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
 
 
 #Plot dynamic spectra, I Q U V
-def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0):
+def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis'):
     """
     This function plots the given dynamic spectra and outputs images in the specified directory. 
     The spectra are normalized by subtracting the time average in each frequency channel.
@@ -440,10 +522,30 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,datadir=DEFAUL
     else:
         peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
 
+    #optimal weighting
+    if weighted:
+        print("weighting...")
+        """
+        I_t_weights = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+
+        I_rolled = np.roll(I,-np.argmax(I.mean(0)),axis=1)
+        Q_rolled = np.roll(Q,-np.argmax(Q.mean(0)),axis=1)
+        U_rolled = np.roll(U,-np.argmax(U.mean(0)),axis=1)
+        V_rolled = np.roll(V,-np.argmax(V.mean(0)),axis=1)
+        I_t_weights_rolled = np.roll(I_t_weights,-np.argmax(I_t_weights))
+
+        I = convolve1d(I_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        Q = convolve1d(Q_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        U = convolve1d(U_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        V = convolve1d(V_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
+        """
+        I,Q,U,V = weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        print("Done weighting!")
+
     #Dynamic Spectra
     f=plt.figure(figsize=(25,15))
     pylab.subplot(2,2,1)
-    plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim)
+    plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
     plt.xlim(timestart-window,timestop+window)
     plt.title(label + " I")
     plt.colorbar()
@@ -451,7 +553,7 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,datadir=DEFAUL
     plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,2)
-    plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim)
+    plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
     plt.xlim(timestart-window,timestop+window)
     plt.title(label + " Q")
     plt.colorbar()
@@ -459,7 +561,7 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,datadir=DEFAUL
     plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,3)
-    plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim)
+    plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
     plt.xlim(timestart-window,timestop+window)
     plt.title(label + " U")
     plt.colorbar()
@@ -467,7 +569,7 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,datadir=DEFAUL
     plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,4)
-    plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim)
+    plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
     plt.xlim(timestart-window,timestop+window)
     plt.title(label + " V")
     plt.colorbar()
@@ -580,7 +682,6 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
     """
     #get width
     width = convert_width(width_native,t_samp,n_t)
-
     #frequency averaged
     if pre_calc_tf:
         I_t = I[0]
@@ -709,9 +810,36 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     sigma_C = np.nanstd((C_t[timestart:timestop])[np.abs(C_t)[timestart:timestop]<=1+allowed_err])
 
     #SNR
-    snr_frac = np.nanmean(pol_t[timestart:timestop])/np.nanstd(pol_t[:n_off])
-    snr_L = np.nanmean(L_t[timestart:timestop])/np.nanstd(L_t[:n_off])
-    snr_C = np.nanmean(C_t[timestart:timestop])/np.nanstd(C_t[:n_off])
+    sig0 = np.nanmean(pol_t[timestart:timestop])
+    pol_t_cut1 = pol_t[timestart%(timestop-timestart):]
+    pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
+    pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+    sigbin = np.argmax(pol_t_binned)
+    noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
+    snr_frac = sig0/noise
+
+    sig0 = np.nanmean(L_t[timestart:timestop])
+    L_t_cut1 = L_t[timestart%(timestop-timestart):]
+    L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
+    L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+    sigbin = np.argmax(L_t_binned)
+    noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
+    snr_L = sig0/noise
+
+    sig0 = np.nanmean(C_t[timestart:timestop])
+    C_t_cut1 = C_t[timestart%(timestop-timestart):]
+    C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
+    C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+    sigbin = np.argmax(C_t_binned)
+    noise = (np.nanstd(np.concatenate([C_t_cut[:sigbin],C_t_cut[sigbin+1:]])))
+    snr_C = sig0/noise
+
+
+
+
+    #snr_frac = np.nanmean(pol_t[timestart:timestop])/np.nanstd(pol_t[:n_off])
+    #snr_L = np.nanmean(L_t[timestart:timestop])/np.nanstd(L_t[:n_off])
+    #snr_C = np.nanmean(C_t[timestart:timestop])/np.nanstd(C_t[:n_off])
 
     return [(pol_f,pol_t,avg_frac,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C)]
 
@@ -1273,7 +1401,7 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
             RM_i = trial_RM[i]
             phi_j = trial_phi[j]
 
-            P_trial = P*np.exp(-1j*((2*RM_i*((wav)**2)) + phi_j))
+            P_trial = P*np.exp(-1j*((2*RM_i*(((wav)**2) - np.mean((wav)**2))) + phi_j))
 
             SNRs[i,j] = np.abs(np.mean(P_trial))
     
@@ -1305,8 +1433,21 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
                 plt.show()
             plt.close(f)
     
+            f=plt.figure(figsize=(12,6))
+            plt.imshow(SNRs,aspect='auto')
+            plt.colorbar()
+            plt.ylabel("trial RM")
+            plt.xlabel("trial phi")
+            plt.xscale("log")
+            #plt.yticks(ticks=np.arange(0,len(trial_RM),20),labels=np.around(trial_RM[::20],1))
+            #plt.xticks(ticks=np.arange(0,len(trial_phi),1),labels=np.around(trial_phi[::1],1))
+            plt.savefig(datadir + label + "_faraday2Dlog_" + calstr + str(n_f) + "_binned" + ext)
+            if show:
+                plt.show()
+            plt.close(f)
+
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
-    P_derot = P*np.exp(-1j*2*trial_RM[max_RM_idx]*(wav**2))
+    P_derot = P*np.exp(-1j*2*trial_RM[max_RM_idx]*(wav**2))*np.exp(-1j*2*trial_RM[max_RM_idx]*(np.mean(wav**2)))
     if plot:
         f=plt.figure(figsize=(12,6))
         plt.plot(wav,np.real(P_derot),label="Q")
@@ -1364,6 +1505,8 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
                 plt.show()
             plt.close(f)
 
+
+
     else:
         RM_err = None
 
@@ -1408,8 +1551,8 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
-    wavall = np.array([wav]*np.shape(I)[1]).transpose()
-    #print(np.any(np.isnan(wavall))) 
+    #wavall = np.array([wav]*np.shape(I)[1]).transpose()
+    #print(np.any(np.isnan(wavall)))
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0
@@ -1434,13 +1577,15 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
     noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
     snr0 = sig0/noise
 
-
+    P_cut = P[:,timestart:timestop]
+    wavall_cut = np.array([wav]*np.shape(P_cut)[1]).transpose()
+    print(P_cut.shape,wavall_cut.shape)
     for i in range(len(trial_RM)):
         for j in range(len(trial_phi)):
             RM_i = trial_RM[i]
             phi_j = trial_phi[j]
-            
-            P_trial = P*np.exp(-1j*((2*RM_i*((wavall)**2)) + phi_j))
+
+            P_trial = P_cut*np.exp(-1j*((2*RM_i*(((wavall_cut)**2) - np.mean(wav**2))) + phi_j))
             Q_trial_t = np.mean(np.real(P_trial),axis=0)
             U_trial_t = np.mean(np.imag(P_trial),axis=0)
             #print(timestop-timestart)
@@ -1449,8 +1594,8 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 
             L_trial_t = np.sqrt(Q_trial_t**2 + U_trial_t**2)
 
-            sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
-            
+            #sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
+            sig = np.mean(L_trial_t)
             """
             L_trial_offp = np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])
             L_trial_offp = L_trial_offp[:len(L_trial_offp) - (len(L_trial_offp)%(timestop-timestart))]
@@ -1458,17 +1603,15 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             L_trial_binned_offp = np.mean(L_trial_offp.reshape(len(L_trial_offp)//(timestop-timestart),timestop-timestart))
             #print(L_trial_offp)
             #print(L_trial_binned_offp)
-
             #binned_off_pulse =  #dsapol.avg_time(np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])[:4096],timestop-timestart)
             noise = np.sqrt(np.mean(L_trial_binned_offp**2))
             print(noise)
             #print(sig,noise)
-            
-            if i == 0:
 
+            if i == 0:
                 L_trial_cut1 = L_trial_t[timestart%(timestop-timestart):]
                 L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
-            
+
                 L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
                 sigbin = np.argmax(L_trial_binned)
                 noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
@@ -1479,53 +1622,40 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
+    max_RM_idx = np.argmax(SNRs)
     print(max_RM_idx)
-    
+
     significance = ((np.max(SNRs)-snr0)/snr0)
 
     if err:
+        """
         #lower = trial_RM[max_RM_idx - np.argmin(np.abs((SNRs[:max_RM_idx,0])-(np.max(SNRs[:,0]) - 1))[::-1])]
         #upper = trial_RM[max_RM_idx]-trial_RM[np.argmin(np.abs((SNRs[max_RM_idx:,0])-(np.max(SNRs[:,0]) - 1)))] + trial_RM[max_RM_idx]
-        
+
         check_lower = (SNRs[:max_RM_idx,0])[::-1]
         lower_idx = max_RM_idx - 1 - np.argmin(np.abs(check_lower-(SNRs[max_RM_idx] - 1)))
-        """
-        if SNRs[lower_idx] > SNRs[max_RM_idx] - 1:
-            lower = 0
-        else:
-        """
         lower = trial_RM[lower_idx]
-
         check_upper = (SNRs[max_RM_idx:,0])
         upper_idx = max_RM_idx + np.argmin(np.abs(check_upper-(SNRs[max_RM_idx] - 1)))
-        """
-        if SNRs[upper_idx] > SNRs[max_RM_idx] - 1:
-            upper = len(SNRs)-1
-        else:
-        """
         upper = trial_RM[upper_idx]
-        
-        check_lower = SNRs[:np.argmax(SNRs)][::-1]
 
+        check_lower = SNRs[:np.argmax(SNRs)][::-1]
         lower_idx = len(check_lower)-1
         for i in range(len(check_lower)):#ts in testsnrs:
             if check_lower[i] < np.max(SNRs) -1:
                 lower_idx = np.argmax(SNRs) - i
                 break
         lower = trial_RM[lower_idx]
-
-
         check_upper = SNRs[np.argmax(SNRs):]
-
         upper_idx = len(check_upper)-1
         for i in range(len(check_upper)):#ts in testsnrs:
             if check_upper[i] < np.max(SNRs) -1:
                 upper_idx = np.argmax(SNRs) - i
                 break
         upper = trial_RM[upper_idx]
-
         RMerr = (upper-lower)/2
-    
+        """
+        RMerr,upper,lower = faraday_error_SNR(SNRs,trial_RM,trial_RM[max_RM_idx])
         if plot:
 
             f=plt.figure(figsize=(12,6))
@@ -1541,28 +1671,57 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 plt.show()
     else:
         RMerr = None
-    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,significance)
+    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance)
+
+#Calculate Error for SNR method
+def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):
+    tmp = SNRs[np.argmax(SNRs):]   
+    for i in range(len(tmp)):
+        if tmp[i] < (np.max(SNRs)-1):
+            break
+    upperRM = trial_RM_zoom[np.argmax(SNRs)+i]
+
+    tmp = SNRs[:np.argmax(SNRs)]
+    tmp = tmp[::-1]
+    for i in range(len(tmp)):
+        if tmp[i] < (np.max(SNRs)-1):
+            break
+    lowerRM = trial_RM_zoom[np.argmax(SNRs)-i]
+
+    return ((upperRM-lowerRM)/2),upperRM,lowerRM
 
 #Calculate initial estimate of RM from dispersion function, then get SNR spectrum to get true estimate and error
-def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,n_off=3000,show=False,fit_window=100,buff=0,normalize=True,DM=-1,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,RM_tools=False):
+def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=75,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,n_off=3000,show=False,fit_window=100,buff=0,normalize=True,DM=-1,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,RM_tools=False,trial_RM_tools=np.linspace(-1e6,1e6,int(1e6)),sigma_clean=2):
     if len(I.shape) == 2:
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=False,normalize=normalize,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
     else:
         (I_f,Q_f,U_f,V_f) = (I,Q,U,V)
 
-    #run initial faraday peak finding
-    (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window,err=True)
+    #get RMSF
+    RMSF = []
+    wav = (3e8)/(freq_test[0]*1e6)
+    for rm in trial_RM:
+        RMSF.append(np.sum(np.exp(-1j*2*rm*((wav**2) - np.mean(wav**2)))))
 
+
+    #run initial faraday peak finding
+    print("Initial RM synthesis...")
+    (RM, phi,SNRs,RMerr) = faradaycal(I_f,Q_f,U_f,V_f,freq_test,trial_RM,trial_phi,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,fit_window=fit_window,err=True)
+    
     #get RM tools estimate and plot with RM synthesis estimate
     if RM_tools:
-        out=run_rmsynth([freq_test[0]*1e6,I_f,Q_f,U_f,np.std(I[:,:n_off],axis=1),np.std(Q[:,:n_off],axis=1),np.std(U[:,:n_off],axis=1)],phiMax_radm2=np.max(trial_RM),dPhi_radm2=np.abs(trial_RM[1]-trial_RM[0]))
+        print("RM tools synthesis...")
+        out=run_rmsynth([freq_test[0]*1e6,I_f,Q_f,U_f,np.std(I[:,:n_off],axis=1),np.std(Q[:,:n_off],axis=1),np.std(U[:,:n_off],axis=1)],phiMax_radm2=np.max(trial_RM),dPhi_radm2=np.abs(trial_RM_tools[1]-trial_RM_tools[0]))
+
+        print("Cleaning...")
+        out=run_rmclean(out[0],out[1],sigma_clean)
         print("RM Tools estimate: " + str(out[0]["phiPeakPIchan_rm2"]) + "\pm" + str(out[0]["dPhiPeakPIchan_rm2"]) + " rad/m^2")
-    
+
         if plot:
             f=plt.figure(figsize=(12,6))
             plt.grid()
             plt.plot(trial_RM,SNRs,label="RM synthesis")
-            plt.plot(out[1]["phiArr_radm2"],np.abs(out[1]["dirtyFDF"]),alpha=0.5,label="RM Tools")
+            plt.plot(out[1]["phiArr_radm2"],np.abs(out[1]["cleanFDF"]),alpha=0.5,label="RM Tools")
             plt.xlabel("Trial RM")
             plt.ylabel("Dispersion Function F(" + r'$\phi$' + ")")
             plt.title(label)
@@ -1577,20 +1736,52 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     sigma_U = np.std(U[:,:n_off])
     sigma = (sigma_Q + sigma_U)/2
 
-    (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff) 
+    (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff)
     peak_chi2 = (np.max(SNRs)**2)/((Q.shape[0]/(timestop-timestart))*(sigma**2))
 
     p_val = chi2.sf(peak_chi2,df=2)
     print(r'Initial Estimate: ' + str(RM) + r'$\pm$' + str(RMerr) + ' rad/m^2, p-value: ' + str(p_val))
-    print("SHAPE:" + str(I.shape))   
+    print("SHAPE:" + str(I.shape))
     if len(I.shape)==2:
         #narrow down search
+        print("Fine S/N synthesis")
         trial_RM_zoom = np.linspace(RM-zoom_window,RM+zoom_window,n_trial_RM_zoom)
-        (RM,phi,SNRs,RMerr,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
+        (RM,phi,SNRs,RMerr,upper,lower,significance) = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_zoom,trial_phi,width_native,t_samp,plot=plot,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,show=show,buff=buff)
         print(r'Refined Estimate: '  + str(RM) + r'$\pm$' + str(RMerr) + r' rad/m^2')
+    
+        if RM_tools:
+
+            L0_t = np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)
+            sig0 = np.mean(np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)[timestart:timestop])
+            L_trial_cut1 = L0_t[timestart%(timestop-timestart):]
+            L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
+            L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
+            sigbin = np.argmax(L_trial_binned)
+            noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
+
+        #get RMSF
+        RMSF_SNR = []
+        for rm in trial_RM_zoom:
+            RMSF_SNR.append(np.mean(np.exp(-1j*2*rm*((wav**2) - np.mean(wav**2)))))
+
     else:
         print("Need 2D spectra for fine estimate")
-    
+
+    if plot:
+        plt.figure(figsize=(12,6))
+        plt.plot(trial_RM,RMSF,label="Synthesis")
+        if len(I.shape)==2:
+            plt.plot(trial_RM_zoom,RMSF_SNR,label="S/N Method")
+        plt.grid()
+        plt.xlabel("RM (rad/m^2)")
+        plt.ylabel("RMSF")
+        plt.title(label)
+        plt.savefig(datadir + label + "_RMSF_" + calstr + str(n_f) + "_binned" + ext)
+        if show:
+            plt.show()
+        plt.close(f)
+
+
     #Estimate true error from Brentjens/deBruyn eqn 52 and 61
     sigma_q = np.mean(np.std(Q[:,:n_off],axis=1))
     sigma_u = np.mean(np.std(U[:,:n_off],axis=1))
@@ -1605,19 +1796,39 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
     if plot and len(I.shape)==2:
         f=plt.figure(figsize=(12,6))
         plt.grid()
-        plt.plot(trial_RM_zoom,SNRs)#,label="RM synthesis")
-        plt.axvline(RM + RMerr,color="red",label=r'$1\sigma$ Error')
-        plt.axvline(RM - RMerr,color="red")
+        plt.plot(trial_RM_zoom,SNRs,label="S/N Method")#,label="RM synthesis")
+        plt.axvline(upper,color="red",label=r'$1\sigma$ Error')
+        plt.axvline(lower,color="red")
         plt.axvline(RM + RMerr2,color="green",label="Brentjens/deBruyn Error")
         plt.axvline(RM - RMerr2,color="green")
         plt.legend()
         plt.xlabel("Trial RM")
-        plt.ylabel("Dispersion Function F(" + r'$\phi$' + ")")
+        plt.ylabel("SNR")
         plt.title(label)
         plt.savefig(datadir + label + "_BrentjensError_" + calstr + str(n_f) + "_binned" + ext)
         if show:
             plt.show()
         plt.close(f)
+        
+        
+        if RM_tools:
+            f=plt.figure(figsize=(12,6))
+            plt.grid()
+            plt.plot(trial_RM_zoom,SNRs,label="S/N Method")#,label="RM synthesis")
+            plt.plot(out[1]["phiArr_radm2"],np.abs(out[1]["cleanFDF"])/noise,alpha=0.5,label="RM Tools")
+            plt.axvline(upper,color="red",label=r'$1\sigma$ Error')
+            plt.axvline(lower,color="red")
+            plt.axvline(RM + RMerr2,color="green",label="Brentjens/deBruyn Error")
+            plt.axvline(RM - RMerr2,color="green")
+            plt.legend()
+            plt.xlabel("Trial RM")
+            plt.ylabel("SNR")
+            plt.xlim(np.min(trial_RM_zoom),np.max(trial_RM_zoom))
+            plt.title(label)
+            plt.savefig(datadir + label + "_BrentjensError_RMtools_" + calstr + str(n_f) + "_binned" + ext)
+            if show:
+                plt.show()
+            plt.close(f)
 
 
     #Estimate B field
@@ -1627,6 +1838,7 @@ def faradaycal_full(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,n_t
         B = None
 
     return (RM,phi,SNRs,RMerr2,p_val,B)
+
 
 #Apply faraday calibration
 def calibrate_RM(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,RM,phi,freq_test,stokes=True):
@@ -1749,7 +1961,7 @@ def arr_to_list_check(x):
 
 
 #Plotting Functions
-def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1):
+def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,RM_in=None,phi_in=0,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1,extra=''):
     if n_trial_RM_zoom == -1:
         n_trial_RM_zoom = len(trial_RM)
     
@@ -1780,14 +1992,14 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     hdr_dict["nchans"] = int(hdr_dict["nchans"]/n_f)
 
 
-    calstr = "_" + cal1str + "_" + RM_calstr + "_" + cal_2Dstr + "_" + cal_fitstr + "_"
+    calstr = "_" + cal1str + "_" + RM_calstr + "_" + cal_2Dstr + "_" + cal_fitstr + "_" + extra + "_"
     
     outdata =dict()
     outdata["calibration"]=dict()
    
     #Get 2D I Q U V array
     (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir=datadir,fn_prefix=prefix,nsamps=nsamps,n_t=n_t,n_f=n_f,n_off=n_off,sub_offpulse_mean=True)
-    
+    outdata["freq_test"] = arr_to_list_check(freq_test[0])    
     hdr_dict["fch1"] = np.max(freq_test[0])
     hdr_dict["foff"] = -np.abs(freq_test[0][1] - freq_test[0][0])
     
@@ -1853,8 +2065,8 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
             (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff) 
         
-            if get_RM:# RM_cal:
-                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True,DM=DM,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,RM_tools=True)
+            if get_RM and RM_in == None:# RM_cal:
+                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True,DM=DM,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,RM_tools=True,trial_RM_tools=trial_RM)
                 if RM_cal:
                     (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM,phi,freq_test,stokes=True)
                 (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
@@ -1872,6 +2084,16 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
                 #hdr_dict["RM"] = float(np.real(RM))
                 #hdr_dict["RMerr"] = float(np.real(RMerr))
                 #hdr_dict["phi"] = float(np.real(phi))
+            elif RM_cal and RM_in != None:
+                print("RM cal using input " + str(RM_in) + " rad/m^2")
+                outdata["calibration"]["RM cal"] = dict()
+                outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM_in))
+                outdata["calibration"]["RM cal"]["phi"] = float(np.real(phi_in))
+                (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM_in,phi_in,freq_test,stokes=True)
+                (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
+                (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
+                if DM != -1:
+                    outdata["calibration"]["RM cal"]["B field (uG)"] = float(RM_in/(0.81*DM))
         else:
             outdata["calibration"]["2D cal"] = False
             (I_cal,Q_cal,U_cal,V_cal) = (I,Q,U,V)#calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
@@ -1879,8 +2101,8 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
             (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
             (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate(I_f,Q_f,U_f,V_f,(gxx,gyy),stokes=True)
             
-            if get_RM:#RM_cal: 
-                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,DM=DM,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,RM_tools=True)
+            if get_RM and RM_in == None:#RM_cal: 
+                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,DM=DM,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,RM_tools=True,trial_RM_tools=trial_RM)
                 if RM_cal:
                     (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate_RM(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,RM,phi,freq_test,stokes=True)
                 outdata["calibration"]["RM cal"] = dict()
@@ -1896,6 +2118,11 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
                 #hdr_dict["RM"] = float(np.real(RM))
                 #hdr_dict["RMerr"] = float(np.real(RMerr))
                 #hdr_dict["phi"] = float(np.real(phi))
+            elif RM_cal and RM_in != None:
+                outdata["calibration"]["RM cal"] = dict()
+                outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM_in))
+                outdata["calibration"]["RM cal"]["phi"] = float(np.real(phi_in))
+                (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM_in,phi_in,freq_test,stokes=True)
 
         outdata["post-cal"] = dict()
         outdata["post-cal"]["I"] = arr_to_list_check(I)
@@ -1942,7 +2169,8 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     outdata["PA"]["time"] = arr_to_list_check(PA_t)
     outdata["PA"]["average"] = float(avg_PA)
     #hdr_dict["PA"] = float(avg_PA)
-
+    print("PA: " + str(avg_PA))
+    print(np.nanstd(PA_t))
 
     (pol_f,pol_t,avg_pol,sigma_pol,snr_pol) = total
     (L_f,L_t,avg_L,sigma_L,snr_L) = linear
@@ -1953,6 +2181,9 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     outdata["polarization"]["average"] = float(avg_pol)
     outdata["polarization"]["error"] = float(sigma_pol)
     outdata["polarization"]["snr"] = float(snr_pol)
+    print("Polarization:")
+    print(avg_pol)
+    print(sigma_pol)
 
     outdata["linear polarization"] = dict()
     outdata["linear polarization"]["frequency"] = arr_to_list_check(L_f)
@@ -1960,6 +2191,9 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     outdata["linear polarization"]["average"] = float(avg_L)
     outdata["linear polarization"]["error"] = float(sigma_L)
     outdata["linear polarization"]["snr"] = float(snr_L)
+    print("Linear:")
+    print(avg_L)
+    print(sigma_L)
 
     outdata["circular polarization"] = dict()
     outdata["circular polarization"]["frequency"] = arr_to_list_check(C_f)
@@ -1967,6 +2201,9 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     outdata["circular polarization"]["average"] = float(avg_C)
     outdata["circular polarization"]["error"] = float(sigma_C)
     outdata["circular polarization"]["snr"] = float(snr_C)
+    print("Circular:")
+    print(avg_C)
+    print(sigma_C)
 
     #hdr_dict["polarization"] = float(avg_pol)
 
