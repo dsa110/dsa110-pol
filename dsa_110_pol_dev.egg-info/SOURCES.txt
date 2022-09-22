@@ -20,9 +20,12 @@ dsa_110_pol_dev.egg-info/top_level.txt
 dsapol/dsapol.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
 scripts/FRB_upper_limits.py
+scripts/RMSNR_all_FRBs.py
+scripts/RM_all_FRBs.py
 scripts/cal_pol.py
 scripts/plot_pol.py
 scripts/process_all_FRBs.py
+scripts/process_all_FRBs_V2.py
 tests/calibration_test.py
 tests/faraday_test.py
 tests/freq_test.py

@@ -4,13 +4,13 @@ import sys
 from matplotlib import pyplot as plt
 
 import json
-ids=["220121aaat", "220204aaai", "220207aabh", "220208aaaa", "220307aaae", "220310aaam", "220330aaan", "220418aaai", "220424aabq", "220506aabd", "220426aaaw","220319aaeb", "220726aabn", "220801aabd", "220411aabk", "220825aaad", "220831aaaj"]
-nicknames=["clare", "fen", "zach", "ishita" ,"alex", "whitney" , "erdos", "quincy" ,"davina", "oran", "jackie","mark","gertrude", "augustine", "maya", "ansel", "ada"]
-widths=[8,4,2,16,2,4,32,4,2,2,2,1,4,4,32,4,8]
-DMs=[313.5,612.2,262.3,437.0,499.15,462.15,468.1,623.45,863.35,396.93,269.5,110.95,686.55,413.0,150,651.2,1146.25]
-n_ts = [2,1,1,2,1,1,4,1,1,1,1,1,1,1,1,1,1]
-RMs = [-1305.55086886348,2.79916683201975,127.199370848151,761.776036230955,-958.800918992897,15.2004530880001,-227.211015168586,64.0126035205116,178.00873672044,-46.800006992007,-140.399224816135,-575098.97219299,463.1961241282585 ,245387.033404836,0,741.199188688634,809.5977443846867]
-RM_gals = [-68.17985557759044,-7.173808637692105,3.4538780715571686,-6.750317532361379,-14.968536640281991,-14.920449670882448,-15.576725577586794,4.84899789477938,-39.1415848090991,1.0584624922027939,7.736806347620126,-3.2924384810295937,-50.258010868238365,5.662006457588828,-0.013026056420469034,10.047789988844018,-9.21574742050912]
+ids=["220121aaat", "220204aaai", "220207aabh", "220208aaaa", "220307aaae", "220310aaam", "220330aaan", "220418aaai", "220424aabq", "220506aabd", "220426aaaw","220319aaeb", "220726aabn", "220801aabd", "220411aabk", "220825aaad", "220831aaaj", "220914aabz"]
+nicknames=["clare", "fen", "zach", "ishita" ,"alex", "whitney" , "erdos", "quincy" ,"davina", "oran", "jackie","mark","gertrude", "augustine", "maya", "ansel", "ada", "elektra"]
+widths=[8,4,2,16,2,4,32,4,2,2,2,1,4,4,32,4,8,2]
+DMs=[313.5,612.2,262.3,437.0,499.15,462.15,468.1,623.45,863.35,396.93,269.5,110.95,686.55,413.0,150,651.2,1146.25,631.05]
+n_ts = [2,1,1,2,1,1,4,1,1,1,1,1,1,1,1,1,1,1]
+RMs = [-1305.55086886348,2.79916683201975,127.199370848151,761.776036230955,-958.800918992897,15.2004530880001,-227.211015168586,64.0126035205116,178.00873672044,-46.800006992007,-140.399224816135,-575098.97219299,463.1961241282585 ,245387.033404836,0,741.199188688634,809.5977443846867,0]
+RM_gals = [-68.17985557759044,-7.173808637692105,3.4538780715571686,-6.750317532361379,-14.968536640281991,-14.920449670882448,-15.576725577586794,4.84899789477938,-39.1415848090991,1.0584624922027939,7.736806347620126,-3.2924384810295937,-50.258010868238365,5.662006457588828,-0.013026056420469034,10.047789988844018,-9.21574742050912,0]
 #ids = ids[2:]
 #nicknames = nicknames[2:]
 #widths = widths[2:]
@@ -30,7 +30,7 @@ print(nicknames)
 for i in range(len(nicknames)):
 
     print("BEFORE RM CAL")
-    out_before = dsapol.FRB_plot_all(datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/" + str(ids[i]) +"_" + str(nicknames[i]) + "/",prefix=ids[i] + "_dev",nickname=nicknames[i],nsamps=20480,n_t=n_ts[i],n_f=32,n_off=int(12000//n_ts[i]),width_native=widths[i],cal=True,gain_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C48/',gain_source_name="3C48",gain_obs_names=["ane"],phase_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286/',phase_source_name="3C286",phase_obs_names=["jqc"],deg=10,suffix="_dev",use_fit=True,get_RM=False,RM_cal=False,trial_RM=np.linspace(-1e6,1e6,int(1e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,buff=1,lim=3,DM=DMs[i],weighted=False,n_t_weight=1,use_sf=True,sfwindow=19,extra="_finalv2_before")
+    out_before = dsapol.FRB_plot_all(datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/" + str(ids[i]) +"_" + str(nicknames[i]) + "/",prefix=ids[i] + "_dev",nickname=nicknames[i],nsamps=20480,n_t=n_ts[i],n_f=32,n_off=int(12000//n_ts[i]),width_native=widths[i],cal=True,gain_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C48/',gain_source_name="3C48",gain_obs_names=["ane"],phase_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286/',phase_source_name="3C286",phase_obs_names=["jqc"],deg=10,suffix="_dev",use_fit=True,get_RM=False,RM_cal=False,trial_RM=np.linspace(-1e6,1e6,int(1e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,buff=1,lim=3,DM=DMs[i],weighted=True,n_t_weight=1,use_sf=True,sfwindow=19,extra="_finalv2_before")
     print(out_before[1:])
     
     #RM cal
@@ -83,7 +83,7 @@ for i in range(len(nicknames)):
     print("Peak SNR: " + str(np.abs(np.mean((Q_calf + 1j*U_calf)*np.exp(-2*1j*RM*wav2)))))
 
     print("AFTER RM CAL")
-    out_after2 = dsapol.FRB_plot_all(datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/" + str(ids[i]) +"_" + str(nicknames[i]) + "/",prefix=ids[i] + "_dev",nickname=nicknames[i],nsamps=20480,n_t=n_ts[i],n_f=32,n_off=int(12000//n_ts[i]),width_native=widths[i],cal=True,gain_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C48/',gain_source_name="3C48",gain_obs_names=["ane"],phase_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286/',phase_source_name="3C286",phase_obs_names=["jqc"],deg=10,suffix="_dev",use_fit=True,get_RM=False,RM_cal=True,trial_RM=np.linspace(-1e6,1e6,int(1e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,buff=1,lim=3,DM=DMs[i],weighted=False,n_t_weight=1,use_sf=True,sfwindow=19,extra="_finalv2_after",RM_in=RM)
+    out_after2 = dsapol.FRB_plot_all(datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/" + str(ids[i]) +"_" + str(nicknames[i]) + "/",prefix=ids[i] + "_dev",nickname=nicknames[i],nsamps=20480,n_t=n_ts[i],n_f=32,n_off=int(12000//n_ts[i]),width_native=widths[i],cal=True,gain_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C48/',gain_source_name="3C48",gain_obs_names=["ane"],phase_dir='/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286/',phase_source_name="3C286",phase_obs_names=["jqc"],deg=10,suffix="_dev",use_fit=True,get_RM=False,RM_cal=True,trial_RM=np.linspace(-1e6,1e6,int(1e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,buff=1,lim=3,DM=DMs[i],weighted=True,n_t_weight=1,use_sf=True,sfwindow=19,extra="_finalv2_after",RM_in=RM)
     print(out_after2[1:])
 
     """
