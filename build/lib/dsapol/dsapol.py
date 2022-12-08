@@ -8,6 +8,9 @@ from scipy.signal import find_peaks
 from scipy.signal import peak_widths
 import copy
 import numpy as np
+
+
+import numpy.ma as ma
 from sigpyproc import FilReader
 from sigpyproc.Filterbank import FilterbankBlock
 from sigpyproc.Header import Header
@@ -30,6 +33,31 @@ from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u
 
+
+
+#3C48 and 3C286 polynomial fit parameters from Perley-Butler 2013
+coeffs_3C286 = [1.2481,-0.4507,-0.1798,0.0357]
+coeffs_3C48 = [ 1.3253, -0.7553, -0.1914, 0.0498]
+def PB_flux(coeffs,nu_GHz):
+    logS = np.zeros(len(nu_GHz))
+    for i in range(len(coeffs)):
+        logS += coeffs[i]*(np.log10(nu_GHz)**(i))
+    return 10**logS
+
+#3C48 parameters
+RA_3C48 = ((1 + 37/60 + 41.1/3600)*360/24) #degrees
+DEC_3C48 = (33 + 9/60 + 32/3600) #degrees
+RM_3C48 = -68 #rad/m^2
+p_3C48 = 0.005
+chip_3C48 = 25*np.pi/180 #rad
+
+
+#3C286 parameters
+RA_3C286 = (13 + 31/60 + 8.28811/3600)*360/24#degrees
+DEC_3C286 = 30 + 30/60 + 32.96/3600#degrees
+RM_3C286 = 0 #rad/m^2
+p_3C286 = 0.0945 + 0.0077*(22/100)
+chip_3C286 = 33*np.pi/180 #rad
 
 #Reads in stokes parameter data from specified directory
 #(Liam Connor)
@@ -151,7 +179,7 @@ def avg_freq(arr,n): #averages freq axis over n samples
         return
     """
     if arr.shape[0]%n != 0:
-        arr[arr.shape[0]%n:,:]
+        arr = arr[arr.shape[0]%n:,:]
 
     return ((arr).reshape(-1,n,arr.shape[1]).mean(1))
 
@@ -340,7 +368,7 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
 
 
 #Get optimal SNR weights using binning that maximizes SNR
-def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45,padded=True):
+def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45,padded=True,norm=True):
     (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff)
     #Bin to optimal time binning
     Ib,Qb,Ub,Vb = avg_time(I,n_t_weight),avg_time(Q,n_t_weight),avg_time(U,n_t_weight),avg_time(V,n_t_weight)
@@ -396,7 +424,11 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
         I_t_weight = I_t_weight[timestart:timestop]
     #print(I_t_weight.shape)    
 
-    return I_t_weight/np.sum(I_t_weight)#,Q_weight,U_weight,V_weight
+    if norm:
+        norm_factor = np.sum(I_t_weight)
+    else:
+        norm_factor = 1
+    return I_t_weight/norm_factor #/np.sum(I_t_weight)#,Q_weight,U_weight,V_weight
 
 #Weight dynamic spectrum using get_weights
 def weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45):
@@ -735,6 +767,13 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
             timestart --> int, time sample at start of pulse
             timestop --> int, time sample at end of pulse
     """
+    if isinstance(buff, int):
+        buff1 = buff
+        buff2 = buff
+    else:
+        buff1 = buff[0]
+        buff2 = buff[1]
+
     #get width
     width = convert_width(width_native,t_samp,n_t)
     #frequency averaged
@@ -752,12 +791,12 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
         snr[i] = np.sum(I_t[peak-i:peak + width - i])
 
     offset = np.argmax(snr)
-    timestart = peak-offset-buff
-    timestop = peak+width-offset+buff+1
+    timestart = peak-offset-buff1
+    timestop = peak+width-offset+buff2+1
     return (peak, timestart, timestop)
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
-def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45):
+def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[]):
     """
     This function calculates and plots the polarization fraction averaged over both time and 
     frequency, and the average polarization fraction within the peak.
@@ -781,6 +820,13 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
              pol_t --> 1D array, time dependent polarization
              avg --> float, frequency and time averaged polarization fraction
     """
+    if isinstance(buff, int):
+        buff1 = buff
+        buff2 = buff
+    else:
+        buff1 = buff[0]
+        buff2 = buff[1]
+
     allowed_err = 0.1 #allowed error above 100 %
     if pre_calc_tf:
         (I_t,I_f) = I
@@ -788,11 +834,13 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         (U_t,U_f) = U
         (V_t,V_f) = V
     else:
-        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize)
+        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize,buff=buff,window=window)
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=n_off,plot=False,normalize=normalize,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
     
-    #use full timestream for calibrators
-    if width_native == -1:
+    if input_weights != []:
+        timestart = 0
+        timestop = len(I_t)
+    elif width_native == -1:#use full timestream for calibrators
         timestart = 0
         timestop = len(I_t)#I.shape[1]
     else:
@@ -801,26 +849,75 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     if full:
         #total polarization
         pol = np.sqrt(Q**2 + U**2 + V**2)
-        pol_f = np.nanmean(pol,axis=1)/I_f
-        pol_t = np.nanmean(pol,axis=0)/I_t
+
+        if unbias:
+            pol_f = np.nanmean(pol,axis=1)
+            pol_t = np.nanmean(pol,axis=0)
+            pol_t[pol_t**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            pol_t = np.sqrt(pol_t**2 - np.std(I_t[:n_off])**2)
+            pol_f[pol_f**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            pol_f = np.sqrt(pol_f**2 - np.std(I_t[:n_off])**2)
+            pol_f = pol_f/I_f
+            pol_t = pol_t/I_t
+        else:
+            pol_f = np.nanmean(pol,axis=1)/I_f
+            pol_t = np.nanmean(pol,axis=0)/I_t
+        
         #linear polarization
         L = np.sqrt(Q**2 + U**2)
-        L_f = np.nanmean(L,axis=1)/I_f
-        L_t = np.nanmean(L,axis=0)/I_t
+        
+        if unbias:
+            L_f = np.nanmean(L,axis=1)
+            L_t = np.nanmean(L,axis=0)
+            L_t[L_t**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+            L_f[L_f**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            L_f = np.sqrt(L_f**2 - np.std(I_t[:n_off])**2)
+            L_f = L_f/I_f
+            L_t = L_t/I_t
+        else:
+            L_f = np.nanmean(L,axis=1)/I_f
+            L_t = np.nanmean(L,axis=0)/I_t
+        
         #circular polarization
         C_f = np.nanmean(V,axis=1)/I_f
         C_t = np.nanmean(V,axis=0)/I_t
     else:
         #print(I_f)
         #total polarization
-        pol_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2)/(np.array(I_f)**2))
-        pol_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
+        if unbias:
+            pol_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2))
+            pol_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2))
+
+            pol_t[pol_t**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            pol_t = np.sqrt(pol_t**2 - np.std(I_t[:n_off])**2)
+            pol_f[pol_f**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            pol_f = np.sqrt(pol_f**2 - np.std(I_t[:n_off])**2)
+            pol_f = pol_f/I_f
+            pol_t = pol_t/I_t
+        else:
+            pol_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2 + np.array(V_f)**2)/(np.array(I_f)**2))
+            pol_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
+        
         #linear polarization
-        L_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2)/(np.array(I_f)**2))
-        L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2)/(np.array(I_t)**2))
+        if unbias:
+            L_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2))
+            L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2))
+
+            L_t[L_t**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+            L_f[L_f**2 <= np.std(I_t[:n_off])**2] = np.std(I_t[:n_off])
+            L_f = np.sqrt(L_f**2 - np.std(I_t[:n_off])**2)
+            L_f = L_f/I_f
+            L_t = L_t/I_t
+        else:
+            L_f = np.sqrt((np.array(Q_f)**2 + np.array(U_f)**2)/(np.array(I_f)**2))
+            L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2)/(np.array(I_t)**2))
+
         #circular polarization
         C_f = V_f/I_f
         C_t = V_t/I_t
+
 
 
 
@@ -860,8 +957,19 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     #avg_frac = (np.mean(pol_t[timestart:timestop]))
     
     if weighted:
-        I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
-        FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+        if input_weights == []:
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        else:
+            I_t_weights = input_weights
+
+
+        if multipeaks:
+            pks,props = find_peaks(I_t_weights,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        else:
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
         intL = int(intL)
         intR = int(intR)
 
@@ -874,17 +982,17 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         sigma_frac = np.nansum(I_t_weights_pol_cut*np.sqrt((pol_t_cut - avg_frac)**2))/np.nansum(I_t_weights_pol_cut)
 
         L_t_cut1 = ((L_t)[intL:intR])
-        L_t_cut = L_t_cut1[np.abs(L_t_cut1) < 1+allowed_err]
+        L_t_cut = L_t_cut1[np.abs(pol_t_cut1) < 1+allowed_err]
         I_t_weights_L_cut = I_t_weights[intL:intR]
-        I_t_weights_L_cut = I_t_weights_L_cut[np.abs(L_t_cut1) < 1+allowed_err]
+        I_t_weights_L_cut = I_t_weights_L_cut[np.abs(pol_t_cut1) < 1+allowed_err]
         avg_L = np.nansum(L_t_cut*I_t_weights_L_cut)/np.nansum(I_t_weights_L_cut)
         sigma_L = np.nansum(I_t_weights_L_cut*np.sqrt((L_t_cut - avg_L)**2))/np.nansum(I_t_weights_L_cut)
 
 
         C_t_cut1 = (np.abs(C_t)[intL:intR])
-        C_t_cut = C_t_cut1[np.abs(C_t_cut1) < 1+allowed_err]
+        C_t_cut = C_t_cut1[np.abs(pol_t_cut1) < 1+allowed_err]
         I_t_weights_C_cut = I_t_weights[intL:intR]
-        I_t_weights_C_cut = I_t_weights_C_cut[np.abs(C_t_cut1) < 1+allowed_err]
+        I_t_weights_C_cut = I_t_weights_C_cut[np.abs(pol_t_cut1) < 1+allowed_err]
         avg_C = np.nansum(C_t_cut*I_t_weights_C_cut)/np.nansum(I_t_weights_C_cut)
         sigma_C = np.nansum(I_t_weights_C_cut*np.sqrt((C_t_cut - avg_C)**2))/np.nansum(I_t_weights_C_cut)
 
@@ -924,9 +1032,9 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         L_t_c = np.sqrt(Q_t_c**2 + U_t_c**2)
         C_t_c = np.sqrt(V_t_c**2)
 
-        noise_pol = np.std(np.concatenate([pol_t_c[:np.argmax(I_t_c)-int(buff)],pol_t_c[np.argmax(I_t_c)+1+int(buff):]]))
-        noise_L = np.std(np.concatenate([L_t_c[:np.argmax(I_t_c)-int(buff)],L_t_c[np.argmax(I_t_c)+1+int(buff):]]))
-        noise_C = np.std(np.concatenate([C_t_c[:np.argmax(I_t_c)-int(buff)],C_t_c[np.argmax(I_t_c)+1+int(buff):]]))
+        noise_pol = np.std(np.concatenate([pol_t_c[:np.argmax(I_t_c)-int(buff1)],pol_t_c[np.argmax(I_t_c)+1+int(buff2):]]))
+        noise_L = np.std(np.concatenate([L_t_c[:np.argmax(I_t_c)-int(buff1)],L_t_c[np.argmax(I_t_c)+1+int(buff2):]]))
+        noise_C = np.std(np.concatenate([C_t_c[:np.argmax(I_t_c)-int(buff1)],C_t_c[np.argmax(I_t_c)+1+int(buff2):]]))
 
         snr_frac = np.max(pol_t_c)/noise_pol
         snr_L = np.max(L_t_c)/noise_L
@@ -979,7 +1087,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     return [(pol_f,pol_t,avg_frac,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C)]
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
-def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45):
+def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[]):
     """
     This function calculates and plots the polarization angle averaged over both time and
     frequency, and the average polarization angle within the peak.
@@ -1008,10 +1116,14 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
         (U_t,U_f) = U
         (V_t,V_f) = V
     else:
-        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize)
+        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize,buff=buff,window=window)
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=n_off,plot=False,normalize=normalize,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
-    #use full timestream for calibrators
-    if width_native == -1:
+
+
+    if input_weights != []:
+        timestart = 0
+        timestop = len(I_t)
+    elif width_native == -1:#use full timestream for calibrators
         timestart = 0
         timestop = len(I_t)#I.shape[1]
     else:
@@ -1048,8 +1160,20 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
 
     
     if weighted:
-        I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
-        FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+        if input_weights == []:
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        else:
+            I_t_weights = input_weights
+
+ 
+        if multipeaks:
+            pks,props = find_peaks(I_t_weights,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        else:
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+
         intL = int(intL)
         intR = int(intR)
 
@@ -1257,7 +1381,7 @@ def gaincal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plo
     return ratio,fit_params,None
 
 #Cleans spurious peaks by downsampling and filtering
-def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False,sfwindow=-1,padwidth=10,peakheight=2,n_t_down=8,n_f=1):
+def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False,sfwindow=-1,padwidth=10,peakheight=2,n_t_down=8,n_f=1,edgefreq=-1,breakfreq=-1):
    
     if stokes:
         I_obs = xx_I_obs
@@ -1275,7 +1399,7 @@ def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,de
     Q_obs = Q_obs.reshape(len(Q_obs)//n_t_down,n_t_down).mean(1)#avg_freq(Q_obs,n_t_down)
     U_obs = U_obs.reshape(len(U_obs)//n_t_down,n_t_down).mean(1)#avg_freq(U_obs,n_t_down)
     V_obs = V_obs.reshape(len(V_obs)//n_t_down,n_t_down).mean(1)#avg_freq(V_obs,n_t_down)
-    print(len(freq_test[0]))
+    #print(len(freq_test[0]))
     freq_test_down = []
     freq_test_down.append(freq_test[0].reshape(len(freq_test[0])//n_t_down,n_t_down).mean(1))
     freq_test2 = []
@@ -1291,7 +1415,7 @@ def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,de
     #padwidth=10
     #peakheight=4
     pks = find_peaks(np.abs(np.pad(ratio_norm,pad_width=padwidth,mode='constant')),height=peakheight)[0]
-    print(pks)
+    #print(pks)
     pks = np.array(pks)-padwidth#10
     wds = peak_widths(np.abs(np.pad(ratio_norm,pad_width=padwidth,mode='constant')),pks)[0]
     for i in range(len(pks)):
@@ -1305,7 +1429,7 @@ def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,de
             low = 0
         if hi >= len(ratio_new):
             hi = len(ratio_new)-1
-        print((low,hi))
+        #print((low,hi))
         ratio_new[low:hi] = np.mean(ratio_use)
 
     #plt.figure(figsize=(12,6))
@@ -1324,20 +1448,48 @@ def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,de
             sfwindow += 1
         if sfwindow <= 1:
             sfwindow = 3
-        deg = 1
-        ratio_use_sf = sf(ratio_use_int,sfwindow,deg)
+        order = 1
+        ratio_use_sf = sf(ratio_use_int,sfwindow,order)
     elif sfwindow != -1:
         ratio_use_sf = sf(ratio_use_int,sfwindow,deg)
     else:
         ratio_use_sf = None
 
     #fit
-    ratio_fit,fit_params = compute_fit(ratio_use_int,freq_test2[0],deg)
+    
+    #optionally piecewise fit with given parameters
+    if edgefreq != -1 and breakfreq != -1:
+        edgeidx = np.argmin(np.abs(freq_test2[0]-edgefreq))
+        breakidx = np.argmin(np.abs(freq_test2[0]-breakfreq))
+        ratio_fit1p,fit_params1 = compute_fit(ratio_use_int[edgeidx:],freq_test2[0][edgeidx:],deg)
+        ratio_fit2p,fit_params2 = compute_fit(ratio_use_int[:edgeidx],freq_test2[0][:edgeidx],deg)
+        
+        ratio_fit1 = np.zeros(len(ratio_use_int))
+        for i in range(len(fit_params1)):
+            ratio_fit1 += fit_params1[i]*(freq_test2[0]**(len(fit_params1)-i-1))
+
+        ratio_fit2 = np.zeros(len(ratio_use_int))
+        for i in range(len(fit_params2)):
+            ratio_fit2 += fit_params2[i]*(freq_test2[0]**(len(fit_params2)-i-1))
+
+
+        ratio_fit = np.zeros(len(ratio_fit1))
+        ratio_fit[breakidx:] = ratio_fit1[breakidx:]
+        ratio_fit[:breakidx] = ratio_fit2[:breakidx]
+        fit_params = [fit_params1,fit_params2]
+    else:
+        ratio_fit,fit_params = compute_fit(ratio_use_int,freq_test2[0],deg)
     if plot:
         f= plt.figure()
         plt.title(r'Gain Ratio ($g_{xx}/g_{yy}$) ' + label)
         plt.plot(freq_test2[0],ratio_use_int,label="Calculated")
-        plt.plot(freq_test2[0],ratio_fit,label="Fit")
+        
+        if edgefreq != -1 and breakfreq != -1:
+            c=plt.plot(freq_test2[0],ratio_fit,label="Fit")
+            plt.plot(freq_test2[0],ratio_fit1,"--",color=c[0].get_color(),label="Fit")
+            plt.plot(freq_test2[0],ratio_fit2,"--",color=c[0].get_color(),label="Fit")
+        else:
+            plt.plot(freq_test2[0],ratio_fit,label="Fit")
         if sfwindow != -1:#len(ratio_use_sf) > 0:
             plt.plot(freq_test2[0],ratio_use_sf,label="Savgol Filter, " + str(sfwindow) + " sample window")
         plt.axhline(np.nanmedian(ratio_use_int),color="black",label="median")
@@ -1352,7 +1504,7 @@ def cleangaincal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,de
     
 
 #Cleans spurious peaks by downsampling and filtering
-def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False,sfwindow=-1,padwidth=10,peakheight=2,n_t_down=8,n_f=1):
+def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=10,plot=False,datadir=DEFAULT_DATADIR,label='',show=False,sfwindow=-1,padwidth=10,peakheight=2,n_t_down=8,n_f=1,edgefreq=-1,breakfreq=-1):
 
     if stokes:
         I_obs = xx_I_obs
@@ -1370,7 +1522,7 @@ def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,d
     Q_obs = Q_obs.reshape(len(Q_obs)//n_t_down,n_t_down).mean(1)#avg_freq(Q_obs,n_t_down)
     U_obs = U_obs.reshape(len(U_obs)//n_t_down,n_t_down).mean(1)#avg_freq(U_obs,n_t_down)
     V_obs = V_obs.reshape(len(V_obs)//n_t_down,n_t_down).mean(1)#avg_freq(V_obs,n_t_down)
-    print(len(freq_test[0]))
+    #print(len(freq_test[0]))
     freq_test_down = []
     freq_test_down.append(freq_test[0].reshape(len(freq_test[0])//n_t_down,n_t_down).mean(1))
     freq_test2 = []
@@ -1385,7 +1537,7 @@ def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,d
     #padwidth=10
     #peakheight=4
     pks = find_peaks(np.abs(np.pad(phase_norm,pad_width=padwidth,mode='constant')),height=peakheight)[0]
-    print(pks)
+    #print(pks)
     pks = np.array(pks)-padwidth#10
     wds = peak_widths(np.abs(np.pad(phase_norm,pad_width=padwidth,mode='constant')),pks)[0]
     for i in range(len(pks)):
@@ -1399,7 +1551,7 @@ def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,d
             low = 0
         if hi >= len(phase_new):
             hi = len(phase_new)-1
-        print((low,hi))
+        #print((low,hi))
         phase_new[low:hi] = np.mean(phase_use)
 
     #interpolate
@@ -1413,21 +1565,48 @@ def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,d
             sfwindow += 1
         if sfwindow <= 1:
             sfwindow = 3
-        deg = 1
-        phase_use_sf = sf(phase_use_int,sfwindow,deg)
+        order = 1
+        phase_use_sf = sf(phase_use_int,sfwindow,order)
     elif sfwindow != -1:
         phase_use_sf = sf(phase_use_int,sfwindow,deg)
     else:
         phase_use_sf = None
 
     #fit
-    phase_fit,fit_params = compute_fit(phase_use_int,freq_test2[0],deg)
+    
+    #optionally piecewise fit with given parameters
+    if edgefreq != -1 and breakfreq != -1:
+        edgeidx = np.argmin(np.abs(freq_test2[0]-edgefreq))
+        breakidx = np.argmin(np.abs(freq_test2[0]-breakfreq))
+        phase_fit1p,fit_params1 = compute_fit(phase_use_int[edgeidx:],freq_test2[0][edgeidx:],deg)
+        phase_fit2p,fit_params2 = compute_fit(phase_use_int[:edgeidx],freq_test2[0][:edgeidx],deg)
+
+        phase_fit1 = np.zeros(len(phase_use_int))
+        for i in range(len(fit_params1)):
+            phase_fit1 += fit_params1[i]*(freq_test2[0]**(len(fit_params1)-i-1))
+
+        phase_fit2 = np.zeros(len(phase_use_int))
+        for i in range(len(fit_params2)):
+            phase_fit2 += fit_params2[i]*(freq_test2[0]**(len(fit_params2)-i-1))
+
+
+        phase_fit = np.zeros(len(phase_fit1))
+        phase_fit[breakidx:] = phase_fit1[breakidx:]
+        phase_fit[:breakidx] = phase_fit2[:breakidx]
+        fit_params = [fit_params1,fit_params2]
+    else:
+        phase_fit,fit_params = compute_fit(phase_use_int,freq_test2[0],deg)
 
     if plot:
         f= plt.figure()
         plt.title(r'Phase Difference ($\phi_{xx} - \phi_{yy}$) ' + label )
         plt.plot(freq_test2[0],phase_use_int,label="Calculated")
-        plt.plot(freq_test2[0],phase_fit,label="Fit")
+        if edgefreq != -1 and breakfreq != -1:
+            c=plt.plot(freq_test2[0],phase_fit,label="Fit")
+            plt.plot(freq_test2[0],phase_fit1,"--",color=c[0].get_color(),label="Fit")
+            plt.plot(freq_test2[0],phase_fit2,"--",color=c[0].get_color(),label="Fit")
+        else:
+            plt.plot(freq_test2[0],phase_fit,label="Fit")
         if sfwindow != -1:
             plt.plot(freq_test2[0],phase_use_sf,label="Savgol Filter, " + str(sfwindow) + " sample window")
         plt.axhline(np.nanmedian(phase_use_int),color="black",label="median")
@@ -1440,6 +1619,152 @@ def cleanphasecal_V2(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,d
         plt.close(f)
 
     return phase_use_int,fit_params,phase_use_sf
+
+#Calculates absolute GY gain from observation of 3C48 and Perly-Butler 2013 polynomial fits
+def absgaincal(gain_dir,source_name,obs_name,n_t,n_f,nsamps,deg,ibeam,suffix="_dev",plot=False,show=False,padwidth=10,peakheight=2,n_t_down=32,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125):
+
+    if source_name == "3C48":
+        RA = RA_3C48
+        DEC = DEC_3C48
+        RM = RM_3C48
+        p = p_3C48
+        chip = chip_3C48
+    elif source_name == "3C286":
+        RA = RA_3C286
+        DEC = DEC_3C286
+        RM = RM_3C286
+        p = p_3C286
+        chip = chip_3C286
+    else:
+        print("Please use valid calibrator")
+        return -1
+
+
+    #read in 3C48 observation
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(gain_dir,source_name + obs_name + "_dev",5,n_t=n_t,n_f=n_t_down,sub_offpulse_mean=False)
+
+    #PA correction
+    Ical,Qcal,Ucal,Vcal,ParA = calibrate_angle(Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,ibeam,RA,DEC)
+
+    #compute simulated I,Q,U and XX,YY (https://science.nrao.edu/facilities/vla/docs/manuals/obsguide/modes/pol)
+    I_sim = PB_flux(coeffs_3C48,freq_test[0]*1e-3) #Jy
+    Q_sim = I_sim*(p*np.cos(chip)*np.cos(2*ParA) + p*np.sin(chip)*np.sin(2*ParA))
+    U_sim = I_sim*(-p*np.cos(chip)*np.sin(2*ParA) + p*np.sin(chip)*np.cos(2*ParA))
+    V_sim = np.zeros(I_sim.shape)
+
+    #apply the measured RM to predict what signal should look like
+    I_sim,Q_sim,U_sim,V_sim = calibrate_RM(I_sim,Q_sim,U_sim,V_sim,-RM,0,freq_test,stokes=True)
+    XX_sim = 0.5*(I_sim + Q_sim)
+    YY_sim = 0.5*(I_sim - Q_sim)
+
+    #compute XX, YY observed after cleaning I for peaks
+    #find peaks
+    I_new = copy.deepcopy(Igainuc.mean(1))
+    I_norm = (Igainuc.mean(1) - np.mean(Igainuc.mean(1)))/np.std(Igainuc.mean(1))
+    pks = find_peaks(np.abs(np.pad(I_norm,pad_width=padwidth,mode='constant')),height=peakheight)[0]
+    pks = np.array(pks)-padwidth#10
+    wds = peak_widths(np.abs(np.pad(I_norm,pad_width=padwidth,mode='constant')),pks)[0]
+    for i in range(len(pks)):
+        pk = pks[i]
+        wd = int(np.ceil(wds[i])) + 1
+        if wd == 0: wd = 1
+
+        low = pk-wd
+        hi = pk+wd+1
+        if low < 0 :
+            low = 0
+        if hi >= len(I_new):
+            hi = len(I_new)-1
+        I_new[low:hi] = np.mean(Igainuc.mean(1))
+
+    Q_new = copy.deepcopy(Qgainuc.mean(1))
+    Q_norm = (Qgainuc.mean(1) - np.mean(Qgainuc.mean(1)))/np.std(Qgainuc.mean(1))
+    pks = find_peaks(np.abs(np.pad(Q_norm,pad_width=padwidth,mode='constant')),height=peakheight)[0]
+    pks = np.array(pks)-padwidth#10
+    wds = peak_widths(np.abs(np.pad(Q_norm,pad_width=padwidth,mode='constant')),pks)[0]
+    for i in range(len(pks)):
+        pk = pks[i]
+        wd = int(np.ceil(wds[i])) + 1
+        if wd == 0: wd = 1
+
+        low = pk-wd
+        hi = pk+wd+1
+        if low < 0 :
+            low = 0
+        if hi >= len(I_new):
+            hi = len(I_new)-1
+        Q_new[low:hi] = np.mean(Qgainuc.mean(1))
+
+
+    XX = 0.5*(I_new + Q_new)
+    YY = 0.5*(I_new - Q_new)
+    if plot:
+
+        plt.figure(figsize=(12,6))
+        c=plt.plot(freq_test[0]*1e-3,I_new,label="I")
+        plt.plot(freq_test[0]*1e-3,I_sim,'--',label="Predicted I (Jy)",color=c[0].get_color())
+        c=plt.plot(freq_test[0]*1e-3,XX,label=r'XX (W)')
+        plt.plot(freq_test[0]*1e-3,XX_sim,'--',label="Predicted XX (Jy)",color=c[0].get_color())
+        c=plt.plot(freq_test[0]*1e-3,YY,label=r'YY (W)')
+        plt.plot(freq_test[0]*1e-3,YY_sim,'--',label="Predicted YY (Jy)",color=c[0].get_color())
+        plt.legend()
+        plt.ylim(0,100)
+        plt.savefig(source_name + obs_name + "_fluxprediction.pdf")
+        if show:
+            plt.show()
+        
+
+    #estimated gains
+    GX = np.sqrt(XX/XX_sim)
+    GY = np.sqrt(YY/YY_sim)
+
+    import numpy.ma as ma 
+    GX = ma.masked_invalid(GX, copy=True)
+    GY = ma.masked_invalid(GY, copy=True)
+
+    if plot:
+        plt.figure(figsize=(12,6))
+        plt.plot(freq_test[0],GX,label="GX")
+        plt.plot(freq_test[0],GY,label="GY")
+        plt.ylabel(r'$Gain = \sqrt{A_{eff}} (m\sqrt{\Omega})$')
+        plt.xlabel("Frequency (MHz)")
+        plt.legend()
+        plt.savefig(source_name + obs_name + "_GYGX.pdf")
+        if show:
+            plt.show()
+        
+    #interpolate
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test) = get_stokes_2D(gain_dir,source_name + obs_name + "_dev",5,n_t=n_t,n_f=n_f,sub_offpulse_mean=False)
+
+    idx = np.isfinite(GX)
+    f_GX= interp1d(freq_test[0][idx],GX[idx],kind="linear",fill_value="extrapolate")
+    GX_fullres = f_GX(freq_test_fullres[0])
+
+
+    idx = np.isfinite(GY)
+    f_GY= interp1d(freq_test[0][idx],GY[idx],kind="linear",fill_value="extrapolate")
+    GY_fullres = f_GY(freq_test_fullres[0])
+
+    #polyfit
+    popt = np.polyfit(freq_test_fullres[0],GY_fullres,deg=deg)
+    print(len(popt))
+    GY_fit = np.zeros(len(GY_fullres))
+    for i in range(len(popt)):
+        GY_fit += popt[i] * (freq_test_fullres[0]**(deg - i))
+
+    if plot:
+        plt.figure(figsize=(12,6))
+        plt.plot(freq_test_fullres[0],GY_fullres,label="GY")
+        plt.plot(freq_test_fullres[0],GY_fit,label="fit")
+        plt.ylabel(r'$Gain = \sqrt{A_{eff}} (m\sqrt{\Omega})$')
+        plt.xlabel("Frequency (MHz)")
+        plt.legend()
+        plt.savefig(source_name + obs_name + "_GY_fit.pdf")
+        if show:
+            plt.show()
+    return GY_fullres,GY_fit,popt
+
+
 
 #deprecated
 #Cleans spurious peaks by downsampling and filtering
@@ -1695,7 +2020,7 @@ def cleanphasecal(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,freq_test,stokes=True,deg=
 
 #Takes directory with all unpolarized calibrator observations and calibrator name and computes average gain ratio
 #vs frequency
-def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False,sfwindow=-1,clean=True,padwidth=10,peakheight=2,n_t_down=8):
+def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False,sfwindow=-1,clean=True,padwidth=10,peakheight=2,n_t_down=8,mask=[],edgefreq=-1,breakfreq=-1):
     #if cleaning, always read at full resolution
     if clean:
         n_f_out = n_f
@@ -1710,10 +2035,16 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
         label = source_name + obs_names[i] + suffix
         sdir = datadir + label
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
+        if mask != []:
+            I = ma.masked_array(I,mask)
+            Q = ma.masked_array(Q,mask)
+            U = ma.masked_array(U,mask)
+            V = ma.masked_array(V,mask)
+
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,plot=plot,datadir=datadir,label=label)
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,-1,fobj.header.tsamp,n_t,plot=plot,datadir=datadir,label=label,normalize=False)
         if clean:
-            ratio,fit_params,ratio_sf = cleangaincal_V2(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label,sfwindow=sfwindow,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down,n_f=n_f_out)
+            ratio,fit_params,ratio_sf = cleangaincal_V2(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label,sfwindow=sfwindow,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down,n_f=n_f_out,edgefreq=edgefreq,breakfreq=breakfreq)
         else:
             ratio,fit_params,ratio_sf = gaincal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label,sfwindow=sfwindow)
         
@@ -1732,6 +2063,8 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
     if average:
         avg_ratio = np.nanmean(np.array(ratio_all),axis=0)
         avg_ratio_fit,avg_fit_params = compute_fit(avg_ratio,freq_test[0],deg)#np.nanmean(np.array(fit_params_all),axis=0)
+        if breakfreq != -1 and edgefreq != -1:
+            avg_fit_params = fit_params
         if sfwindow != -1 and not clean:
             ratio_masked = np.ma.masked_outside(avg_ratio,np.mean(avg_ratio)-3*np.std(avg_ratio),np.mean(avg_ratio)+3*np.std(avg_ratio))
             ratio_sf = sf(ratio_masked,sfwindow,3)
@@ -1772,7 +2105,7 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
 
 #Takes directory with all linear calibrator observations and calibrator name and computes average phase difference
 #vs frequency
-def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False,sfwindow=-1,clean=True,padwidth=10,peakheight=2,n_t_down=8):
+def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",average=False,plot=False,show=False,sfwindow=-1,clean=True,padwidth=10,peakheight=2,n_t_down=8,mask=[],edgefreq=-1,breakfreq=-1):
     
     #if cleaning, always use n_f = 1
     if clean:
@@ -1787,10 +2120,15 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
         label = source_name + obs_names[i] + suffix
         sdir = datadir + label
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
+        if mask != []:
+            I = ma.masked_array(I,mask)
+            Q = ma.masked_array(Q,mask)
+            U = ma.masked_array(U,mask)
+            V = ma.masked_array(V,mask)
         (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,-1,fobj.header.tsamp,n_f,n_t,freq_test,plot=plot,datadir=datadir,label=label)
         (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,-1,fobj.header.tsamp,n_t,plot=plot,datadir=datadir,label=label,normalize=False)
         if clean:
-            phase_diff,fit_params,phase_sf = cleanphasecal_V2(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label,sfwindow=sfwindow,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down,n_f=n_f_out)
+            phase_diff,fit_params,phase_sf = cleanphasecal_V2(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label,sfwindow=sfwindow,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down,n_f=n_f_out,edgefreq=edgefreq,breakfreq=breakfreq)
         else:
             phase_diff,fit_params,phase_sf = phasecal(I_f,Q_f,U_f,V_f,freq_test,stokes=True,deg=deg,plot=plot,datadir=datadir,label=label)
         phase_diff_all.append(phase_diff)
@@ -1807,6 +2145,8 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
     if average:
         avg_phase_diff = np.nanmean(np.array(phase_diff_all),axis=0)
         avg_phase_diff_fit,avg_fit_params = compute_fit(avg_phase_diff,freq_test[0],deg)#np.nanmean(np.array(fit_params_all),axis=0)
+        if breakfreq != -1 and edgefreq != -1:
+            avg_fit_params = fit_params
         if sfwindow != -1 and not clean:
             phase_masked = np.ma.masked_outside(avg_phase_diff,np.mean(avg_phase_diff)-3*np.std(avg_phase_diff),np.mean(avg_phase_diff)+3*np.std(avg_phase_diff))
             phase_sf = sf(phase_masked,sfwindow,3)
@@ -1960,7 +2300,7 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
         V_obs = -1j*0.5*(xy_U_obs - yx_V_obs)#-np.imag(xy_obs)
 
     #antenna properties
-    chi_ant = np.pi
+    chi_ant = np.pi/2
     synth_beamsize = (np.pi/180) * beamsize_as / 3600  #rad, need to verify beam size with Vikram and Liam
     #centerbeam = 125
     #Lat = 37.23 #degrees
@@ -1988,9 +2328,13 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
     print("FRB RA: " + str(RA) + " degrees")
     print("FRB DEC: " + str(DEC) + " degrees")
 
+    RA = RA*np.pi/180
+    DEC = DEC*np.pi/180
+
     #use hour angle for beam nearest center to estimate actual elevation
     observing_time = Time(fobj.header.tstart, format='mjd', location=observing_location)#Time(fobj.header.tstart, format='mjd', location=observing_location)
-    LST = observing_time.sidereal_time('mean').hour
+    GST = Time(fobj.header.tstart, format='mjd').to_datetime().hour + Time(fobj.header.tstart, format='mjd').to_datetime().minute/60 + Time(fobj.header.tstart, format='mjd').to_datetime().second/3600#observing_time.sidereal_time('mean').hour
+    LST = (GST + Lon*24/360)%24
     print(observing_time.isot)
     print(LST)
 
