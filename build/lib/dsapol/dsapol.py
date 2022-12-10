@@ -3000,6 +3000,149 @@ def arr_to_list_check(x):
 
 
 #Plotting Functions
+def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,gain_dir,gain_source_name,gain_obs_name,gain_beam,phase_dir,phase_source_name,phase_obs_name,phase_beam,n_t,n_f,sfwindow=-1,nsamps_cal=5,suffix="_dev",padwidth=10,peakheight=2,n_t_down=32,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,edgefreq=-1,breakfreq=-1,use_fit=True,weighted=False,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000):
+
+
+
+    #get calibration parameters
+    #GY
+    GY,GY_fit,GY_fit_params=absgaincal(gain_dir,gain_source_name,gain_obs_name,n_t,1,nsamps_cal,deg,gain_beam,suffix=suffix,plot=plot,show=show,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down,beamsize_as=beamsize_as,Lat=Lat,Lon=Lon,centerbeam=centerbeam)
+
+    #gain,phase
+    (tmp,tmp,tmp,tmp,tmp,tmp,freq_test,tmp) = get_stokes_2D(gain_dir,gain_source_name + gain_obs_name + suffix ,nsamps,n_t=n_t,n_f=1)
+
+    ratio_2,ratio_params_2,ratio_sf_2 = gaincal_full(gain_dir,gain_source_name,gain_obs_names,n_t,1,nsamps,deg,suffix=suffix,average=True,plot=False,show=False,sfwindow=sfwindow,clean=True,padwidth=padwidth,peakheight=peakheight+1,n_t_down=n_t_down,edgefreq=edgefreq,breakfreq=breakfreq)
+    phase_2,phase_params_2,phase_sf_2 = phasecal_full(phase_dir,phase_source_name,phase_obs_names,n_t,1,nsamps,deg,suffix=suffix,average=True,plot=False,show=False,sfwindow=sfwindow,clean=True,padwidth=padwidth,peakheight=peakheight+1,n_t_down=n_t_down,edgefreq=-1,breakfreq=-1)#,edgefreq=-1,breakfreq=-1)
+
+    if len(ratio_params_2) ==2:
+        ratio_fit1 = np.zeros(len(ratio_2))
+        for i in range(len(ratio_params_2[0])):
+            ratio_fit1 += ratio_params_2[0][i]*(freq_test[0]**(len(ratio_params_2[0])-i-1))
+        ratio_fit2 = np.zeros(len(ratio_2))
+        for i in range(len(ratio_params_2[1])):
+            ratio_fit2 += ratio_params_2[1][i]*(freq_test[0]**(len(ratio_params_2[1])-i-1))
+        breakidx = np.argmin(np.abs(freq_test[0]-breakfreq))#np.argmin(np.abs(ratio_fit1 - ratio_fit2))
+        ratio_fit3 = np.zeros(len(ratio_fit1))
+        ratio_fit3[breakidx:] = ratio_fit1[breakidx:]
+        ratio_fit3[:breakidx] = ratio_fit2[:breakidx]
+        ratio_fit = ratio_fit3
+    else:
+        ratio_fit1 = np.zeros(len(ratio_2))
+        for i in range(len(ratio_params_2)):
+            ratio_fit1 += ratio_params_2[i]*(freq_test[0]**(len(ratio_params_2)-i-1))
+        ratio_fit = ratio_fit1
+
+    phase_fit = np.zeros(len(phase_2))
+    for i in range(len(phase_params_2)):
+        phase_fit += phase_params_2[i]*(freq_test[0]**(len(phase_params_2)-i-1))
+    phase_fit = np.nanmedian(phase_fit)*np.ones(len(phase_fit))
+    
+
+    if use_fit:
+        ratio_use = ratio_fit
+        phase_use = phase_fit
+        GY_use = GY_fit
+    elif sfwindow != -1:
+        ratio_use = ratio_sf_2
+        phase_use = phase_sf_2
+        GY_use = GY_fit
+    else:
+        ratio_use = ratio_2
+        phase_use = phase_2
+        GY_use = GY
+
+    (gxx,gyy) = get_calmatrix_from_ratio_phasediff(ratio_fit,phase_fit,gyy_mag=GY_USE)
+
+    print("Modelling phase as constant: " + str(np.mean(np.angle(gxx))*180/np.pi) + " degrees")
+    print(str(deg) + " degree fit for gain: " + str(ratio_params_2))
+
+    #Read data
+    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+    (I_fullres,Q_fullres,U_fullres,V_fullres,fobj,timeaxis,freq_test_fullres,wav_test) = get_stokes_2D(datadir,ids + "_dev",20480,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=True)
+    
+    #gain/phase and PA calibrate
+    Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres = calibrate(I_fullres,Q_fullres,U_fullres,V_fullres,(gxx,gyy),stokes=True)
+    Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres,ParA_fullres = calibrate_angle(Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres,fobj,ibeam,RA,DEC)
+
+    #downsample in frequency
+    I = dsapol.avg_freq(I_fullres,n_f)
+    Q = dsapol.avg_freq(Q_fullres,n_f)
+    U = dsapol.avg_freq(U_fullres,n_f)
+    V = dsapol.avg_freq(V_fullres,n_f)
+
+    Ical = dsapol.avg_freq(Ical_fullres,n_f)
+    Qcal = dsapol.avg_freq(Qcal_fullres,n_f)
+    Ucal = dsapol.avg_freq(Ucal_fullres,n_f)
+    Vcal = dsapol.avg_freq(Vcal_fullres,n_f)
+    
+    if freq_test_fullres[0].shape[0]%n_f != 0:
+            for i in range(4):
+                freq_test_fullres[i] = freq_test_fullres[i][freq_test_fullres[i].shape[0]%n_f:]
+
+    freq_test =  [freq_test_fullres[0].reshape(len(freq_test_fullres[0])//n_f,n_f).mean(1)]*4
+    
+    #get window
+    (peak,timestart,timestop) = find_peak(I,width_native,fobj.header.tsamp,n_t=n_t,peak_range=None,pre_calc_tf=False,buff=buff)
+    t = 32.7*n_t*np.arange(0,I.shape[1])
+
+
+    if plot:
+        plot_spectra_2D(I,Q,U,V,width_native,fobj.header.tsamp,n_t,n_f,freq_test,lim=np.percentile(I,90),show=show,buff=int(64/n_t),weighted=False,window=int(64/n_t),datadir=datadir,ext=".png",label="_uncal_")
+        plot_spectra_2D(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_f,freq_test,lim=np.percentile(I,90),show=show,buff=int(64/n_t),weighted=False,window=int(64/n_t),datadir=datadir,ext=".png",label="_cal_")
+
+
+    if weighted:
+        #get filter, FWHM
+        I_w_t_filt = get_weights(I,Q,U,V,width_native,fobj.header.tsamp,n_f,n_t,freq_test,timeaxis,fobj,n_off=int(12000/n_t),buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        FWHM,heights,intL,intR = peak_widths(I_w_t_filt,[np.argmax(I_w_t_filt)])
+        print("FWHM: " + str((intR-intL)*n_t*32.7) + " us")
+        wind = (intL-intR)*3
+        if plot:
+            plt.figure(figsize=(12,6))
+            plt.plot(t,I_w_t_filt)
+            plt.axvline(32.7*n_t*intL)
+            plt.axvline(32.7*n_t*intR)
+            plt.xlim(32.7*n_t*timestart - wind*32.7*n_t,32.7*n_t*timestop + wind*32.7*n_t)
+            plt.savefig(datadir + ids + "_" + nickname + "_filterplot.png")
+            if show:
+                plt.show()
+
+    #get IQUV vs time and freq
+    (I_tcal,Q_tcal,U_tcal,V_tcal) = get_stokes_vs_time(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_off=int(12000//n_t),plot=plot,show=show,datadir=datadir,normalize=True,buff=buff,window=3)
+    (I_fcal,Q_fcal,U_fcal,V_fcal) = get_stokes_vs_freq(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_f,n_t,freq_test,n_off=int(12000/n_t),plot=plot,show=show,normalize=True,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
+
+    #estimate polarization fractions before RM
+    
+    [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C)] = get_pol_fraction(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=int(12000/n_t),plot=plot,show=show,datadir=datadir,normalize=True,buff=buff,full=False,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
+    PA_f,PA_t,avg_PA,PA_err = dsapol.get_pol_angle(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=int(12000/n_t),plot=plot,show=show,datadir=datadir,normalize=True,buff=buff,weighted=weighted,n_t_weight=n_t_weights,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
+    print(r'Total Polarization: ${avg} \pm {err}$'.format(avg=avg,err=sigma_frac))
+    print(r'Linear Polarization: ${avg} \pm {err}$'.format(avg=avg_L,err=sigma_L))
+    print(r'Circular Polarization: ${avg} \pm {err}$'.format(avg=avg_C,err=sigma_C))
+    print(r'Position Angle: ${avg}^\circ \pm {err}^\circ$'.format(avg=avg_PA*180/np.pi,err=PA_err*180/np.pi))
+
+    #RM synthesis
+    if RMcal:
+        (I_fcal_fullres,Q_fcal_fullres,U_fcal_fullres,V_fcal_fullres) = get_stokes_vs_freq(Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres,width_native,fobj.header.tsamp,n_f,n_t,freq_test_fullres,n_off=int(12000/n_t),plot=plot,show=show,normalize=True,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
+        RM1,phi1,RMsnrs1,RMerr1 = faradaycal(I_fcal_fullres,Q_fcal_fullres,U_fcal_fullres,V_fcal_fullres,freq_test_fullres,trial_RM,trial_phi,plot=plot,show=show,fit_window=fit_window,err=True)
+        print(r'RM Synthesis estimate: ${avg} \pm {err} rad/m^2$'.format(avg=RM1,err=RMerr1))
+        
+        trial_RM2 = np.linspace(RM1-zoom_window,RM1+zoom_window,n_trial_RM_zoom)
+
+        RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,RMsnrs2_full = faradaycal_SNR(Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres,freq_test_fullres,trial_RM2,trial_phi,width_native,fobj.header.tsamp,plot=plot,n_f=1,n_t=n_t,show=show,datadir=datadir,err=True,buff=buff,weighted=weighted,n_off=int(12000/n_t),n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights,full=True)
+        print(r'RM S/N method estimate: ${avg} \pm {err} rad/m^2$, Linear S/N = {SNR}'.format(avg=RM2,err=RMerr2,SNR=np.max(RMsnrs2)))
+
+        #calibrate and re-estimate polarization
+        (IcalRM,QcalRM,UcalRM,VcalRM)=calibrate_RM(Ical,Qcal,Ucal,Vcal,RM2,phi,freq_test,stokes=True)
+        [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C)] = get_pol_fraction(IcalRM,QcalRM,UcalRM,VcalRM,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=int(12000/n_t),plot=plot,show=show,datadir=datadir,normalize=True,buff=buff,full=False,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
+        PA_f,PA_t,avg_PA,PA_err = dsapol.get_pol_angle(IcalRM,QcalRM,UcalRM,VcalRM,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=int(12000/n_t),plot=plot,show=show,datadir=datadir,normalize=True,buff=buff,weighted=weighted,n_t_weight=n_t_weights,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
+        print(r'Total Polarization: ${avg} \pm {err}$'.format(avg=avg,err=sigma_frac))
+        print(r'Linear Polarization: ${avg} \pm {err}$'.format(avg=avg_L,err=sigma_L))
+        print(r'Circular Polarization: ${avg} \pm {err}$'.format(avg=avg_C,err=sigma_C))
+        print(r'Position Angle: ${avg}^\circ \pm {err}^\circ$'.format(avg=avg_PA180/np.pi,err=PA_err*180/np.pi))
+
+    return -1
+
+#deprecated
 def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,RM_in=None,phi_in=0,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1,extra='',clean=True,padwidth=10,peakheight=2,n_t_down=8,sf_window_weights=45):
     if n_trial_RM_zoom == -1:
         n_trial_RM_zoom = len(trial_RM)
