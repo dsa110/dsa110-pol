@@ -455,20 +455,30 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
     (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff)
     #Bin to optimal time binning
     Ib,Qb,Ub,Vb = avg_time(I,n_t_weight),avg_time(Q,n_t_weight),avg_time(U,n_t_weight),avg_time(V,n_t_weight)
+    """
     if fobj.header.nsamples == 5120:
         timeaxisb = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//(n_t*n_t_weight))
     else:
         timeaxisb = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//(n_t*n_t_weight))
-    
+    """
     #this is simpler:
     timeaxis = np.arange(I.shape[1])
     #timaxisb = np.linspace(0,I.shape[1],Ib.shape[1])
 
     #Calculate weights
     (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(Ib,Qb,Ub,Vb,width_native,t_samp,n_t*n_t_weight,n_off//n_t_weight,normalize=True,buff=buff) #note normalization always used to get SNR
-    timeaxisb = np.linspace(0,I.shape[1],len(I_t))
-    print(len(timeaxisb),len(I_t))
+    #timeaxisb = np.linspace(0,I.shape[1],len(I_t))
+    timeaxist = np.zeros((1,timeaxis.shape[0]))
+    timeaxist[0,:] = timeaxis
 
+    if timeaxist.shape[1]%n_t_weight != 0:
+        timeaxist = timeaxist[:,timeaxist.shape[1]%n_t_weight:]
+    
+    timeaxisb = (((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())[0]
+    print(len(timeaxisb),len(I_t))
+    #print(timeaxist)
+    #print(timeaxisb)
+    #print(((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())
 
     #Interpolate to original sample rate
     fI = interp1d(timeaxisb,I_t,kind="linear",fill_value="extrapolate")
@@ -525,18 +535,38 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
 
 
 def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45,padded=True,norm=True):
+    if timestart==-1 or timestop==-1:
+        peak,timestart,timestop = find_peak((I_t_init,I_t_init),width_native,t_samp,n_t,buff=buff,pre_calc_tf=True)
+
     #downsample
-    I_t = I_t_init[I_t_init.shape[0]%n_t_weight:]
-    Q_t = Q_t_init[Q_t_init.shape[0]%n_t_weight:]
-    U_t = U_t_init[U_t_init.shape[0]%n_t_weight:]
-    V_t = V_t_init[V_t_init.shape[0]%n_t_weight:]
+    I_t = np.zeros((1,len(I_t_init)))
+    I_t[0,:] = I_t_init[I_t_init.shape[0]%n_t_weight:]
+    I_t = (((I_t.transpose()).reshape(-1,n_t_weight,I_t.shape[0]).mean(1)).transpose())[0]
+    Q_t = np.zeros((1,len(Q_t_init)))
+    Q_t[0,:] = Q_t_init[Q_t_init.shape[0]%n_t_weight:]
+    Q_t = (((Q_t.transpose()).reshape(-1,n_t_weight,Q_t.shape[0]).mean(1)).transpose())[0]
+    U_t = np.zeros((1,len(U_t_init)))
+    U_t[0,:] = U_t_init[U_t_init.shape[0]%n_t_weight:]
+    U_t = (((U_t.transpose()).reshape(-1,n_t_weight,U_t.shape[0]).mean(1)).transpose())[0]
+    V_t = np.zeros((1,len(V_t_init)))
+    V_t[0,:] = V_t_init[V_t_init.shape[0]%n_t_weight:]
+    V_t = (((V_t.transpose()).reshape(-1,n_t_weight,V_t.shape[0]).mean(1)).transpose())[0]
+
+    
 
     timeaxis = np.arange(I_t_init.shape[0])
     #timaxisb = np.linspace(0,I.shape[1],Ib.shape[1])
 
     #Calculate weights
     #(I_t,Q_t,U_t,V_t) = get_stokes_vs_time(Ib,Qb,Ub,Vb,width_native,t_samp,n_t*n_t_weight,n_off//n_t_weight,normalize=True,buff=buff) #note normalization always used to get SNR
-    timeaxisb = np.linspace(0,I_t.shape[0],len(I_t))
+    timeaxist = np.zeros((1,timeaxis.shape[0]))
+    timeaxist[0,:] = timeaxis
+
+    if timeaxist.shape[1]%n_t_weight != 0:
+        timeaxist = timeaxist[:,timeaxist.shape[1]%n_t_weight:]
+
+    timeaxisb = (((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())[0]
+    #timeaxisb = np.linspace(0,I_t.shape[0],len(I_t))
     print(len(timeaxisb),len(I_t))
 
 
@@ -554,10 +584,13 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
     V_t_weight = fV(timeaxis)/np.sum(fV(timeaxis))
 
     #savgol filter
-    I_t_weight = sf(I_t_weight,sf_window_weights,3)
-    Q_t_weight = sf(Q_t_weight,sf_window_weights,3)
-    U_t_weight = sf(U_t_weight,sf_window_weights,3)
-    V_t_weight = sf(V_t_weight,sf_window_weights,3)
+    if sf_window_weights <= 3:
+        print("No SF Filter")
+    else:
+        I_t_weight = sf(I_t_weight,sf_window_weights,3)
+        Q_t_weight = sf(Q_t_weight,sf_window_weights,3)
+        U_t_weight = sf(U_t_weight,sf_window_weights,3)
+        V_t_weight = sf(V_t_weight,sf_window_weights,3)
 
     #take absolute value (negative weights meaningless)
     I_t_weight = np.abs(I_t_weight)
@@ -3470,7 +3503,7 @@ from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 #interactive functions
-def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000):
+def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False):
     datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     #function for tuning the following paramters:
     #n_t
@@ -3485,18 +3518,33 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     V = copy.deepcopy(V_init)
 
     #TIME
-    fig = plt.figure(figsize=(72,60))
-    ax = plt.subplot2grid(shape=(4,2),loc=(0,0))
-    ax1 = plt.subplot2grid(shape=(4,2),loc=(3,0))
+    fig = plt.figure(figsize=(72,84))
+    ax = plt.subplot2grid(shape=(6,2),loc=(0,0))
+    final_complist_min = []
+    final_complist_max = []
+    complist_min = []
+    complist_max = []
+    donelist = []
+    #function to highlight components
+    def update_component(xmin,xmax):
+        if len(donelist) == 0:
+            complist_min.append(xmin)
+            complist_max.append(xmax)
+            print("Current comp bounds: " + str(xmin) + "-" + str(xmax))
+    span = SpanSelector(ax,update_component,"horizontal",interactive=True,props=dict(facecolor='red', alpha=0.5))
+    span.set_active(False)
+    span.set_visible(True)
+    print(ax.lines)
+    ax1 = plt.subplot2grid(shape=(6,2),loc=(4,0))
     ax1.set_xlabel("Frequency (MHz)")
     ax1.set_xlim(np.min(freq_test_init[0]),np.max(freq_test_init[0]))
     
-    ax2 = plt.subplot2grid(shape=(4,2),loc=(0,1))
+    ax2 = plt.subplot2grid(shape=(6,2),loc=(0,1))
     ax2.set_title("RM Analysis")
-    ax2.set_xlabel("RM (rad/m^2)")
+    ax2.set_xlabel("RM ($rad/m^2$)")
     ax2.set_ylabel(r'$F(\phi)$')
 
-    ax3 = plt.subplot2grid(shape=(4,2),loc=(3,1))
+    ax3 = plt.subplot2grid(shape=(6,2),loc=(4,1))
     ax3_1 = ax3.twinx()
     ax3.set_xlabel(r'RM ($rad/m^2$)')
     ax3.set_ylabel("Linear S/N")
@@ -3526,36 +3574,48 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     slideheight = 0.03
     offset = 0.36- slideheight*3.5
     buttonwidth = 0.1
+    offset2 = 0.08
     
 
     #TIME AXES
-    axn_t = plt.axes([slideleft,offset + slideheight*7,slidewidth,slideheight])
-    axmulti = plt.axes([slideleft,0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
-    axnextcomp = plt.axes([slideleft+buttonwidth+0.01,0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1-(0.03/2)])
-    axdone = plt.axes([slideleft+2*buttonwidth+0.02, 0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1-(0.03/2)])
-    axn_t_weight = plt.axes([slideleft,offset + slideheight*2,slidewidth,slideheight])
-    axsf_window_weights = plt.axes([slideleft,offset + slideheight*3,slidewidth,slideheight])
-    axbuff1 = plt.axes([slideleft,offset + slideheight*4,slidewidth,slideheight])
-    axbuff2 = plt.axes([slideleft,offset + slideheight*5,slidewidth,slideheight])
-    axwidth = plt.axes([slideleft,offset + slideheight*6,slidewidth,slideheight])
+    axn_t = plt.axes([slideleft,offset2+offset + slideheight*7,slidewidth,slideheight])
+    axmulti = plt.axes([slideleft,offset2+0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
+    axnextcomp = plt.axes([slideleft+buttonwidth+0.01,offset2+0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1-(0.03/2)])
+    axdone = plt.axes([slideleft+2*buttonwidth+0.02,offset2+ 0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1-(0.03/2)])
+    axn_t_weight = plt.axes([slideleft,offset2+offset + slideheight*2,slidewidth,slideheight])
+    axsf_window_weights = plt.axes([slideleft,offset2+offset + slideheight*3,slidewidth,slideheight])
+    axbuff1 = plt.axes([slideleft,offset2+offset + slideheight*4,slidewidth,slideheight])
+    axbuff2 = plt.axes([slideleft,offset2+offset + slideheight*5,slidewidth,slideheight])
+    axwidth = plt.axes([slideleft,offset2+offset + slideheight*6,slidewidth,slideheight])
     
 
     #FREQ AXES
-    axn_f = plt.axes([slideleft,offset + slideheight*1,slidewidth,slideheight])
+    axn_f = plt.axes([slideleft,offset2+offset + slideheight*1,slidewidth,slideheight])
     #axdone2 = plt.axes([0.625, 0.25 + slideheight*1 + 0.13 - (0.03/2) - 0.05 - 0.01,0.15,0.1-(0.03/2)])
 
     #RM AXES
-    ax_RMmin = plt.axes([slideleft+0.45,0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
-    ax_RMmax = plt.axes([slideleft+0.45+buttonwidth+buttonwidth/2,0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
-    ax_RMtrials = plt.axes([slideleft+0.45,0.22 + 0.1 + 2*0.085 + 0.02-0.1-0.01,buttonwidth,0.1])
-    ax_RMresult = plt.axes([slideleft+0.45,0.22 + 0.1 + 2*0.085 + 0.02-0.2-0.02,buttonwidth,0.1])
-    ax_RMerror = plt.axes([slideleft+0.45+buttonwidth+buttonwidth/2,0.22 + 0.1 + 2*0.085 + 0.02-0.2-0.02,buttonwidth,0.1])
-    ax_RMrun = plt.axes([slideleft+0.45+2*buttonwidth+buttonwidth,0.22 + 0.1 + 2*0.085 + 0.02-0.2-0.02,buttonwidth,0.1])
-    ax_RMzoomrange = plt.axes([slideleft+0.45+2*buttonwidth+buttonwidth,0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
-    ax_RMzoomtrials = plt.axes([slideleft+0.45+2*buttonwidth+buttonwidth,0.22 + 0.1 + 2*0.085 + 0.02-0.1-0.01,buttonwidth,0.1])
-    ax_reset = plt.axes([slideleft,1,buttonwidth,0.1])
+    ax_RMmin = plt.axes([slideleft+0.45,offset2+0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
+    ax_RMmax = plt.axes([slideleft+0.45+buttonwidth+buttonwidth/2,offset2+0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
+    ax_RMtrials = plt.axes([slideleft+0.45,offset2+0.22 + 0.1 + 2*0.085 + 0.02-0.1-0.01,buttonwidth,0.1])
+    ax_RMresult = plt.axes([slideleft+0.45,offset2+0.22 + 0.1 + 2*0.085 + 0.02-0.2-0.02,buttonwidth,0.1])
+    ax_RMerror = plt.axes([slideleft+0.45+buttonwidth+buttonwidth/2,offset2+0.22 + 0.1 + 2*0.085 + 0.02-0.2-0.02,buttonwidth,0.1])
+    ax_RMapply = plt.axes([slideleft+0.45+buttonwidth+buttonwidth/2,offset2+0.22 + 0.1 + 2*0.085 + 0.02-0.1-0.01,buttonwidth,0.1])
+    ax_RMrun = plt.axes([slideleft+0.45+2*buttonwidth+buttonwidth,offset2+0.22 + 0.1 + 2*0.085 + 0.02-0.2-0.02,buttonwidth,0.1])
+    ax_RMzoomrange = plt.axes([slideleft+0.45+2*buttonwidth+buttonwidth,offset2+0.22 + 0.1 + 2*0.085 + 0.02,buttonwidth,0.1])
+    ax_RMzoomtrials = plt.axes([slideleft+0.45+2*buttonwidth+buttonwidth,offset2+0.22 + 0.1 + 2*0.085 + 0.02-0.1-0.01,buttonwidth,0.1])
+    ax_reset = plt.axes([slideleft,0.9,buttonwidth,0.1])
 
+    #POL AXES
+    axTPOL = plt.axes([slideleft,0.05,buttonwidth*3/4,0.1])
+    axLPOL = plt.axes([slideleft+buttonwidth+0.01,0.05,buttonwidth*3/4,0.1])
+    axCPOL = plt.axes([slideleft+2*buttonwidth+0.02,0.05,buttonwidth*3/4,0.1])
+    axSCPOL = plt.axes([slideleft+3*buttonwidth+0.03,0.05,buttonwidth*3/4,0.1])
+    axTSNR = plt.axes([slideleft+4*buttonwidth+0.04,0.05,buttonwidth*3/4,0.1])
+    axLSNR = plt.axes([slideleft+5*buttonwidth+0.05,0.05,buttonwidth*3/4,0.1])
+    axCSNR = plt.axes([slideleft+6*buttonwidth+0.06,0.05,buttonwidth*3/4,0.1])
+    axSNR = plt.axes([slideleft+7*buttonwidth+0.07,0.05,buttonwidth*3/4,0.1])
 
+    #make buttons
     n_t_slider = Slider(axn_t,r'$n_t$',1,64,1,valstep=1)
     multi_button = CheckButtons(axmulti,labels=["multi"])
     nextcomp_button = Button(axnextcomp,label="next")
@@ -3563,7 +3623,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     #deactivate others
     n_t_weight_slider = Slider(axn_t_weight,r'$n_{tw}$',0,8,0,valstep=1)
     n_t_weight_slider.valtext.set_text(1)
-    sf_window_weights_slider = Slider(axsf_window_weights,"sf window",5,21,5,valstep=2)
+    sf_window_weights_slider = Slider(axsf_window_weights,"sf window",3,21,3,valstep=2)
     buff1_slider = Slider(axbuff1,"left buffer",0,20,0,valstep=1)
     buff2_slider = Slider(axbuff2,"right buffer",0,20,0,valstep=1)
     width_slider = Slider(axwidth,"ibox",0,40,init_width_native,valstep=1)
@@ -3582,6 +3642,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     RMmax_input = TextBox(ax_RMmax, 'RM Max', initial="1e6")
     RMmin_input = TextBox(ax_RMmin, 'RM Min', initial="-1e6")
     RMtrials_input = TextBox(ax_RMtrials, 'RM Trials', initial="2e6")
+    RMapply_button = Button(ax_RMapply,label="apply")
     RMrun_button = Button(ax_RMrun,label="run")
     RMresult_input = TextBox(ax_RMresult, 'Result', initial="")
     RMerror_input = TextBox(ax_RMerror, 'Error', initial="")
@@ -3590,6 +3651,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     RMmax_input.set_active(False)
     RMmin_input.set_active(False)
     RMtrials_input.set_active(False)
+    RMapply_button.set_active(False)
     RMrun_button.set_active(False)
     RMresult_input.set_active(False)
     RMerror_input.set_active(False)
@@ -3598,11 +3660,28 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
     reset_button = Button(ax_reset,label="reset")
 
+
+    TPOL_input = TextBox(axTPOL, 'T/I', initial="")
+    LPOL_input = TextBox(axLPOL, 'L/I', initial="")
+    CPOL_input = TextBox(axCPOL, '|V|/I', initial="")
+    SCPOL_input = TextBox(axSCPOL, 'V/I', initial="")
+    TSNR_input = TextBox(axTSNR, 'T/I\nS/N', initial="")
+    LSNR_input = TextBox(axLSNR, 'L/I\nS/N', initial="")
+    CSNR_input = TextBox(axCSNR, 'V/I\nS/N', initial="")
+    SNR_input = TextBox(axSNR, 'S/N', initial="")
+
     #function for n_t slider
     def update_n_t(val):
         n_t = n_t_slider.val
 
-        ax.clear()
+        for i in range(2,len(ax.lines)):
+            ax.lines.pop()
+            ax.set_prop_cycle(None)
+            # recompute the ax.dataLim
+            ax.relim()
+            # update ax.viewLim using the new dataLim
+            ax.autoscale_view()
+
         I_t = I_t_init[len(I_t_init)%n_t:]
         I_t = I_t.reshape(len(I_t)//n_t,n_t).mean(1)
         Q_t = Q_t_init[len(Q_t_init)%n_t:]
@@ -3627,10 +3706,12 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
     #function to select multiple components, activates span
     def update_multi(val):
+        #span = span_lst[0]
         n_t_slider.set_active(not multi_button.get_status())
         span.set_active(not span.get_active())
         return
 
+    """
     final_complist_min = []
     final_complist_max = []
     complist_min = []
@@ -3642,10 +3723,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             complist_min.append(xmin)
             complist_max.append(xmax)
             print("Current comp bounds: " + str(xmin) + "-" + str(xmax))
-
-    span = SpanSelector(ax,update_component,"horizontal",interactive=True,props=dict(facecolor='red', alpha=0.5))
-    span.set_active(False)
-    span.set_visible(True)
+    """
 
     comp_widths = []
     comp_weights = []
@@ -3655,8 +3733,29 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     comp_weights_list = [0]
     comp_timestarts = []
     comp_timestops =[]
+    comp_TPOLs = []
+    comp_LPOLs = []
+    comp_CPOLs = []
+    comp_SCPOLs = []
+    comp_TSNRs = []
+    comp_LSNRs = []
+    comp_CSNRs = []
+    comp_SNRs = []
+    comp_multipeaks = []
+
+
+    TPOL_str = []
+    LPOL_str = []
+    CPOL_str = []
+    SCPOL_str = []
+    TSNR_str = []
+    LSNR_str = []
+    CSNR_str = []
+    SNR_str = []
+
     #function to switch to next component
     def update_nextcomp(val):
+        #span = span_lst[0]
         if span.get_active() and len(donelist) == 0:
             final_complist_min.append(complist_min[-1])
             final_complist_max.append(complist_max[-1])
@@ -3667,6 +3766,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             ax.axvline(final_complist_min[-1],color="red")
             ax.axvline(final_complist_max[-1],color="red")
 
+            
             print("Component " + str(len(final_complist_min)) + " Bounds:" + str(final_complist_max[-1]) + "-" + str(final_complist_max[-1]))
         elif len(donelist) == 1:
             if len(comp_weights_list) < len(final_complist_min):
@@ -3680,7 +3780,12 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                 buff= [buff1,buff2]
                 width_native = width_slider.val
 
-                ax.clear()
+                for i in range(2,len(ax.lines)):
+                    ax.lines.pop()
+                    ax.set_prop_cycle(None)
+                    ax.relim()
+                    # update ax.viewLim using the new dataLim
+                    ax.autoscale_view()
                 I_t = I_t_init[len(I_t_init)%n_t:]
                 I_t = I_t.reshape(len(I_t)//n_t,n_t).mean(1)
                 Q_t = Q_t_init[len(Q_t_init)%n_t:]
@@ -3690,9 +3795,9 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                 V_t = V_t_init[len(V_t_init)%n_t:]
                 V_t = V_t.reshape(len(V_t)//n_t,n_t).mean(1)
 
-                peak = int(15280/n_t)
-                timestart = int(peak - (5e-3)/(n_t*32.7e-6))
-                timestop = int(peak + (5e-3)/(n_t*32.7e-6))
+                #peak = int(15280/n_t)
+                #timestart = int(peak - (1e-3)/(n_t*32.7e-6))
+                #timestop = int(peak + (1e-3)/(n_t*32.7e-6))
                 #mask all but first burst
                 for i in range(len(final_complist_min)):
                     if i != comp_weights_list[-1]:
@@ -3707,8 +3812,49 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                         V_t = ma.masked_array(V_t,mask)
 
                 (peak,timestart1,timestop1) = find_peak((I_t,I_t),width_native,t_samp,n_t,buff=buff,pre_calc_tf=True)
+                timestart2 = timestart1 - int( (1e-3)/(n_t*32.7e-6))
+                timestop2 = timestop1 + int( (1e-3)/(n_t*32.7e-6))
                 I_t_weights=get_weights_1D(I_t,Q_t,U_t,V_t,timestart1,timestop1,width_native,t_samp,1,n_t,freq_test_init,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=True)
-                I_t_weights_cut = I_t_weights[timestart:timestop]
+                I_t_weights_cut = I_t_weights[timestart2:timestop2]
+
+                #get polarization of component
+                [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C),(C_f_u,C_t_u,avg_C_u,sigma_C_u,snr_C_u),snr] = get_pol_fraction([I_t,np.ones(1)],[Q_t,np.zeros(1)],[U_t,np.zeros(1)],[V_t,np.zeros(1)],width_native,t_samp,n_t,1,np.ones(1),n_off=int(12000/n_t),plot=False,pre_calc_tf=True,show=False,normalize=True,buff=[buff1_slider.val,buff2_slider.val],weighted=True,n_t_weight=1,timeaxis=timeaxis,fobj=fobj,unbias=True,input_weights=I_t_weights,allowed_err=1,unbias_factor=1)
+                
+                """
+                TPOL_input.set_val(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+                LPOL_input.set_val(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+                CPOL_input.set_val(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+                SCPOL_input.set_val(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+                
+                SNR_input.set_val(np.around(snr,2))
+                TSNR_input.set_val(np.around(snr_frac,2))
+                LSNR_input.set_val(np.around(snr_L,2))
+                CSNR_input.set_val(np.around(snr_C,2))
+              
+
+                TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+                LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+                CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+                SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+                SNR_str.append(str(np.around(snr,2)))
+                TSNR_str.append(str(np.around(snr_frac,2)))
+                LSNR_str.append(str(np.around(snr_L,2)))
+                CSNR_str.append(str(np.around(snr_C,2)))
+
+
+                TPOL_input.set_val(',\n'.join(TPOL_str))
+                LPOL_input.set_val(',\n'.join(LPOL_str))
+                CPOL_input.set_val(',\n'.join(CPOL_str))
+                SCPOL_input.set_val(',\n'.join(SCPOL_str))
+
+
+                TSNR_input.set_val(',\n'.join(TSNR_str))
+                LSNR_input.set_val(',\n'.join(LSNR_str))
+                CSNR_input.set_val(',\n'.join(CSNR_str))
+                SNR_input.set_val(',\n'.join(SNR_str))
+                """
+
                 if len(comp_weights) < len(comp_weights_list):
                     print((len(comp_weights),len(comp_weights_list)))
                     comp_widths.append(width_native)
@@ -3718,6 +3864,23 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                     comp_buffs.append(buff)
                     comp_timestarts.append(timestart1)
                     comp_timestops.append(timestop1)
+                    comp_TPOLs.append(avg)
+                    comp_LPOLs.append(avg_L)
+                    comp_CPOLs.append(avg_C)
+                    comp_SCPOLs.append(avg_C_u)
+                    comp_TSNRs.append(snr_frac)
+                    comp_LSNRs.append(snr_L)
+                    comp_CSNRs.append(snr_C)
+                    comp_SNRs.append(snr)
+                    TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+                    LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+                    CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+                    SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+                    SNR_str.append(str(np.around(snr,2)))
+                    TSNR_str.append(str(np.around(snr_frac,2)))
+                    LSNR_str.append(str(np.around(snr_L,2)))
+                    CSNR_str.append(str(np.around(snr_C,2)))
                 else:
                     comp_widths[-1] = width_native
                     comp_weights[-1] = copy.deepcopy(I_t_weights)
@@ -3726,14 +3889,43 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                     comp_buffs[-1] = buff
                     comp_timestarts[-1] = timestart1
                     comp_timestops[-1] = timestop1
-                ax.plot(I_t[timestart:timestop],label="I")
-                ax.plot(Q_t[timestart:timestop],label="Q")
-                ax.plot(U_t[timestart:timestop],label="U")
-                ax.plot(V_t[timestart:timestop],label="V")
-                ax.plot(I_t_weights_cut*np.max(I_t)/np.max(I_t_weights_cut),linewidth=4,label="weights")
+                    comp_TPOLs[-1] = avg
+                    comp_LPOLs[-1] = avg_L
+                    comp_CPOLs[-1] = avg_C
+                    comp_SCPOLs[-1] = avg_C_u
+                    comp_TSNRs[-1] = snr_frac
+                    comp_LSNRs[-1] = snr_L
+                    comp_CSNRs[-1] = snr_C
+                    comp_SNRs[-1] = snr
+                    TPOL_str[-1] = str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")"
+                    LPOL_str[-1] = str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")"
+                    CPOL_str[-1] = str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")"
+                    SCPOL_str[-1] = str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")"
+
+                    SNR_str[-1] = str(np.around(snr,2))
+                    TSNR_str[-1] = str(np.around(snr_frac,2))
+                    LSNR_str[-1] = str(np.around(snr_L,2))
+                    CSNR_str[-1] = str(np.around(snr_C,2))
+
+                TPOL_input.set_val(',\n'.join(TPOL_str))
+                LPOL_input.set_val(',\n'.join(LPOL_str))
+                CPOL_input.set_val(',\n'.join(CPOL_str))
+                SCPOL_input.set_val(',\n'.join(SCPOL_str))
+
+
+                TSNR_input.set_val(',\n'.join(TSNR_str))
+                LSNR_input.set_val(',\n'.join(LSNR_str))
+                CSNR_input.set_val(',\n'.join(CSNR_str))
+                SNR_input.set_val(',\n'.join(SNR_str))
+
+                ax.plot(I_t_weights_cut*np.max(I_t)/np.max(I_t_weights_cut),linewidth=4,label="weights",color="purple")
+                ax.plot(I_t[timestart2:timestop2],label="I")
+                ax.plot(Q_t[timestart2:timestop2],label="Q")
+                ax.plot(U_t[timestart2:timestop2],label="U")
+                ax.plot(V_t[timestart2:timestop2],label="V")
                 ax.legend(ncol=2,loc=legend_loc)
                 ax.set_xlabel("Time Sample (Sampling Time {t} $\mu s$)".format(t=np.around(32.7*n_t,2)))
-                ax.set_xlim(0,timestop-timestart)
+                ax.set_xlim(0,timestop2-timestart2)
             else:
                 print("No more components")
 
@@ -3742,6 +3934,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     #function to save results
     freq_avg_arrays = []
     def update_done(val):
+        #span = span_lst[0]
         if len(donelist) == 0:
             donelist.append(1)
             n_t = n_t_slider.val
@@ -3754,7 +3947,14 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             span.set_visible(False)
             span.set_active(False)
         
-            ax.clear() 
+            for i in range(2,len(ax.lines)):
+                print(ax.lines)
+                print(i)
+                ax.lines.pop()
+                ax.set_prop_cycle(None)
+                ax.relim()
+                # update ax.viewLim using the new dataLim
+                ax.autoscale_view()
             I_t = I_t_init[len(I_t_init)%n_t:]
             I_t = I_t.reshape(len(I_t)//n_t,n_t).mean(1)
             Q_t = Q_t_init[len(Q_t_init)%n_t:]
@@ -3764,9 +3964,9 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             V_t = V_t_init[len(V_t_init)%n_t:]
             V_t = V_t.reshape(len(V_t)//n_t,n_t).mean(1)
 
-            peak = int(15280/n_t)
-            timestart = int(peak - (5e-3)/(n_t*32.7e-6))
-            timestop = int(peak + (5e-3)/(n_t*32.7e-6))
+            #peak = int(15280/n_t)
+            #timestart = int(peak - (1e-3)/(n_t*32.7e-6))
+            #timestop = int(peak + (1e-3)/(n_t*32.7e-6))
             #mask all but first burst
             for i in range(1,len(final_complist_min)):
                 print((i,int(final_complist_min[i]),int(final_complist_max[i])))
@@ -3779,17 +3979,62 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                 U_t = ma.masked_array(U_t,mask)
                 V_t = ma.masked_array(V_t,mask)
             (peak,timestart1,timestop1) = find_peak((I_t,I_t),width_native,t_samp,n_t,buff=0,pre_calc_tf=True)
-            I_t_weights=get_weights_1D(I_t,Q_t,U_t,V_t,timestart1,timestop1,width_native,t_samp,1,n_t,freq_test_init,timeaxis,fobj,n_off=n_off,buff=0,n_t_weight=1,sf_window_weights=5,padded=True,norm=False)
-            I_t_weights_cut = I_t_weights[timestart:timestop]
+            timestart2 = timestart1 - int( (1e-3)/(n_t*32.7e-6))
+            timestop2 = timestop1 + int( (1e-3)/(n_t*32.7e-6))
+            I_t_weights=get_weights_1D(I_t,Q_t,U_t,V_t,timestart1,timestop1,width_native,t_samp,1,n_t,freq_test_init,timeaxis,fobj,n_off=n_off,buff=0,n_t_weight=1,sf_window_weights=3,padded=True,norm=False)
+            I_t_weights_cut = I_t_weights[timestart2:timestop2]
+
+            #get polarization of component
+            [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C),(C_f_u,C_t_u,avg_C_u,sigma_C_u,snr_C_u),snr] = get_pol_fraction([I_t,np.ones(1)],[Q_t,np.zeros(1)],[U_t,np.zeros(1)],[V_t,np.zeros(1)],width_native,t_samp,n_t,1,np.ones(1),n_off=int(12000/n_t),plot=False,pre_calc_tf=True,show=False,normalize=True,buff=[buff1_slider.val,buff2_slider.val],weighted=True,n_t_weight=1,timeaxis=timeaxis,fobj=fobj,unbias=True,input_weights=I_t_weights,allowed_err=1,unbias_factor=1)
+
+            """
+            TPOL_input.set_val(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+            LPOL_input.set_val(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+            CPOL_input.set_val(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+            SCPOL_input.set_val(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+            
+            SNR_input.set_val(np.around(snr,2))
+            TSNR_input.set_val(np.around(snr_frac,2))
+            LSNR_input.set_val(np.around(snr_L,2))
+            CSNR_input.set_val(np.around(snr_C,2))
+
+            TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+            LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+            CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+            SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+            SNR_str.append(str(np.around(snr,2)))
+            TSNR_str.append(str(np.around(snr_frac,2)))
+            LSNR_str.append(str(np.around(snr_L,2)))
+            CSNR_str.append(str(np.around(snr_C,2)))
+            """
+
             if len(comp_weights) < len(comp_weights_list):
                 print((len(comp_weights),len(comp_weights_list)))
                 comp_weights.append(copy.deepcopy(I_t_weights))
                 comp_widths.append(width_native)
                 comp_n_t_weights.append(1)
-                comp_sf_window_weights.append(5)
+                comp_sf_window_weights.append(3)
                 comp_buffs.append(0)
                 comp_timestarts.append(timestart1)
                 comp_timestops.append(timestop1)
+                comp_TPOLs.append(avg)
+                comp_LPOLs.append(avg_L)
+                comp_CPOLs.append(avg_C)
+                comp_SCPOLs.append(avg_C_u)
+                comp_TSNRs.append(snr_frac)
+                comp_LSNRs.append(snr_L)
+                comp_CSNRs.append(snr_C)
+                comp_SNRs.append(snr)
+                TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+                LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+                CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+                SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+                SNR_str.append(str(np.around(snr,2)))
+                TSNR_str.append(str(np.around(snr_frac,2)))
+                LSNR_str.append(str(np.around(snr_L,2)))
+                CSNR_str.append(str(np.around(snr_C,2)))
             else:
                 comp_widths.append(width_native)
                 comp_weights[-1] = copy.deepcopy(I_t_weights)
@@ -3798,15 +4043,43 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                 comp_buffs[-1] = 0#buff
                 comp_timestarts[-1] = timestart1
                 comp_timestops[-1] = timestop1
+                comp_TPOLs[-1] = avg
+                comp_LPOLs[-1] = avg_L
+                comp_CPOLs[-1] = avg_C
+                comp_SCPOLs[-1] = avg_C_u
+                comp_TSNRs[-1] = snr_frac
+                comp_LSNRs[-1] = snr_L
+                comp_CSNRs[-1] = snr_C
+                comp_SNRs[-1] = snr
+                TPOL_str[-1] = str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")"
+                LPOL_str[-1] = str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")"
+                CPOL_str[-1] = str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")"
+                SCPOL_str[-1] = str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")"
 
-            ax.plot(I_t[timestart:timestop],label="I")
-            ax.plot(Q_t[timestart:timestop],label="Q")
-            ax.plot(U_t[timestart:timestop],label="U")
-            ax.plot(V_t[timestart:timestop],label="V")
-            ax.plot(I_t_weights_cut*np.max(I_t)/np.max(I_t_weights_cut),linewidth=4,label="weights")
+                SNR_str[-1] = str(np.around(snr,2))
+                TSNR_str[-1] = str(np.around(snr_frac,2))
+                LSNR_str[-1] = str(np.around(snr_L,2))
+                CSNR_str[-1] = str(np.around(snr_C,2))
+
+            TPOL_input.set_val(',\n'.join(TPOL_str))
+            LPOL_input.set_val(',\n'.join(LPOL_str))
+            CPOL_input.set_val(',\n'.join(CPOL_str))
+            SCPOL_input.set_val(',\n'.join(SCPOL_str))
+
+
+            TSNR_input.set_val(',\n'.join(TSNR_str))
+            LSNR_input.set_val(',\n'.join(LSNR_str))
+            CSNR_input.set_val(',\n'.join(CSNR_str))
+            SNR_input.set_val(',\n'.join(SNR_str))
+            
+            ax.plot(I_t_weights_cut*np.max(I_t)/np.max(I_t_weights_cut),linewidth=4,label="weights",color="purple")
+            ax.plot(I_t[timestart2:timestop2],label="I")
+            ax.plot(Q_t[timestart2:timestop2],label="Q")
+            ax.plot(U_t[timestart2:timestop2],label="U")
+            ax.plot(V_t[timestart2:timestop2],label="V")
             ax.legend(ncol=2,loc=legend_loc)
             ax.set_xlabel("Time Sample (Sampling Time {t} $\mu s$)".format(t=np.around(32.7*n_t,2)))
-            ax.set_xlim(0,timestop-timestart)
+            ax.set_xlim(0,timestop2-timestart2)
 
         elif len(donelist) == 1 and (not (multi_button.get_status())[0] or  len(comp_weights_list) == len(final_complist_min)):
             print(comp_weights)
@@ -3832,7 +4105,12 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             span.set_visible(False)
             span.set_active(False)
             """
-            ax.clear()
+            for i in range(2,len(ax.lines)):
+                ax.lines.pop()
+                ax.set_prop_cycle(None)
+                ax.relim()
+                # update ax.viewLim using the new dataLim
+                ax.autoscale_view()
             I_t = I_t_init[len(I_t_init)%n_t:]
             I_t = I_t.reshape(len(I_t)//n_t,n_t).mean(1)
             Q_t = Q_t_init[len(Q_t_init)%n_t:]
@@ -3842,14 +4120,40 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             V_t = V_t_init[len(V_t_init)%n_t:]
             V_t = V_t.reshape(len(V_t)//n_t,n_t).mean(1)
 
+
+            #get total polarization
+            n_t = n_t_slider.val
+            [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C),(C_f_u,C_t_u,avg_C_u,sigma_C_u,snr_C_u),snr] = get_pol_fraction([I_t,np.ones(1)],[Q_t,np.zeros(1)],[U_t,np.zeros(1)],[V_t,np.zeros(1)],init_width_native,t_samp,n_t,1,np.ones(1),n_off=int(12000/n_t),plot=False,pre_calc_tf=True,show=False,normalize=True,buff=[buff1_slider.val,buff2_slider.val],weighted=True,n_t_weight=1,timeaxis=timeaxis,fobj=fobj,unbias=True,input_weights=comp_weights_sum,allowed_err=1,unbias_factor=1)
+
+            TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+            LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+            CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+            SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+            SNR_str.append(str(np.around(snr,2)))
+            TSNR_str.append(str(np.around(snr_frac,2)))
+            LSNR_str.append(str(np.around(snr_L,2)))
+            CSNR_str.append(str(np.around(snr_C,2)))
+
+            TPOL_input.set_val(',\n'.join(TPOL_str))
+            LPOL_input.set_val(',\n'.join(LPOL_str))
+            CPOL_input.set_val(',\n'.join(CPOL_str))
+            SCPOL_input.set_val(',\n'.join(SCPOL_str))
+
+
+            TSNR_input.set_val(',\n'.join(TSNR_str))
+            LSNR_input.set_val(',\n'.join(LSNR_str))
+            CSNR_input.set_val(',\n'.join(CSNR_str))
+            SNR_input.set_val(',\n'.join(SNR_str))
+
             peak = int(15280/n_t)
             timestart = int(peak - (5e-3)/(n_t*32.7e-6))
             timestop = int(peak + (5e-3)/(n_t*32.7e-6))
+            ax.plot((comp_weights_sum*np.max(I_t)/np.max(comp_weights_sum))[timestart:timestop],linewidth=4,label="weights",color="purple")
             ax.plot(I_t[timestart:timestop],label="I")
             ax.plot(Q_t[timestart:timestop],label="Q")
             ax.plot(U_t[timestart:timestop],label="U")
             ax.plot(V_t[timestart:timestop],label="V")
-            ax.plot((comp_weights_sum*np.max(I_t)/np.max(comp_weights_sum))[timestart:timestop],linewidth=4,label="weights")
             #ax.plot((comp_weights[0]*np.max(I_t)/np.max(comp_weights[0]))[timestart:timestop],linewidth=4,label="weights")
             #ax.plot((comp_weights[1]*np.max(I_t)/np.max(comp_weights[1]))[timestart:timestop],linewidth=4,label="weights")
             ax.legend(ncol=2,loc=legend_loc)
@@ -3956,7 +4260,12 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
         buff = [buff1,buff2]
         width_native = width_slider.val
 
-        ax.clear()
+        for i in range(2,len(ax.lines)):
+            ax.lines.pop()
+            ax.set_prop_cycle(None)
+            ax.relim()
+            # update ax.viewLim using the new dataLim
+            ax.autoscale_view()
         I_t = I_t_init[len(I_t_init)%n_t:]
         I_t = I_t.reshape(len(I_t)//n_t,n_t).mean(1)
         Q_t = Q_t_init[len(Q_t_init)%n_t:]
@@ -3966,9 +4275,9 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
         V_t = V_t_init[len(V_t_init)%n_t:]
         V_t = V_t.reshape(len(V_t)//n_t,n_t).mean(1)
 
-        peak = int(15280/n_t)
-        timestart = int(peak - (5e-3)/(n_t*32.7e-6))
-        timestop = int(peak + (5e-3)/(n_t*32.7e-6))
+        #peak = int(15280/n_t)
+        #timestart = int(peak - (5e-3)/(n_t*32.7e-6))
+        #timestop = int(peak + (5e-3)/(n_t*32.7e-6))
         #mask all but first burst
         for i in range(len(final_complist_min)):
             if i != comp_weights_list[-1]:
@@ -3983,9 +4292,50 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                 V_t = ma.masked_array(V_t,mask)
 
         (peak,timestart1,timestop1) = find_peak((I_t,I_t),width_native,t_samp,n_t,buff=buff,pre_calc_tf=True)
+        timestart2 = timestart1 - int( (1e-3)/(n_t*32.7e-6))
+        timestop2 = timestop1 + int( (1e-3)/(n_t*32.7e-6))
         #I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)        
         I_t_weights=get_weights_1D(I_t,Q_t,U_t,V_t,timestart1,timestop1,width_native,t_samp,1,n_t,freq_test_init,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=True,norm=False)
-        I_t_weights_cut = I_t_weights[timestart:timestop]
+        I_t_weights_cut = I_t_weights[timestart2:timestop2]
+
+        #get polarization of component
+        [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C),(C_f_u,C_t_u,avg_C_u,sigma_C_u,snr_C_u),snr] = get_pol_fraction([I_t,np.ones(1)],[Q_t,np.zeros(1)],[U_t,np.zeros(1)],[V_t,np.zeros(1)],width_native,t_samp,n_t,1,np.ones(1),n_off=int(12000/n_t),plot=False,pre_calc_tf=True,show=False,normalize=True,buff=buff,weighted=True,timeaxis=timeaxis,fobj=fobj,unbias=True,input_weights=I_t_weights,allowed_err=1,unbias_factor=1)
+
+        """
+        TPOL_input.set_val(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+        LPOL_input.set_val(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+        CPOL_input.set_val(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+        SCPOL_input.set_val(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+                
+        SNR_input.set_val(np.around(snr,2))
+        TSNR_input.set_val(np.around(snr_frac,2))
+        LSNR_input.set_val(np.around(snr_L,2))
+        CSNR_input.set_val(np.around(snr_C,2))
+        
+
+        TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+        LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+        CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+        SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+        SNR_str.append(str(np.around(snr,2)))
+        TSNR_str.append(str(np.around(snr_frac,2)))
+        LSNR_str.append(str(np.around(snr_L,2)))
+        CSNR_str.append(str(np.around(snr_C,2)))
+
+
+        TPOL_input.set_val(',\n'.join(TPOL_str))
+        LPOL_input.set_val(',\n'.join(LPOL_str))
+        CPOL_input.set_val(',\n'.join(CPOL_str))
+        SCPOL_input.set_val(',\n'.join(SCPOL_str))
+
+
+        TSNR_input.set_val(',\n'.join(TSNR_str))
+        LSNR_input.set_val(',\n'.join(LSNR_str))
+        CSNR_input.set_val(',\n'.join(CSNR_str))
+        SNR_input.set_val(',\n'.join(SNR_str))
+        """
+
         if len(comp_weights) < len(comp_weights_list):
             print((len(comp_weights),len(comp_weights_list)))
             comp_widths.append(width_native)
@@ -3995,6 +4345,24 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             comp_buffs.append(buff)
             comp_timestarts.append(timestart1)
             comp_timestops.append(timestop1)
+            comp_TPOLs.append(avg)
+            comp_LPOLs.append(avg_L)
+            comp_CPOLs.append(avg_C)
+            comp_SCPOLs.append(avg_C_u)
+            comp_TSNRs.append(snr_frac)
+            comp_LSNRs.append(snr_L)
+            comp_CSNRs.append(snr_C)
+            comp_SNRs.append(snr)
+            TPOL_str.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+            LPOL_str.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+            CPOL_str.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+            SCPOL_str.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+            SNR_str.append(str(np.around(snr,2)))
+            TSNR_str.append(str(np.around(snr_frac,2)))
+            LSNR_str.append(str(np.around(snr_L,2)))
+            CSNR_str.append(str(np.around(snr_C,2)))
+
         else:
             comp_widths[-1] = width_native
             comp_weights[-1] = copy.deepcopy(I_t_weights)
@@ -4003,15 +4371,43 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             comp_buffs[-1] = buff
             comp_timestarts[-1] = timestart1
             comp_timestops[-1] = timestop1
+            comp_TPOLs[-1] = avg
+            comp_LPOLs[-1] = avg_L
+            comp_CPOLs[-1] = avg_C
+            comp_SCPOLs[-1] = avg_C_u
+            comp_TSNRs[-1] = snr_frac
+            comp_LSNRs[-1] = snr_L
+            comp_CSNRs[-1] = snr_C
+            comp_SNRs[-1] = snr
+            TPOL_str[-1] = str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")"
+            LPOL_str[-1] = str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")"
+            CPOL_str[-1] = str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")"
+            SCPOL_str[-1] = str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")"
 
-        ax.plot(I_t[timestart:timestop],label="I")
-        ax.plot(Q_t[timestart:timestop],label="Q")
-        ax.plot(U_t[timestart:timestop],label="U")
-        ax.plot(V_t[timestart:timestop],label="V")
-        ax.plot(I_t_weights_cut*np.max(I_t)/np.max(I_t_weights_cut),linewidth=4,label="weights")
+            SNR_str[-1] = str(np.around(snr,2))
+            TSNR_str[-1] = str(np.around(snr_frac,2))
+            LSNR_str[-1] = str(np.around(snr_L,2))
+            CSNR_str[-1] = str(np.around(snr_C,2))
+
+        TPOL_input.set_val(',\n'.join(TPOL_str))
+        LPOL_input.set_val(',\n'.join(LPOL_str))
+        CPOL_input.set_val(',\n'.join(CPOL_str))
+        SCPOL_input.set_val(',\n'.join(SCPOL_str))
+
+
+        TSNR_input.set_val(',\n'.join(TSNR_str))
+        LSNR_input.set_val(',\n'.join(LSNR_str))
+        CSNR_input.set_val(',\n'.join(CSNR_str))
+        SNR_input.set_val(',\n'.join(SNR_str))
+
+        ax.plot(I_t_weights_cut*np.max(I_t)/np.max(I_t_weights_cut),linewidth=4,label="weights",color="purple")
+        ax.plot(I_t[timestart2:timestop2],label="I")
+        ax.plot(Q_t[timestart2:timestop2],label="Q")
+        ax.plot(U_t[timestart2:timestop2],label="U")
+        ax.plot(V_t[timestart2:timestop2],label="V")
         ax.legend(ncol=2,loc=legend_loc)
         ax.set_xlabel("Time Sample (Sampling Time {t} $\mu s$)".format(t=np.around(32.7*n_t,2)))
-        ax.set_xlim(0,timestop-timestart)
+        ax.set_xlim(0,timestop2-timestart2)
     
     
     n_t_weight_slider.on_changed(update_time)
@@ -4092,6 +4488,10 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     
     RMsnrs = []
     RMzoomsnrs = []
+    sigflag=[]
+
+    trial_RMtools=[]
+    trial_RMtoolszoom = []
     def update_RMrun(val):
         #do RM synthesis
 
@@ -4164,8 +4564,11 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             ax2.plot(trial_RM,RMsnrs1,label="RM Synthesis",color="black")
             ax2.plot(out[1]["phiArr_radm2"],np.abs(out[1]["cleanFDF"]),alpha=0.5,label="RM Tools",color="blue")
             ax2.legend(ncol=2,loc="upper right")
-
+        
+            RMapply_button.set_active(True)
+            trial_RMtools.append(out[1]["phiArr_radm2"])
         elif len(RMrunlist) == 1:
+            RMrunlist.append(1)
             #RM synthesis
             trial_RM = np.linspace(RMresults[0]-RMzoom_params[0],RMresults[0]+RMzoom_params[0],int(RMzoom_params[1]))
             trial_phi = [0]
@@ -4184,11 +4587,12 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
                 RMzoomerrors.append(out[0]["dPhiPeakPIchan_rm2"])
 
                 L1=ax3_1.plot(out[1]["phiArr_radm2"],np.abs(out[1]["cleanFDF"]),label="RM Tools",color="blue")
+                trial_RMtoolszoom.append(out[1]["phiArr_radm2"])
             else:
                 print("RM Magnitude out of range for RM tools")
                 RMzoomresults.append(np.nan)
                 RMzoomerrors.append(np.nan)
-
+                trial_RMtoolszoom.append(np.nan)
             #S/N method
             RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,QUnoise = faradaycal_SNR(I,Q,U,V,freq_test_init,trial_RM,trial_phi,init_width_native,fobj.header.tsamp,plot=False,n_f=n_f,n_t=n_t,show=False,err=True,buff=comp_buffs[-1],weighted=True,n_off=int(12000/n_t),input_weights=(comp_weights[-1])[np.min(comp_timestarts):np.max(comp_timestops)],timestart_in=np.min(comp_timestarts),timestop_in=np.max(comp_timestops))
             RMerr_fit = RM_error_fit(np.max(RMsnrs2))
@@ -4207,13 +4611,152 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
             ax3.legend(L1+L2+L3,["RM Tools","S/N Method","RM Synthesis"],loc="upper right")
             ax3.set_xlim(np.min(trial_RM),np.max(trial_RM))
             RMrunlist.append(1)
+            if np.max(RMsnrs2) > 9:
+                sigflag.append(True)
+            RMapply_button.set_active(True)
+
+    
+    comp_TPOLs_cal = []#.append(avg)
+    comp_LPOLs_cal = []#.append(avg_L)
+    comp_CPOLs_cal = []#.append(avg_C)
+    comp_SCPOLs_cal = []#.append(avg_C_u)
+    comp_TSNRs_cal = []#.append(snr_frac)
+    comp_LSNRs_cal = []#.append(snr_L)
+    comp_CSNRs_cal = []#.append(snr_C)
+    comp_SNRs_cal = []#.append(snr)
+
+    TPOL_str_cal = []#.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+    LPOL_str_cal = []#.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+    CPOL_str_cal = []#.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+    SCPOL_str_cal = []#.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+    SNR_str_cal = []#.append(str(np.around(snr,2)))
+    TSNR_str_cal = []#.append(str(np.around(snr_frac,2)))
+    LSNR_str_cal = []#.append(str(np.around(snr_L,2)))
+    CSNR_str_cal = []#.append(str(np.around(snr_C,2)))
+    def update_RMapply(val):
+        if len(RMrunlist) == 1:
+            RM = RMresults[0]
+        else:
+            RM = RMzoomresults[-1]
+        print("Clearing Axes...")
+        
+        #clear axes and pol text boxes
+        for i in range(2,len(ax.lines)):
+            ax.lines.pop()
+            ax.set_prop_cycle(None)
+            ax.relim()
+            # update ax.viewLim using the new dataLim
+            ax.autoscale_view()
+
+        ax1.clear()
+
+        TPOL_input.set_val("")#str(np.around(avg*100,2)) + "(" + str(int(np.around(sigma_frac*10000,0))) + ") %")
+        LPOL_input.set_val("")#(str(np.around(avg_L*100,2)) + "(" + str(int(np.around(sigma_L*10000,0))) + ") %")
+        CPOL_input.set_val("")#(str(np.around(avg_C*100,2)) + "(" + str(int(np.around(sigma_C*10000,0))) + ") %")
+        SCPOL_input.set_val("")#(str(np.around(avg_C_u*100,2)) + "(" + str(int(np.around(sigma_C_u*10000,0))) + ") %")
+
+        SNR_input.set_val("")#(np.around(snr,2))
+        TSNR_input.set_val("")#(np.around(snr_frac,2))
+        LSNR_input.set_val("")#(np.around(snr_L,2))
+        CSNR_input.set_val("")#(np.around(snr_C,2))
+
+        #downsample, then RM calibrate
+        n_t = n_t_slider.val
+        n_f = 2**(n_f_slider.val)
+        I = avg_time(I_init,n_t)
+        Q = avg_time(Q_init,n_t)
+        U = avg_time(U_init,n_t)
+        V = avg_time(V_init,n_t)
+        
+        I = avg_freq(I,n_f)
+        Q = avg_freq(Q,n_f)
+        U = avg_freq(U,n_f)
+        V = avg_freq(V,n_f)
 
 
+        freq_test = (freq_test_init[0])[len(freq_test_init[0])%n_f:]
+        freq_test = freq_test.reshape(len(freq_test)//n_f,n_f).mean(1)
+        freq_test = [freq_test]*4
+
+        print("RM calibrating...")
+        (I,Q,U,V) = calibrate_RM(I,Q,U,V,RM,0,freq_test,stokes=True)
+        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,init_width_native,fobj.header.tsamp,n_t,n_off=n_off,plot=False,show=False,datadir=datadir,normalize=True)
+        (I_f,Q_f,U_f,V_f) = get_stokes_vs_freq(I,Q,U,V,init_width_native,fobj.header.tsamp,n_f,n_t,freq_test,n_off=n_off,plot=False,show=False,normalize=True,weighted=True,timeaxis=timeaxis,fobj=fobj,input_weights=comp_weights[-1])
+
+
+        #replot
+        peak = int(15280/n_t)
+        timestart = int(peak - (5e-3)/(n_t*32.7e-6))
+        timestop = int(peak + (5e-3)/(n_t*32.7e-6))
+        ax.plot((comp_weights[-1]*np.max(I_t)/np.max(comp_weights[-1]))[timestart:timestop],linewidth=4,label="weights",color="purple")
+        ax.plot(I_t[timestart:timestop],label="I")
+        ax.plot(Q_t[timestart:timestop],label="Q")
+        ax.plot(U_t[timestart:timestop],label="U")
+        ax.plot(V_t[timestart:timestop],label="V")
+        ax.legend(ncol=2,loc=legend_loc)
+        ax.set_xlabel("Time Sample (Sampling Time {t} $\mu s$)".format(t=np.around(32.7*n_t,2)))
+        ax.set_xlim(0,timestop-timestart)
+
+        fmin = np.min(freq_test[0])
+        fmax = np.max(freq_test[0])
+        ax1.plot(freq_test[0],I_f,label="I")
+        ax1.plot(freq_test[0],Q_f,label="Q")
+        ax1.plot(freq_test[0],U_f,label="U")
+        ax1.plot(freq_test[0],V_f,label="V")
+        ax1.set_xlabel("Frequency (MHz)")
+        ax1.set_xlim(fmin,fmax)
+    
+        #recalculate polarization (how do you want to do this?)
+        for i in range(len(comp_weights)):
+            #get weights
+            I_t_weights = comp_weights[i]
+            if i == len(comp_weights)-1:
+                width_native = comp_widths[i-1]
+                buff = comp_widths[i-1]
+            else:
+                width_native = comp_widths[i]
+                buff = comp_buffs[i]
+
+            #compute pol fraction
+            [(p_f,p_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C,sigma_C,snr_C),(C_f_u,C_t_u,avg_C_u,sigma_C_u,snr_C_u),snr] = get_pol_fraction([I_t,np.ones(1)],[Q_t,np.zeros(1)],[U_t,np.zeros(1)],[V_t,np.zeros(1)],width_native,t_samp,n_t,1,np.ones(1),n_off=int(12000/n_t),plot=False,pre_calc_tf=True,show=False,normalize=True,buff=buff,weighted=True,timeaxis=timeaxis,fobj=fobj,unbias=True,input_weights=I_t_weights,allowed_err=1,unbias_factor=1)
+
+            #write in text box
+            comp_TPOLs_cal.append(avg)
+            comp_LPOLs_cal.append(avg_L)
+            comp_CPOLs_cal.append(avg_C)
+            comp_SCPOLs_cal.append(avg_C_u)
+            comp_TSNRs_cal.append(snr_frac)
+            comp_LSNRs_cal.append(snr_L)
+            comp_CSNRs_cal.append(snr_C)
+            comp_SNRs_cal.append(snr)
+    
+            TPOL_str_cal.append(str(np.around(avg,2)) + "(" + str(int(np.around(sigma_frac*100,0))) + ")")
+            LPOL_str_cal.append(str(np.around(avg_L,2)) + "(" + str(int(np.around(sigma_L*100,0))) + ")")
+            CPOL_str_cal.append(str(np.around(avg_C,2)) + "(" + str(int(np.around(sigma_C*100,0))) + ")")
+            SCPOL_str_cal.append(str(np.around(avg_C_u,2)) + "(" + str(int(np.around(sigma_C_u*100,0))) + ")")
+
+            SNR_str_cal.append(str(np.around(snr,2)))
+            TSNR_str_cal.append(str(np.around(snr_frac,2)))
+            LSNR_str_cal.append(str(np.around(snr_L,2)))
+            CSNR_str_cal.append(str(np.around(snr_C,2)))
+        
+        TPOL_input.set_val(',\n'.join(TPOL_str_cal))
+        LPOL_input.set_val(',\n'.join(LPOL_str_cal))
+        CPOL_input.set_val(',\n'.join(CPOL_str_cal))
+        SCPOL_input.set_val(',\n'.join(SCPOL_str_cal))
+
+
+        TSNR_input.set_val(',\n'.join(TSNR_str_cal))
+        LSNR_input.set_val(',\n'.join(LSNR_str_cal))
+        CSNR_input.set_val(',\n'.join(CSNR_str_cal))
+        SNR_input.set_val(',\n'.join(SNR_str_cal))
 
 
     RMmax_input.on_submit(update_RMmax)
     RMmin_input.on_submit(update_RMmin)
     RMtrials_input.on_submit(update_RMtrials)
+    RMapply_button.on_clicked(update_RMapply)
     RMrun_button.on_clicked(update_RMrun)
     RMzoomtrials_input.on_submit(update_RMzoomtrials)
     RMzoomrange_input.on_submit(update_RMzoomrange)
@@ -4221,7 +4764,15 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
 
     def update_reset(val):
-        ax.clear()
+        #ax.clear()
+        for i in range(2,len(ax.lines)):
+            ax.lines.pop()
+            ax.set_prop_cycle(None)
+
+            ax.relim()
+            # update ax.viewLim using the new dataLim
+            ax.autoscale_view()
+        
         ax1.clear()
         ax2.clear()
         ax3.clear()
@@ -4245,7 +4796,6 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
         ax1.set_xlabel("Frequency (MHz)")
         ax1.set_xlim(np.min(freq_test_init[0]),np.max(freq_test_init[0]))
 
-        ax2 = plt.subplot2grid(shape=(4,2),loc=(0,1))
         ax2.set_title("RM Analysis")
         ax2.set_xlabel("RM (rad/m^2)")
         ax2.set_ylabel(r'$F(\phi)$')
@@ -4264,6 +4814,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
         RMmax_input.set_active(False)
         RMmin_input.set_active(False)
         RMtrials_input.set_active(False)
+        RMapply_button.set_active(False)
         RMrun_button.set_active(False)
         RMresult_input.set_active(False)
         RMerror_input.set_active(False)
@@ -4276,8 +4827,12 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
         complist_max.clear() # = []
         donelist.clear() # = []
 
-        span.set_active(False)
-        span.set_visible(True)
+        #span.set_active(False)
+        #span.set_visible(True)
+        #span_lst[0] = SpanSelector(ax,update_component,"horizontal",interactive=True,props=dict(facecolor='red', alpha=0.5))
+        #span_lst[0].set_active(False)
+        #span_lst[0].set_visible(True)
+
 
         comp_widths.clear() # = []
         comp_weights.clear() # = []
@@ -4299,7 +4854,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
         RMsnrs.clear() # = []
         RMzoomsnrs.clear() # = []
-
+        sigflag.clear()
         
         return
 
@@ -4331,136 +4886,120 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
     outdict["RM_zoomerrors"] = RMzoomerrors
     outdict["RM_zoomsnrs"] = RMzoomsnrs
 
+
+    #output plots
+    n_t = n_t_slider.val
+    n_f = 2**(n_f_slider.val)
+    
+    buff1 = comp_buffs[0]
+    buff2 = comp_buffs[1]
+    buff = []
+    if isinstance(buff1, int):
+        buff.append(buff1)
+    else:
+        buff.append(buff1[0])
+
+    if isinstance(buff2, int):
+        buff.append(buff2)
+    else:
+        buff.append(buff2[0])
+
+    I = avg_time(I_init,n_t)
+    Q = avg_time(Q_init,n_t)
+    U = avg_time(U_init,n_t)
+    V = avg_time(V_init,n_t)
+
+    I = avg_freq(I,n_f)  
+    Q = avg_freq(Q,n_f)
+    U = avg_freq(U,n_f)
+    V = avg_freq(V,n_f)
+
+    freq_test = (freq_test_init[0])[len(freq_test_init[0])%n_f:]
+    freq_test = freq_test.reshape(len(freq_test)//n_f,n_f).mean(1)
+    freq_test = [freq_test]*4
+
+    I,Q,U,V = calibrate_RM(I,Q,U,V,RMzoomresults[-1],0,freq_test,stokes=True) #total derotation
+
+    pol_summary_plot(I,Q,U,V,ids,nickname,comp_widths[0],t_samp,n_t_slider.val,2**(n_f_slider.val),freq_test,timeaxis,fobj,n_off=int(12000/n_t),buff=buff,weighted=True,n_t_weight=2,sf_window_weights=7,show=False,input_weights=comp_weights[-1],intL=-1,intR=-1,multipeaks=multi_button.get_status(),wind=n_t,suffix="",mask_flag=mask_flag,sigflag=sigflag[0],plot_weights=False)
+    trial_RM1 = np.linspace(RM_params[0],RM_params[1],int(RM_params[2]))
+    trial_RM2 = np.linspace(RMresults[0]-RMzoom_params[0],RMresults[0]+RMzoom_params[0],int(RMzoom_params[1]))
+    RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RMzoomresults[-1],RMzoomerrors[-1],trial_RM1,trial_RM2,trial_RMtools[0],trial_RMtoolszoom[0],threshold=9,suffix="",show=False)
+    
     return outdict
 
-"""
-#jump
-#interactive quick analysis
-def FRB_quick_analysis_interactive(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False):
+
+#plotting functions
+def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True):
     datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
-    outdata = dict()
-    outdata["inputs"] = dict()
-    outdata["inputs"]["ids"] = ids
-    outdata["inputs"]["nickname"] = nickname
-    outdata["inputs"]["datadir"] = datadir
-
-    #read cal parameters from file
-    (ratio,ratio_fit,phase,phase_fit,gainY,gainY_fit,gxx,gyy) = read_polcal(caldate)
-
-    #Read data
-    #datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
-    (I_fullres,Q_fullres,U_fullres,V_fullres,fobj,timeaxis,freq_test_fullres,wav_test) = get_stokes_2D(datadir,ids + "_dev",20480,n_t=1,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=True)
-
-    #interactively get n_t, n_f, weighting parameters
-    multi_flag,int_dict = int_get_downsampling_params(I_fullres,Q_fullres,U_fullres,V_fullres,ids,nickname,width_native,fobj.header.tsamp,freq_test_fullres,timeaxis,fobj,n_off=int(12000))
-    if multi_flag:
-        resp = input("Multiple components identified, analyze individually? (Y/N)")
-        if resp == "Y" or resp == "y" or resp == "yes" or resp == "Yes":
-            multi_flag_all = True
-        else:
-            multi_flag_all = False
+    #parse results
+    RMsynth_snrs, RMtools_snrs = RMsnrs
+    if len(RMzoomsnrs) == 3:
+        RMsynth_zoomsnrs, RMtools_zoomsnrs, RMSNR_zoomsnrs = RMzoomsnrs
+    else:
+        RMsynth_zoomsnrs, RMSNR_zoomsnrs = RMzoomsnrs
 
 
-    n_t = int_dict["n_t"]
-    n_f = int_dict["n_f"]
-    outdata["inputs"]["n_t"] = n_t
-    outdata["inputs"]["n_f"] = n_f
-    outdata["inputs"]["buff"] = int_dict["buff"]
-    outdata["inputs"]["avger_w"] = int_dict["n_t_weights"]
-    outdata["inputs"]["sf_window_weights"] = int_dict["sf_window_weights"]
-    outdata["inputs"]["width_native"] = int_dict["widths"]
-    outdata["inputs"]["weights"] = int_dict["weights"]
+    fig, axs = plt.subplots(2,1,figsize=(38,24), gridspec_kw={'height_ratios': [1, 1]})
 
-    I_fullres = avg_time(I_fullres,n_t)
-    Q_fullres = avg_time(Q_fullres,n_t)
-    U_fullres = avg_time(U_fullres,n_t)
-    V_fullres = avg_time(V_fullres,n_t)
+    ax4= axs[0]# = plt.subplot2grid(shape=(2, 2), loc=(0, 0), colspan=2)
+    ax5 =axs[1]#= plt.subplot2grid(shape=(2, 2), loc=(1, 0), colspan=2,rowspan=2)
 
-    #gain/phase and PA calibrate
-    Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres = calibrate(I_fullres,Q_fullres,U_fullres,V_fullres,(gxx,gyy),stokes=True)
-    Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres,ParA_fullres = calibrate_angle(Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres,fobj,ibeam,RA,DEC)
+    #set title
+    if nickname == "220912A" and ids == "221018aaaj":
+        ax4.set_title("FRB20220912A Burst 1 RM Analysis")
+    elif nickname == "220912A":
+        ax4.set_title("FRB20220912A Burst 2 RM Analysis")
+    else:
+        ax4.set_title("FRB20" + ids[:6] + " RM Analysis")
 
+    #full range plot
+    ax4.plot(trial_RM1,RMsynth_snrs,label="RM synthesis",color="black")
+    ax4.plot(trial_RMtools1,RMtools_snrs,alpha=0.5,label="RM Tools",color="blue") 
+    ax4.legend(loc="upper right")
+    ax4.set_xlabel("RM (rad/m^2)")
+    ax4.set_ylabel(r'$F(\phi)$')
+    ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
 
-    #downsample in frequency
-    I = avg_freq(I_fullres,n_f)
-    Q = avg_freq(Q_fullres,n_f)
-    U = avg_freq(U_fullres,n_f)
-    V = avg_freq(V_fullres,n_f)
+    #zoom range plot
+    lns = []
+    labs = []
+    l1 = ax5.plot(trial_RM2,RMSNR_zoomsnrs,label="S/N Method",color="orange",linewidth=4)
+    lns.append(l1[0])
+    labs.append("S/N Method")
+    l3 = ax5.axvline(RM+RMerror,color="red",label="RM Error",linewidth=2)
+    lns.append(l3)
+    labs.append("RM Error")
+    ax5.axvline(RM-RMerror,color="red",linewidth=2)
 
-    Ical = avg_freq(Ical_fullres,n_f)
-    Qcal = avg_freq(Qcal_fullres,n_f)
-    Ucal = avg_freq(Ucal_fullres,n_f)
-    Vcal = avg_freq(Vcal_fullres,n_f)
+    ax5_1 = ax5.twinx()
+    l4 = ax5_1.plot(trial_RM2,RMsynth_zoomsnrs,label="RM Synthesis",color="black")
+    lns.append(l4[0])
+    labs.append("RM Synthesis")
+    if len(RMzoomsnrs)==3:
+        l2=ax5_1.plot(trial_RMtools2,RMtools_zoomsnrs,label="RM Tools",color="blue")
+        lns.append(l2[0])
+        labs.append("RM Tools")
+    ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
+    l6 = ax5.axhline(threshold,color="purple",linestyle="--",label=r'${t}\sigma$ threshold'.format(t=threshold),linewidth=2)
+    lns.append(l6)
+    ax5_1.set_ylabel(r'$F(\phi)$')
 
-    if freq_test_fullres[0].shape[0]%n_f != 0:
-            for i in range(4):
-                freq_test_fullres[i] = freq_test_fullres[i][freq_test_fullres[i].shape[0]%n_f:]
-
-    freq_test =  [freq_test_fullres[0].reshape(len(freq_test_fullres[0])//n_f,n_f).mean(1)]*4
-
-    #get IQUV vs time
-    (I_tcal,Q_tcal,U_tcal,V_tcal) = get_stokes_vs_time(Ical,Qcal,Ucal,Vcal,int_dict["widths"][0],fobj.header.tsamp,n_t,n_off=int(12000//n_t),plot=False,show=show,datadir=datadir,normalize=True,buff=int_dict["buff"][0],window=3,label=ids + "_" + nickname + "_cal_")
-
-    if not multi_flag_all: #just process full FRB
-        I_w_t_filt = int_dict["weights"][-1]
-
-        #get window
-        timestart = np.min(int_dict["timestarts"])
-        timestop = np.max(int_dict["timestops"])
-        t = 32.7*n_t*np.arange(0,I.shape[1])
-
-
-        if plot:
-            plot_spectra_2D(I,Q,U,V,width_native,fobj.header.tsamp,n_t,n_f,freq_test,lim=np.percentile(I,90),show=show,buff=int(64/n_t),weighted=False,window=int(64/n_t),datadir=datadir,ext=".pdf",label=ids + "_" + nickname + "_uncal_")
-            plot_spectra_2D(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_f,freq_test,lim=np.percentile(I,90),show=show,buff=int(64/n_t),weighted=False,window=int(64/n_t),datadir=datadir,ext=".pdf",label=ids + "_" + nickname + "_cal_")
+    ax5.legend(lns, labs, loc="upper right")
+    ax5.set_xlabel("RM (rad/m^2)")
+    ax5.set_ylabel("Linear S/N")
 
 
-        #get filter, FWHM
-        I_w_t_filt = int_dict["weights"][-1]
-        pks,props = find_peaks(I_w_t_filt,height=0.01)
-        if len(pks) > 1:
-            #pks = pks[1:]
-            FWHM,heights,intL,intR = peak_widths(I_w_t_filt,pks)
-            intL = intL[0]
-            intR = intR[-1]
-        else:
-            FWHM,heights,intL,intR = peak_widths(I_w_t_filt,[np.argmax(I_w_t_filt)])
 
-        print("FWHM: " + str((intR-intL)*n_t*32.7) + " us")
-        wind = (intR-intL)*3
-        if plot:
-            plt.figure(figsize=(12,6))
-            plt.plot(t,I_w_t_filt)
-            plt.axvline(32.7*n_t*intL)
-            plt.axvline(32.7*n_t*intR)
-            plt.xlim(32.7*n_t*timestart - wind*32.7*n_t,32.7*n_t*timestop + wind*32.7*n_t)
-            plt.savefig(datadir + ids + "_" + nickname + "_filterplot.png")
-            if show:
-                plt.show()
-
-        #get IQUV vs freq
-        (I_fcal,Q_fcal,U_fcal,V_fcal) = get_stokes_vs_freq(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_f,n_t,freq_test,n_off=int(12000/n_t),plot=False,show=show,datadir=datadir,normalize=True,input_weights=I_w_t_filt,buff=buff,weighted=True,timeaxis=timeaxis,fobj=fobj,label=ids + "_" + nickname + "_cal_")
-
-    #estimate polarization fractions before RM
-
-    [(pol_f,pol_t,avg,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),(C_f,C_t,avg_C,sigma_C,snr_C),snr] = get_pol_fraction(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=int(12000/n_t),plot=False,show=show,datadir=datadir,normalize=True,buff=buff,full=False,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights,label=ids + "_" + nickname + "_cal_")
-    PA_f,PA_t,PA_f_errs,PA_t_errs,avg_PA,PA_err = get_pol_angle(Ical,Qcal,Ucal,Vcal,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=int(12000/n_t),plot=False,show=show,datadir=datadir,normalize=True,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights,label=ids + "_" + nickname + "_cal_")
-    print(r'SNR: ${snr}\sigma$'.format(snr=snr))
-    print(r'Total Polarization: ${avg} \pm {err}$'.format(avg=avg,err=sigma_frac))
-    print(r'Linear Polarization: ${avg} \pm {err}$'.format(avg=avg_L,err=sigma_L))
-    print(r'Circular Polarization: ${avg} \pm {err}$'.format(avg=avg_C_abs,err=sigma_C_abs))
-    print(r'Signed Circular Polarization: ${avg} \pm {err}$'.format(avg=avg_C,err=sigma_C))
-    print(r'Position Angle: ${avg}^\circ \pm {err}^\circ$'.format(avg=avg_PA*180/np.pi,err=PA_err*180/np.pi))
-    outdata["calibrated"] = dict()
-    outdata["calibrated"]["polarization"] = [avg,sigma_frac,snr_frac]
-    outdata["calibrated"]["linear polarization"] = [avg_L,sigma_L,snr_L]
-    outdata["calibrated"]["circular polarization"] = [avg_C,sigma_C,snr_C]
+    plt.savefig(datadir + ids + "_" + nickname + "_RMsummary_plot" + suffix + ".pdf")
+    if show:
+        plt.show()
+    plt.close(fig)
+    
 
     return
 
-""" 
 
-#plotting functions
+
 def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
