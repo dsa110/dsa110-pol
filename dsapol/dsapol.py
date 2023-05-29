@@ -539,6 +539,7 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
         peak,timestart,timestop = find_peak((I_t_init,I_t_init),width_native,t_samp,n_t,buff=buff,pre_calc_tf=True)
 
     #downsample
+    """
     I_t = np.zeros((1,len(I_t_init)))
     I_t[0,:] = I_t_init[I_t_init.shape[0]%n_t_weight:]
     I_t = (((I_t.transpose()).reshape(-1,n_t_weight,I_t.shape[0]).mean(1)).transpose())[0]
@@ -551,8 +552,18 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
     V_t = np.zeros((1,len(V_t_init)))
     V_t[0,:] = V_t_init[V_t_init.shape[0]%n_t_weight:]
     V_t = (((V_t.transpose()).reshape(-1,n_t_weight,V_t.shape[0]).mean(1)).transpose())[0]
+    """
+   
+    I_t = I_t_init[len(I_t_init)%n_t_weight:]
+    I_t = I_t.reshape(len(I_t)//n_t_weight,n_t_weight).mean(1)
+    Q_t = Q_t_init[len(Q_t_init)%n_t_weight:]
+    Q_t = Q_t.reshape(len(Q_t)//n_t_weight,n_t_weight).mean(1)
+    U_t = U_t_init[len(U_t_init)%n_t_weight:]
+    U_t = U_t.reshape(len(U_t)//n_t_weight,n_t_weight).mean(1)
+    V_t = V_t_init[len(V_t_init)%n_t_weight:]
+    V_t = V_t.reshape(len(V_t)//n_t_weight,n_t_weight).mean(1)
 
-    
+
 
     timeaxis = np.arange(I_t_init.shape[0])
     #timaxisb = np.linspace(0,I.shape[1],Ib.shape[1])
