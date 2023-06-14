@@ -89,6 +89,34 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False):
     stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
     return stokes_arr
 
+#read in Stokes I filterbank only
+def create_I_arr(sdir, nsamp=10240,verbose=False):
+    """
+    This function reads in Stokes parameter data from a given directory. Stokes parameters
+    are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
+    for I,Q,U,V respectively
+
+    Inputs: sdir --> str,directory containing Stokes fil files
+            nsamp --> int,number of time samples to read in
+            verbose --> bool,if True prints additional information
+    Outputs: size 4 list containing dynamic spectra for each stokes parameter
+
+    """
+    if verbose:
+        print("Reading stokes parameters from " + sdir)
+    stokes_arr=[]
+    ii =0
+    print("Reading stokes param..." + str(ii),end="")
+    fn = '%s_%d.fil'%(sdir,ii)
+    d = read_fil_data_dsa(fn, start=0, stop=nsamp)[0]
+    #if d == 0:
+        #print("Failed to read file: " + fn + ", returning 0")
+    return d
+    #stokes_arr.append(d)
+    #print("Done!")
+    #stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
+    #return stokes_arr
+
 #Creates freq, time axes
 def create_freq_time(sdir,nsamp=10240):#1500):
     """
@@ -107,6 +135,28 @@ def create_freq_time(sdir,nsamp=10240):#1500):
         freq.append(d[1])
         dt.append(d[2])
         #print(len(freq[ii]))
+    #stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
+    return freq,dt
+
+#Creates freq, time axes for stokes I only
+def create_freq_time_I(sdir,nsamp=10240):#1500):
+    """
+    This function creates frequency and time axes from stokes filterbank headers
+
+    Inputs: sdir --> str,directory containing Stokes fil files
+            nsamp --> int,number of time samples to read in
+    Outputs: (freq,dt) --> frequency and time axes respectively
+
+    """
+    freq=[]
+    dt = []
+    #for ii in range(4):
+    ii = 0
+    fn = '%s_%d.fil'%(sdir,ii)
+    d = read_fil_data_dsa(fn, start=0, stop=nsamp)
+    freq.append(d[1])
+    dt.append(d[2])
+    #print(len(freq[ii]))
     #stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
     return freq,dt
 
@@ -326,6 +376,7 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     #Subtract off-pulse mean
     if sub_offpulse_mean:
+        """
         offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=True) 
         offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=True)
         offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=True)
@@ -346,7 +397,27 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
         Q = (Q - offpulse_Q)/offpulse_Q_std
         U = (U - offpulse_U)/offpulse_U_std
         V = (V - offpulse_V)/offpulse_V_std
-   
+        """
+        offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=False)
+        offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=False)
+        offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=False)
+        offpulse_V = np.mean(V[:,:n_off],axis=1,keepdims=False)
+
+        offpulse_I_std = np.std(I[:,:n_off],axis=1,keepdims=False)
+        offpulse_Q_std = np.std(Q[:,:n_off],axis=1,keepdims=False)
+        offpulse_U_std = np.std(U[:,:n_off],axis=1,keepdims=False)
+        offpulse_V_std = np.std(V[:,:n_off],axis=1,keepdims=False)
+
+        if fixchans:
+            offpulse_I_std[bad_chans] = 1
+            offpulse_Q_std[bad_chans] = 1
+            offpulse_U_std[bad_chans] = 1
+            offpulse_V_std[bad_chans] = 1
+
+        I = ((I.transpose() - offpulse_I)/offpulse_I_std).transpose()
+        Q = ((Q.transpose() - offpulse_Q)/offpulse_Q_std).transpose()
+        U = ((U.transpose() - offpulse_U)/offpulse_U_std).transpose()
+        V = ((V.transpose() - offpulse_V)/offpulse_V_std).transpose()
 
     #calculate frequency and wavelength arrays (separate array for each stokes parameter, but should be the same)
     c = (3e8) #m/s
@@ -359,6 +430,116 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     
     return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr)
 
+
+#Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
+def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True):
+    """
+    This function generates 2D dynamic spectra for each stokes parameter, taken from
+    filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
+    would not recommend this for calibrators.
+
+    Inputs: datadir --> str, path to directory containing all 4 stokes filterbank files
+            fn_prefix -->str, prefix of filterbank files, e.g. '220319aaeb_dev' for file '220319aaeb_dev_0/1/2/3.fil'
+            n_t --> int, number of time samples to bin by (average over)
+            n_f --> int, number of frequency samples to bin by (average over)
+            n_off --> int, specifies index of end of off-pulse samples
+            sub_offpulse_mean --> bool, if True, subtracts mean of data up to n_off samples
+    Outputs: (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr) --> 2D dynamic spectra for I,Q,U,V; filterbank object for I file; time axis; frequency
+                                                        and wavelength axes for each stokes param
+
+    """
+    sdir = datadir + fn_prefix
+    I = create_I_arr(sdir, nsamp=nsamps)
+    freq,dt = create_freq_time_I(sdir, nsamp=nsamps)
+    fobj=FilReader(sdir+"_0.fil") #need example object for header data
+
+    #Bin in time and frequency
+    #n_t = 1#8
+    #n_f = 1#32
+    print("Binning by " + str(n_t)  + " in time")
+    print("Binning by " + str(n_f) + " in frequency")
+    #timeaxis = np.arange(fobj.header.tstart*86400, fobj.header.tstart*86400 + fobj.header.tsamp*fobj.header.nsamples/n_t, fobj.header.tsamp*n_t)
+    if fobj.header.nsamples == 5120:
+        timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//n_t)
+    else:
+        timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//n_t)
+    I= avg_time(I,n_t)#,avg_time(sarr[1],n_t),avg_time(sarr[2],n_t),avg_time(sarr[3],n_t)
+    I= avg_freq(I,n_f)#,avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
+
+
+    if fixchans == True:
+        bad_chans = find_bad_channels(I)
+        #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
+        print("Bad Channels: " + str(bad_chans))
+
+
+        #mask
+        mask = np.zeros(I.shape)
+        mask[bad_chans,:] = 1
+        I = ma.masked_array(I,mask)
+        #Q = ma.masked_array(Q,mask)
+        #U = ma.masked_array(U,mask)
+        #V = ma.masked_array(V,mask)
+
+    #Subtract off-pulse mean
+    if sub_offpulse_mean:
+        """
+        offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=True) 
+        offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=True)
+        offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=True)
+        offpulse_V = np.mean(V[:,:n_off],axis=1,keepdims=True)
+    
+        offpulse_I_std = np.std(I[:,:n_off],axis=1,keepdims=True)
+        offpulse_Q_std = np.std(Q[:,:n_off],axis=1,keepdims=True)
+        offpulse_U_std = np.std(U[:,:n_off],axis=1,keepdims=True)
+        offpulse_V_std = np.std(V[:,:n_off],axis=1,keepdims=True)
+    
+        if fixchans:
+            offpulse_I_std[bad_chans,:] = 1
+            offpulse_Q_std[bad_chans,:] = 1
+            offpulse_U_std[bad_chans,:] = 1
+            offpulse_V_std[bad_chans,:] = 1
+
+        I = (I - offpulse_I)/offpulse_I_std
+        Q = (Q - offpulse_Q)/offpulse_Q_std
+        U = (U - offpulse_U)/offpulse_U_std
+        V = (V - offpulse_V)/offpulse_V_std
+        """
+        offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=False)
+        #offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=False)
+        #offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=False)
+        #offpulse_V = np.mean(V[:,:n_off],axis=1,keepdims=False)
+
+        offpulse_I_std = np.std(I[:,:n_off],axis=1,keepdims=False)
+        #offpulse_Q_std = np.std(Q[:,:n_off],axis=1,keepdims=False)
+        #offpulse_U_std = np.std(U[:,:n_off],axis=1,keepdims=False)
+        #offpulse_V_std = np.std(V[:,:n_off],axis=1,keepdims=False)
+
+        if fixchans:
+            offpulse_I_std[bad_chans] = 1
+         #   offpulse_Q_std[bad_chans] = 1
+         #   offpulse_U_std[bad_chans] = 1
+         #   offpulse_V_std[bad_chans] = 1
+
+        I = ((I.transpose() - offpulse_I)/offpulse_I_std).transpose()
+        #Q = ((Q.transpose() - offpulse_Q)/offpulse_Q_std).transpose()
+        #U = ((U.transpose() - offpulse_U)/offpulse_U_std).transpose()
+        #V = ((V.transpose() - offpulse_V)/offpulse_V_std).transpose()
+
+    #calculate frequency and wavelength arrays (separate array for each stokes parameter, but should be the same)
+    c = (3e8) #m/s
+    freq_1D = freq[0].reshape(-1,n_f).mean(1)
+    wav_1D = c/(np.array(freq_1D*1e6))
+
+    """
+    freq_arr = []
+    wav_arr = []
+    for i in range(4):
+        freq_arr.append(freq[i].reshape(-1,n_f).mean(1))
+        wav_arr.append(list(c/(np.array(freq_arr[i])*(1e6))))
+    """
+
+    return (I,fobj,timeaxis,freq_1D,wav_1D)
 
 #Get frequency averaged stokes params vs time; note run get_stokes_2D first to get 2D I Q U V arrays
 def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,window=10):
@@ -1462,10 +1643,22 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
         sigma_PA = np.sqrt(np.nansum((I_t_weights_pol_cut*(PA_t_errs[intL:intR]))**2))/np.nansum(I_t_weights_pol_cut)
 
     else:
+        if multipeaks:
+            pks,props = find_peaks(I_t,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        else:
+            FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
+        print("here: " + str((intL,intR)))
+        intL = int(intL)
+        intR = int(intR)
+        print("here: " + str((intL,intR)))
+
         #avg_PA = np.mean(PA_t[timestart:timestop][PA_t[timestart:timestop]<1])
         avg_PA = np.nanmean(PA_t[intL:intR])
         #sigma_PA = np.nanstd(PA_t[intL:intR])
-        sigma_PA = np.sqrt(np.nansum(((PA_t_errs[intL:intR]))**2))/len(I_t_weights_pol_cut)
+        sigma_PA = np.sqrt(np.nansum(((PA_t_errs[intL:intR]))**2))/(intR-intL)
 
     return PA_f,PA_t,PA_f_errs,PA_t_errs,avg_PA,sigma_PA
 
