@@ -668,11 +668,11 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
     fV = interp1d(timeaxisb,V_t,kind="linear",fill_value="extrapolate")
 
 
-    #divide by sum to normalize to 1
-    I_t_weight = fI(timeaxis)/np.sum(fI(timeaxis))
-    Q_t_weight = fQ(timeaxis)/np.sum(fQ(timeaxis))
-    U_t_weight = fU(timeaxis)/np.sum(fU(timeaxis))
-    V_t_weight = fV(timeaxis)/np.sum(fV(timeaxis))
+    #divide by sum to normalize to 1-- actually don't because you already do this at the end
+    I_t_weight = fI(timeaxis)#/np.sum(fI(timeaxis))
+    Q_t_weight = fQ(timeaxis)#/np.sum(fQ(timeaxis))
+    U_t_weight = fU(timeaxis)#/np.sum(fU(timeaxis))
+    V_t_weight = fV(timeaxis)#/np.sum(fV(timeaxis))
 
     #savgol filter
     if sf_window_weights > 3:
@@ -769,11 +769,11 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
     fV = interp1d(timeaxisb,V_t,kind="linear",fill_value="extrapolate")
 
 
-    #divide by sum to normalize to 1
-    I_t_weight = fI(timeaxis)/np.sum(fI(timeaxis))
-    Q_t_weight = fQ(timeaxis)/np.sum(fQ(timeaxis))
-    U_t_weight = fU(timeaxis)/np.sum(fU(timeaxis))
-    V_t_weight = fV(timeaxis)/np.sum(fV(timeaxis))
+    #divide by sum to normalize to 1-- actually don't because you already do this at the end
+    I_t_weight = fI(timeaxis)#/np.sum(fI(timeaxis))
+    Q_t_weight = fQ(timeaxis)#/np.sum(fQ(timeaxis))
+    U_t_weight = fU(timeaxis)#/np.sum(fU(timeaxis))
+    V_t_weight = fV(timeaxis)#/np.sum(fV(timeaxis))
 
     #savgol filter
     if sf_window_weights <= 3:
