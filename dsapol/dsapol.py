@@ -5204,7 +5204,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
@@ -5213,7 +5213,7 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     if width_native == -1:
         timestart = 0
         timestop = I.shape[1]
-    else:
+    elif timestart == -1 and timestop == -1:
         peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
 
     #optimal weighting
