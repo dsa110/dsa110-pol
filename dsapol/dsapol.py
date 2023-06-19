@@ -431,6 +431,28 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr)
 
 
+
+#functions for rewriting data to filterbanks
+def write_fil_data_dsa(arr,fn,fobj):
+    #create filterbank block object with identical header
+    b = FilterbankBlock(arr,header=fobj.header)
+    b.toFile(fn)
+    return
+
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal"):
+
+    sdir = datadir + fn_prefix + "_" + suffix
+    print("Writing Stokes I to " + sdir + "_0.fil")
+    write_fil_data_dsa(I,sdir + "_0.fil",fobj)
+    print("Writing Stokes Q to " + sdir + "_1.fil")
+    write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
+    print("Writing Stokes U to " + sdir + "_2.fil")
+    write_fil_data_dsa(U,sdir + "_2.fil",fobj)
+    print("Writing Stokes V to " + sdir + "_3.fil")
+    write_fil_data_dsa(V,sdir + "_3.fil",fobj)
+    return
+
+
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
 def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True):
     """
