@@ -361,10 +361,17 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     I,Q,U,V = avg_freq(I,n_f),avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
 
     if fixchans == True:
-        bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
+        #bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
         #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
+        bad_idxs = np.all(I==0,axis=1)
+        good_idxs = np.logical_not(bad_idxs)
+        bad_chans = np.arange(I.shape[0])[bad_idxs]
+        good_chans = np.arange(I.shape[0])[good_idxs]
         print("Bad Channels: " + str(bad_chans))
         
+
+
+
 
         #mask
         mask = np.zeros(I.shape)
@@ -398,6 +405,8 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
         U = (U - offpulse_U)/offpulse_U_std
         V = (V - offpulse_V)/offpulse_V_std
         """
+
+        """
         offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=False)
         offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=False)
         offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=False)
@@ -413,6 +422,41 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
             offpulse_Q_std[bad_chans] = 1
             offpulse_U_std[bad_chans] = 1
             offpulse_V_std[bad_chans] = 1
+
+        """
+        if fixchans:
+            offpulse_I = np.zeros(I.shape[0])
+            offpulse_Q = np.zeros(I.shape[0])
+            offpulse_U = np.zeros(I.shape[0])
+            offpulse_V = np.zeros(I.shape[0])
+
+            offpulse_I[good_chans] = np.mean(I[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_Q[good_chans] = np.mean(Q[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_U[good_chans] = np.mean(U[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_V[good_chans] = np.mean(V[good_chans,:n_off],axis=1,keepdims=False)
+
+
+            offpulse_std_I = np.ones(I.shape[0])
+            offpulse_std_Q = np.ones(I.shape[0])
+            offpulse_std_U = np.ones(I.shape[0])
+            offpulse_std_V = np.ones(I.shape[0])
+
+            offpulse_std_I[good_chans] = np.std(I[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_std_Q[good_chans] = np.std(Q[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_std_U[good_chans] = np.std(U[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_std_V[good_chans] = np.std(V[good_chans,:n_off],axis=1,keepdims=False)
+
+
+        else:
+            offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=False)
+            offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=False)
+            offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=False)
+            offpulse_V = np.mean(V[:,:n_off],axis=1,keepdims=False)
+
+            offpulse_I_std = np.std(I[:,:n_off],axis=1,keepdims=False)
+            offpulse_Q_std = np.std(Q[:,:n_off],axis=1,keepdims=False)
+            offpulse_U_std = np.std(U[:,:n_off],axis=1,keepdims=False)
+            offpulse_V_std = np.std(V[:,:n_off],axis=1,keepdims=False)
 
         I = ((I.transpose() - offpulse_I)/offpulse_I_std).transpose()
         Q = ((Q.transpose() - offpulse_Q)/offpulse_Q_std).transpose()
