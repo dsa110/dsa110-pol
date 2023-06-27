@@ -62,7 +62,7 @@ chip_3C286 = 33*np.pi/180 #rad
 
 #Reads in stokes parameter data from specified directory
 #(Liam Connor)
-def create_stokes_arr(sdir, nsamp=10240,verbose=False):
+def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
     """
     This function reads in Stokes parameter data from a given directory. Stokes parameters
     are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
@@ -84,13 +84,13 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False):
         #if d == 0:
             #print("Failed to read file: " + fn + ", returning 0")
          
-        stokes_arr.append(d)
+        stokes_arr.append(d.astype(dtype))
         print("Done!")
     stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
     return stokes_arr
 
 #read in Stokes I filterbank only
-def create_I_arr(sdir, nsamp=10240,verbose=False):
+def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
     """
     This function reads in Stokes parameter data from a given directory. Stokes parameters
     are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
@@ -111,7 +111,7 @@ def create_I_arr(sdir, nsamp=10240,verbose=False):
     d = read_fil_data_dsa(fn, start=0, stop=nsamp)[0]
     #if d == 0:
         #print("Failed to read file: " + fn + ", returning 0")
-    return d
+    return d.astype(np.float16)
     #stokes_arr.append(d)
     #print("Done!")
     #stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
@@ -326,7 +326,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -343,7 +343,7 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     """
     sdir = datadir + fn_prefix 
-    sarr = create_stokes_arr(sdir, nsamp=nsamps)
+    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype)
     freq,dt = create_freq_time(sdir, nsamp=nsamps)
     fobj=FilReader(sdir+"_0.fil") #need example object for header data
 
@@ -429,6 +429,28 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     
     return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr)
+
+
+
+#functions for rewriting data to filterbanks
+def write_fil_data_dsa(arr,fn,fobj):
+    #create filterbank block object with identical header
+    b = FilterbankBlock(arr,header=fobj.header)
+    b.toFile(fn)
+    return
+
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal"):
+
+    sdir = datadir + fn_prefix + "_" + suffix
+    print("Writing Stokes I to " + sdir + "_0.fil")
+    write_fil_data_dsa(I,sdir + "_0.fil",fobj)
+    print("Writing Stokes Q to " + sdir + "_1.fil")
+    write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
+    print("Writing Stokes U to " + sdir + "_2.fil")
+    write_fil_data_dsa(U,sdir + "_2.fil",fobj)
+    print("Writing Stokes V to " + sdir + "_3.fil")
+    write_fil_data_dsa(V,sdir + "_3.fil",fobj)
+    return
 
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
