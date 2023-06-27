@@ -361,7 +361,7 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     I,Q,U,V = avg_freq(I,n_f),avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
 
     if fixchans == True:
-        bad_chans = find_bad_channels(I)
+        bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
         #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
         print("Bad Channels: " + str(bad_chans))
         
