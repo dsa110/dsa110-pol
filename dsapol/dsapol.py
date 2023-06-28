@@ -453,15 +453,15 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
 
         else:
-            offpulse_I = np.mean(I.data[:,:n_off],axis=1,keepdims=False)
-            offpulse_Q = np.mean(Q.data[:,:n_off],axis=1,keepdims=False)
-            offpulse_U = np.mean(U.data[:,:n_off],axis=1,keepdims=False)
-            offpulse_V = np.mean(V.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_I = np.mean(I.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_Q = np.mean(Q.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_U = np.mean(U.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_V = np.mean(V.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
 
-            offpulse_I_std = np.std(I.data[:,:n_off],axis=1,keepdims=False)
-            offpulse_Q_std = np.std(Q.data[:,:n_off],axis=1,keepdims=False)
-            offpulse_U_std = np.std(U.data[:,:n_off],axis=1,keepdims=False)
-            offpulse_V_std = np.std(V.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_I_std = np.std(I.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_Q_std = np.std(Q.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_U_std = np.std(U.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_V_std = np.std(V.data[:,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
 
 
         I = ((I - offpulse_I[..., np.newaxis])/offpulse_I_std[..., np.newaxis])
@@ -947,10 +947,10 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
     else:
         peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
 
-    I_copy = copy.deepcopy(I)
-    Q_copy = copy.deepcopy(Q)
-    U_copy = copy.deepcopy(U)
-    V_copy = copy.deepcopy(V)
+    #I_copy = copy.deepcopy(I)
+    #Q_copy = copy.deepcopy(Q)
+    #U_copy = copy.deepcopy(U)
+    #V_copy = copy.deepcopy(V)
     
     #optimal weighting
     if weighted:
@@ -977,13 +977,25 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
             I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
         else:   
             I_t_weights = input_weights
+
+
+        """    
         I_t_weights_2D = np.array([I_t_weights]*I.shape[0])        
 
         I = I*I_t_weights_2D
         Q = Q*I_t_weights_2D
         U = U*I_t_weights_2D
         V = V*I_t_weights_2D
-    
+        """
+        #more efficient weighted average
+
+        nzero = np.nonzero(I_t_weights)
+
+        I_f = np.average(I[:,nzero][:,0,:],weights=I_t_weights[nzero],axis=1)
+        Q_f = np.average(Q[:,nzero][:,0,:],weights=I_t_weights[nzero],axis=1)
+        U_f = np.average(U[:,nzero][:,0,:],weights=I_t_weights[nzero],axis=1)
+        V_f = np.average(V[:,nzero][:,0,:],weights=I_t_weights[nzero],axis=1)
+
         if normalize:
             """
             I_f = (I[:,timestart:timestop].sum(1) - I_copy[:,:n_off].mean(1))/np.std(np.mean(I_copy[:,:n_off],axis=0))#I[:,:n_off].std(1)
@@ -991,24 +1003,35 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
             U_f = (U[:,timestart:timestop].sum(1) - U_copy[:,:n_off].mean(1))/np.std(np.mean(U_copy[:,:n_off],axis=0))#U[:,:n_off].std(1)
             V_f = (V[:,timestart:timestop].sum(1) - V_copy[:,:n_off].mean(1))/np.std(np.mean(V_copy[:,:n_off],axis=0))#V[:,:n_off].std(1)
             """
+            """
             I_f = (I[:,timestart:timestop].sum(1) - np.mean(I_copy[:,:n_off].mean(0)))/np.std(np.mean(I_copy[:,:n_off],axis=0))#I[:,:n_off].std(1)
             Q_f = (Q[:,timestart:timestop].sum(1) - np.mean(Q_copy[:,:n_off].mean(0)))/np.std(np.mean(Q_copy[:,:n_off],axis=0))#Q[:,:n_off].std(1)
             U_f = (U[:,timestart:timestop].sum(1) - np.mean(U_copy[:,:n_off].mean(0)))/np.std(np.mean(U_copy[:,:n_off],axis=0))#U[:,:n_off].std(1)
             V_f = (V[:,timestart:timestop].sum(1) - np.mean(V_copy[:,:n_off].mean(0)))/np.std(np.mean(V_copy[:,:n_off],axis=0))#V[:,:n_off].std(1)
+            """
+            I_f = (I_f - np.mean(I[:,:n_off].mean(0)))/np.std(np.mean(I[:,:n_off],axis=0))#I[:,:n_off].std(1)
+            Q_f = (Q_f - np.mean(Q[:,:n_off].mean(0)))/np.std(np.mean(Q[:,:n_off],axis=0))#Q[:,:n_off].std(1)
+            U_f = (U_f - np.mean(U[:,:n_off].mean(0)))/np.std(np.mean(U[:,:n_off],axis=0))#U[:,:n_off].std(1)
+            V_f = (V_f - np.mean(V[:,:n_off].mean(0)))/np.std(np.mean(V[:,:n_off],axis=0))#V[:,:n_off].std(1)
 
 
-        else:
-            I_f = I[:,timestart:timestop].sum(1)
-            Q_f = Q[:,timestart:timestop].sum(1)
-            U_f = U[:,timestart:timestop].sum(1)
-            V_f = V[:,timestart:timestop].sum(1)
+        
+        #else:
+        #    I_f = I[:,timestart:timestop].sum(1)
+        #    Q_f = Q[:,timestart:timestop].sum(1)
+        #    U_f = U[:,timestart:timestop].sum(1)
+        #    V_f = V[:,timestart:timestop].sum(1)
     
+        
+        
+
+
     else:
         if normalize:
-            I_f = (I[:,timestart:timestop].mean(1) - np.mean(I_copy[:,:n_off].mean(0)))/np.std(np.mean(I_copy[:,:n_off],axis=0))#I[:,:n_off].std(1)
-            Q_f = (Q[:,timestart:timestop].mean(1) - np.mean(Q_copy[:,:n_off].mean(0)))/np.std(np.mean(Q_copy[:,:n_off],axis=0))#Q[:,:n_off].std(1)
-            U_f = (U[:,timestart:timestop].mean(1) - np.mean(U_copy[:,:n_off].mean(0)))/np.std(np.mean(U_copy[:,:n_off],axis=0))#U[:,:n_off].std(1)
-            V_f = (V[:,timestart:timestop].mean(1) - np.mean(V_copy[:,:n_off].mean(0)))/np.std(np.mean(V_copy[:,:n_off],axis=0))#V[:,:n_off].std(1)
+            I_f = (I[:,timestart:timestop].mean(1) - np.mean(I[:,:n_off].mean(0)))/np.std(np.mean(I[:,:n_off],axis=0))#I[:,:n_off].std(1)
+            Q_f = (Q[:,timestart:timestop].mean(1) - np.mean(Q[:,:n_off].mean(0)))/np.std(np.mean(Q[:,:n_off],axis=0))#Q[:,:n_off].std(1)
+            U_f = (U[:,timestart:timestop].mean(1) - np.mean(U[:,:n_off].mean(0)))/np.std(np.mean(U[:,:n_off],axis=0))#U[:,:n_off].std(1)
+            V_f = (V[:,timestart:timestop].mean(1) - np.mean(V[:,:n_off].mean(0)))/np.std(np.mean(V[:,:n_off],axis=0))#V[:,:n_off].std(1)
             """
             I_f = (I[:,timestart:timestop].mean(1) - I_copy[:,:n_off].mean(1))/np.std(np.mean(I_copy[:,:n_off],axis=0))#I[:,:n_off].std(1)
             Q_f = (Q[:,timestart:timestop].mean(1) - Q_copy[:,:n_off].mean(1))/np.std(np.mean(Q_copy[:,:n_off],axis=0))#Q[:,:n_off].std(1)
@@ -1576,6 +1599,281 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
 
     return [(pol_f,pol_t,avg_frac,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C_abs,sigma_C_abs,snr_C),(C_f,C_t,avg_C,sigma_C,snr_C),snr]
 
+
+#Calculate polarization fraction vs time from 2D I Q U V arrays
+def get_pol_fraction_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1):
+    """
+    This function calculates and plots the polarization fraction averaged over both time and 
+    frequency, and the average polarization fraction within the peak.
+    Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
+            width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
+            t_samp --> float, sampling time
+            n_t --> int, number of time samples spectra have been binned by (average over)
+            n_off --> int, specifies index of end of off-pulse samples
+            plot --> bool, set to plot and output images in specified directory
+            datadir --> str, path to directory to output images
+            label --> str, trigname_nickname of FRB, e.g. '220319aaeb_Mark'
+            calstr --> str, string specifying whether given data is calibrated or not, optional
+            pre_calc_tf --> bool, set if I,Q,U,V are given as tuples of the frequency and time averaged arrays, e.g. (I_t,I_f)
+            ext --> str, image file extension (png, pdf, etc.)
+            show --> bool, if True, displays images with matplotlib
+            buff --> int, number of samples to buffer either side of pulse if needed
+            full --> bool, if True, calculates polarization vs frequency and time before averaging
+    Outputs: pol_f --> 1D array, frequency dependent polarization
+             pol_t --> 1D array, time dependent polarization
+             avg --> float, frequency and time averaged polarization fraction
+    """
+    if isinstance(buff, int):
+        buff1 = buff
+        buff2 = buff
+    else:
+        buff1 = buff[0]
+        buff2 = buff[1]
+
+    if pre_calc_tf:
+        (I_t,I_f) = I
+        (Q_t,Q_f) = Q
+        (U_t,U_f) = U
+        (V_t,V_f) = V
+    else:
+        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize,buff=buff,window=window)
+
+    #if input_weights != []:
+    #    timestart = 0
+    #    timestop = len(I_t)
+    if width_native == -1:#use full timestream for calibrators
+        timestart = 0
+        timestop = len(I_t)#I.shape[1]
+    else:
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,pre_calc_tf=pre_calc_tf,buff=buff)
+
+    if full:
+        #linear polarization
+        L = np.sqrt(Q**2 + U**2)
+
+        if unbias:
+            L_t = np.nanmean(L,axis=0)
+            L_t[L_t**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
+            L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+            L_t = L_t#/I_t
+        else:
+            L_t = np.nanmean(L,axis=0)#/I_t
+
+        #circular polarization
+        C_t = np.nanmean(V,axis=0)#/I_t
+
+
+        #total polarization
+        pol_t = np.sqrt(L_t**2 + C_t**2)/I_t
+
+        C_t = C_t/I_t
+
+        L_t = L_t/I_t
+
+    else:
+        #linear polarization
+        if unbias:
+            L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2))
+
+            L_t[L_t**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
+            L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+            L_t = L_t#/I_t
+        else:
+            L_t = np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2))#/I_t#(np.array(I_t)**2))
+
+        #circular polarization
+        C_t = V_t#/I_t
+
+        #total polarization
+        pol_t = np.sqrt(C_t**2 + L_t**2)/I_t
+
+        C_t = C_t/I_t
+
+        L_t = L_t/I_t
+
+    if plot:
+        f=plt.figure(figsize=(12,6))
+        plt.plot(np.arange(timestart,timestop),pol_t[timestart:timestop],label=r'Frequency Averaged Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)')
+        plt.plot(np.arange(timestart,timestop),L_t[timestart:timestop],label=r'Frequency Averaged Linear Polarization ($\sqrt{Q^2 + U^2}/I$)')
+        plt.plot(np.arange(timestart,timestop),C_t[timestart:timestop],label=r'Frequency Averaged Circular Polarization ($V/I$)')
+        plt.grid()
+        plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+        plt.ylabel("Polarization Fraction")
+        plt.ylim(-1-allowed_err,1+allowed_err)
+        plt.title(label)
+        plt.legend()
+        plt.savefig(datadir + label + "_polfraction_time_" + calstr + str(n_t) + "_binned" + ext)
+        if show:
+            plt.show()
+        plt.close(f)
+
+    if weighted:
+        if input_weights == []:
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+            I_t_weights_unpadded = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
+        else:
+            I_t_weights = input_weights
+            I_t_weights_unpadded = np.trim_zeros(input_weights)
+
+
+        if multipeaks:
+            pks,props = find_peaks(I_t_weights,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        else:
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+        intL = int(intL)
+        intR = int(intR)
+
+        #average,error
+        off_pulse_I = np.nanstd(I_t[:n_off])
+        off_pulse_Q = np.nanstd(Q_t[:n_off])
+        off_pulse_U = np.nanstd(U_t[:n_off])
+        off_pulse_V = np.nanstd(V_t[:n_off])
+        L_t_biased = np.sqrt(Q_t**2 + U_t**2)
+        T_t_biased = np.sqrt(Q_t**2 + U_t**2  + V_t**2)
+
+
+
+        pol_t_cut1 = ((pol_t)[intL:intR])
+        pol_t_cut = pol_t_cut1[np.abs(pol_t_cut1) < 1+allowed_err]
+        I_t_weights_pol_cut = I_t_weights[intL:intR]
+        I_t_weights_pol_cut = I_t_weights_pol_cut[np.abs(pol_t_cut1) < 1+allowed_err]
+        avg_frac = np.nansum(pol_t_cut*I_t_weights_pol_cut)/np.nansum(I_t_weights_pol_cut)
+        #sigma_frac = np.nansum(I_t_weights_pol_cut*np.sqrt((pol_t_cut - avg_frac)**2))/np.nansum(I_t_weights_pol_cut)
+        sigma_frac = np.sqrt((Q_t*off_pulse_Q/I_t/T_t_biased)**2 +   (U_t*off_pulse_U/I_t/T_t_biased)**2+ (V_t*off_pulse_V/I_t/T_t_biased)**2  + (T_t_biased*off_pulse_I/((I_t)**2)))
+        sigma_frac = (sigma_frac[intL:intR])[np.abs(pol_t_cut1) < 1+allowed_err]
+        sigma_frac = np.sqrt(np.nansum((I_t_weights_pol_cut*sigma_frac)**2))/np.nansum(I_t_weights_pol_cut)
+
+        L_t_cut1 = ((L_t)[intL:intR])
+        L_t_cut = L_t_cut1[np.abs(pol_t_cut1) < 1+allowed_err]
+        I_t_weights_L_cut = I_t_weights[intL:intR]
+        I_t_weights_L_cut = I_t_weights_L_cut[np.abs(pol_t_cut1) < 1+allowed_err]
+        avg_L = np.nansum(L_t_cut*I_t_weights_L_cut)/np.nansum(I_t_weights_L_cut)
+        #sigma_L = np.nansum(I_t_weights_L_cut*np.sqrt((L_t_cut - avg_L)**2))/np.nansum(I_t_weights_L_cut)
+        sigma_L = np.sqrt((Q_t*off_pulse_Q/I_t/L_t_biased)**2 +   (U_t*off_pulse_U/I_t/L_t_biased)**2  + (L_t_biased*off_pulse_I/((I_t)**2)))
+        sigma_L = (sigma_L[intL:intR])[np.abs(pol_t_cut1) < 1+allowed_err]
+        sigma_L = np.sqrt(np.nansum((I_t_weights_pol_cut*sigma_L)**2))/np.nansum(I_t_weights_pol_cut)
+
+
+        C_t_cut1 = (np.abs(C_t)[intL:intR])
+        C_t_cut = C_t_cut1[np.abs(pol_t_cut1) < 1+allowed_err]
+        I_t_weights_C_cut = I_t_weights[intL:intR]
+        I_t_weights_C_cut = I_t_weights_C_cut[np.abs(pol_t_cut1) < 1+allowed_err]
+        avg_C_abs = np.nansum(C_t_cut*I_t_weights_C_cut)/np.nansum(I_t_weights_C_cut)
+        #sigma_C_abs = np.nansum(I_t_weights_C_cut*np.sqrt((C_t_cut - avg_C_abs)**2))/np.nansum(I_t_weights_C_cut)
+        sigma_C_abs = np.sqrt((off_pulse_V/I_t)**2  + (V_t*off_pulse_I/((I_t)**2))**2)
+        sigma_C_abs = (sigma_C_abs[intL:intR])[np.abs(pol_t_cut1) < 1+allowed_err]
+        sigma_C_abs = np.sqrt(np.nansum((I_t_weights_pol_cut*sigma_C_abs)**2))/np.nansum(I_t_weights_pol_cut)
+
+        C_t_cut1 = ((C_t)[intL:intR])
+        C_t_cut = C_t_cut1[np.abs(pol_t_cut1) < 1+allowed_err]
+        I_t_weights_C_cut = I_t_weights[intL:intR]
+        I_t_weights_C_cut = I_t_weights_C_cut[np.abs(pol_t_cut1) < 1+allowed_err]
+        avg_C = np.nansum(C_t_cut*I_t_weights_C_cut)/np.nansum(I_t_weights_C_cut)
+        sigma_C = np.nansum(I_t_weights_C_cut*np.sqrt((C_t_cut - avg_C)**2))/np.nansum(I_t_weights_C_cut)
+        sigma_C = sigma_C_abs
+
+        I_trial_binned = convolve(I_t,I_t_weights_unpadded)
+        sigbin = np.argmax(I_trial_binned)
+        sig0 = I_trial_binned[sigbin]
+        I_binned = convolve(I_t,I_t_weights_unpadded)
+        noise = np.std(np.concatenate([I_binned[:sigbin-(timestop-timestart)*2],I_binned[sigbin+(timestop-timestart)*2:]]))
+        snr = sig0/noise
+        print((sig0,noise,snr))
+
+        T_trial_binned = convolve(pol_t*I_t,I_t_weights_unpadded)
+        sig0 = T_trial_binned[sigbin]
+        Q_binned = convolve(Q_t,I_t_weights_unpadded)
+        noise = np.std(np.concatenate([Q_binned[:sigbin-(timestop-timestart)*2],Q_binned[sigbin+(timestop-timestart)*2:]]))
+        snr_frac = sig0/noise
+        print((sig0,noise,snr_frac))
+
+        L_trial_binned = convolve(L_t*I_t,I_t_weights_unpadded)
+        sig0 = L_trial_binned[sigbin]
+        snr_L = sig0/noise
+        print((sig0,noise,snr_L))
+
+        C_trial_binned = np.convolve(np.abs(C_t)*I_t,I_t_weights_unpadded)
+        sig0 = C_trial_binned[sigbin]
+        V_binned = convolve(V_t,I_t_weights_unpadded)
+        noise = np.std(np.concatenate([V_binned[:sigbin-(timestop-timestart)*2],V_binned[sigbin+(timestop-timestart)*2:]]))
+        snr_C = sig0/noise
+        print((sig0,noise,snr_C))
+
+
+    else:
+        #average,error
+        off_pulse_I = np.nanstd(I_t[:n_off])
+        off_pulse_Q = np.nanstd(Q_t[:n_off])
+        off_pulse_U = np.nanstd(U_t[:n_off])
+        off_pulse_V = np.nanstd(V_t[:n_off])
+        L_t_biased = np.sqrt(Q_t**2 + U_t**2)
+        T_t_biased = np.sqrt(Q_t**2 + U_t**2  + V_t**2)
+
+        avg_frac = np.nanmean((pol_t[intL:intR])[np.abs(pol_t)[intL:intR]<=1+allowed_err])
+        avg_L = np.nanmean((L_t[intL:intR])[np.abs(L_t)[intL:intR]<=1+allowed_err])
+        avg_C_abs = np.nanmean((np.abs(C_t)[intL:intR])[np.abs(C_t)[intL:intR]<=1+allowed_err])
+        avg_C = np.nanmean(((C_t)[intL:intR])[(C_t)[intL:intR]<=1+allowed_err])
+
+        #RMS error
+        sigma_frac = np.sqrt((Q_t*off_pulse_Q/I_t/T_t_biased)**2 +   (U_t*off_pulse_U/I_t/T_t_biased)**2+ (V_t*off_pulse_V/I_t/T_t_biased)**2  + (T_t_biased*off_pulse_I/((I_t)**2)))
+        sigma_frac = (sigma_frac[intL:intR])[np.abs(pol_t)[intL:intR] < 1+allowed_err]
+        sigma_frac = np.sqrt(np.nansum((sigma_frac)**2))/len(sigma_frac)
+
+        sigma_L = np.sqrt((Q_t*off_pulse_Q/I_t/L_t_biased)**2 +   (U_t*off_pulse_U/I_t/L_t_biased)**2  + (L_t_biased*off_pulse_I/((I_t)**2)))
+        sigma_L = (sigma_L[intL:intR])[np.abs(pol_t)[intL:intR] < 1+allowed_err]
+        sigma_L = np.sqrt(np.nansum((sigma_L)**2))/len(sigma_L)
+
+        sigma_C_abs = np.sqrt((off_pulse_V/I_t)**2  + (V_t*off_pulse_I/((I_t)**2))**2)
+        sigma_C_abs = (sigma_C_abs[intL:intR])[np.abs(pol_t)[intL:intR] < 1+allowed_err]
+        sigma_C_abs = np.sqrt(np.nansum((sigma_C_abs)**2))/len(sigma_C_abs)
+        sigma_C = sigma_C_abs
+
+        #SNR
+        sig0 = np.nanmean(I_t[timestart:timestop])
+        I_t_cut1 = I_t[timestart%(timestop-timestart):]
+        I_t_cut = I_t_cut1[:(len(I_t_cut1)-(len(I_t_cut1)%(timestop-timestart)))]
+        I_t_binned = I_t_cut.reshape(len(I_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+        sigbin = np.argmax(I_t_binned)
+        noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
+        snr = sig0/noise
+
+        sig0 = np.nanmean(pol_t*I_t[timestart:timestop])
+        pol_t_cut1 = pol_t*I_t[timestart%(timestop-timestart):]
+        pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
+        pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+        sigbin = np.argmax(pol_t_binned)
+        noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
+        snr_frac = sig0/noise
+
+        sig0 = np.nanmean(L_t*I_t[timestart:timestop])
+        L_t_cut1 = L_t*I_t[timestart%(timestop-timestart):]
+        L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
+        L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+        sigbin = np.argmax(L_t_binned)
+        noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
+        snr_L = sig0/noise
+
+        sig0 = np.nanmean(np.abs(C_t)*I_t[timestart:timestop])
+        C_t_cut1 = np.abs(C_t)*I_t[timestart%(timestop-timestart):]
+        C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
+        C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+        sigbin = np.argmax(C_t_binned)
+        noise = (np.nanstd(np.concatenate([C_t_cut[:sigbin],C_t_cut[sigbin+1:]])))
+        snr_C = sig0/noise
+
+
+
+    #snr_frac = np.nanmean(pol_t[timestart:timestop])/np.nanstd(pol_t[:n_off])
+    #snr_L = np.nanmean(L_t[timestart:timestop])/np.nanstd(L_t[:n_off])
+    #snr_C = np.nanmean(C_t[timestart:timestop])/np.nanstd(C_t[:n_off])
+
+    return [(pol_t,avg_frac,sigma_frac,snr_frac),(L_t,avg_L,sigma_L,snr_L),(C_t,avg_C_abs,sigma_C_abs,snr_C),(C_t,avg_C,sigma_C,snr_C),snr]
+
+
+
 #1sigma PA error calculation 
 def PA_error_NKC(mean,L0,sigma,siglevel=0.68,plot=False):
 
@@ -1739,6 +2037,116 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
         sigma_PA = np.sqrt(np.nansum(((PA_t_errs[intL:intR]))**2))/(intR-intL)
 
     return PA_f,PA_t,PA_f_errs,PA_t_errs,avg_PA,sigma_PA
+
+#Calculate polarization angle vs time from 2D I Q U V arrays
+def get_pol_angle_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1):
+    """
+    This function calculates and plots the polarization angle averaged over both time and
+    frequency, and the average polarization angle within the peak.
+    Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
+            width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
+            t_samp --> float, sampling time
+            n_t --> int, number of time samples spectra have been binned by (average over)
+            n_off --> int, specifies index of end of off-pulse samples
+            plot --> bool, set to plot and output images in specified directory
+            datadir --> str, path to directory to output images
+            label --> str, trigname_nickname of FRB, e.g. '220319aaeb_Mark'
+            calstr --> str, string specifying whether given data is calibrated or not, optional
+            pre_calc_tf --> bool, set if I,Q,U,V are given as tuples of the frequency and time averaged arrays, e.g. (I_t,I_f)
+            ext --> str, image file extension (png, pdf, etc.)
+            show --> bool, if True, displays images with matplotlib
+            buff --> int, number of samples to buffer either side of pulse if needed
+    Outputs: PA_t --> 1D array, time dependent PA
+             avg --> float, frequency and time averaged PA
+    """
+    if pre_calc_tf:
+        (I_t,I_f) = I
+        (Q_t,Q_f) = Q
+        (U_t,U_f) = U
+        (V_t,V_f) = V
+    else:
+        (I_t,Q_t,U_t,V_t) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=n_off,plot=False,normalize=normalize,buff=buff,window=window)
+
+
+    if plot and input_weights != []:
+        timestart = 0
+        timestop = len(I_t)
+    elif plot and width_native == -1:#use full timestream for calibrators
+        timestart = 0
+        timestop = len(I_t)#I.shape[1]
+    elif plot:
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,pre_calc_tf=pre_calc_tf,buff=buff)
+
+    PA_t = 0.5*np.angle(Q_t +1j*U_t)#np.sqrt((np.array(Q_t)**2 + np.array(U_t)**2 + np.array(V_t)**2)/(np.array(I_t)**2))
+
+    #errorbars
+    L_t = np.sqrt(Q_t**2 + U_t**2)#*I_w_t_filt
+    L_t[L_t**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
+    L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+    PA_t_errs = PA_error_NKC_array(PA_t,L_t,np.std(I_t[:n_off]))
+
+    if plot:
+        f=plt.figure(figsize=(12,6))
+        plt.errorbar(np.arange(timestart,timestop),PA_t[timestart:timestop],yerr=PA_t_errs[timestart:timestop],linestyle="",marker="o",capsize=5)
+        plt.grid()
+        plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+        plt.ylabel("Polarization Angle (rad)")
+        #plt.ylim(-1,1)
+        plt.title(label)
+        plt.savefig(datadir + label + "_polangle_time_" + calstr + str(n_t) + "_binned" + ext)
+        #plt.xlim(timestart,timestop)dd
+        if show:
+            plt.show()
+        plt.close(f)
+
+    if weighted:
+        if input_weights == []:
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+        else:
+            I_t_weights = input_weights
+
+
+        if multipeaks:
+            pks,props = find_peaks(I_t_weights,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        else:
+            FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+        print("here: " + str((intL,intR)))
+        intL = int(intL)
+        intR = int(intR)
+        print("here: " + str((intL,intR)))
+
+        #average,error
+        PA_t_cut1 = PA_t[intL:intR]
+        PA_t_cut = PA_t_cut1#[np.abs(PA_t_cut1) < (2*np.pi)]
+        I_t_weights_pol_cut = I_t_weights[intL:intR]
+        I_t_weights_pol_cut = I_t_weights_pol_cut#[np.abs(PA_t_cut1) < (2*np.pi)]
+        avg_PA = np.nansum(PA_t_cut*I_t_weights_pol_cut)/np.nansum(I_t_weights_pol_cut)
+        #sigma_PA = np.nansum(I_t_weights_pol_cut*np.sqrt((PA_t_cut - avg_PA)**2))/np.nansum(I_t_weights_pol_cut)
+        sigma_PA = np.sqrt(np.nansum((I_t_weights_pol_cut*(PA_t_errs[intL:intR]))**2))/np.nansum(I_t_weights_pol_cut)
+
+    else:
+        if multipeaks:
+            pks,props = find_peaks(I_t,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        else:
+            FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
+        print("here: " + str((intL,intR)))
+        intL = int(intL)
+        intR = int(intR)
+        print("here: " + str((intL,intR)))
+
+        #avg_PA = np.mean(PA_t[timestart:timestop][PA_t[timestart:timestop]<1])
+        avg_PA = np.nanmean(PA_t[intL:intR])
+        #sigma_PA = np.nanstd(PA_t[intL:intR])
+        sigma_PA = np.sqrt(np.nansum(((PA_t_errs[intL:intR]))**2))/(intR-intL)
+
+    return PA_t,PA_t_errs,avg_PA,sigma_PA
+
 
 """
 #function to compute error and upper limit on polarization
