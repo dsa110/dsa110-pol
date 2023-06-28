@@ -267,6 +267,9 @@ def avg_time(arr,n): #averages time axis over n samples
     Outputs: 2D array of size (nchans x nsamples/n) 
 
     """
+    if n == 1:
+        return arr
+
     """
     if arr.shape[1]%n != 0:
         print("array size must be divisible by n")
@@ -290,6 +293,8 @@ def avg_freq(arr,n): #averages freq axis over n samples
     Outputs: 2D array of size (nchans/n x nsamples)
 
     """
+    if n == 1:
+        return arr
     """
     if arr.shape[0]%n != 0:
         print("array size must be divisible by n")
