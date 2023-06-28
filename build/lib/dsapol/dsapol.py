@@ -430,38 +430,45 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
             offpulse_U = np.zeros(I.shape[0])
             offpulse_V = np.zeros(I.shape[0])
 
-            offpulse_I[good_chans] = np.mean(I[good_chans,:n_off],axis=1,keepdims=False)
-            offpulse_Q[good_chans] = np.mean(Q[good_chans,:n_off],axis=1,keepdims=False)
-            offpulse_U[good_chans] = np.mean(U[good_chans,:n_off],axis=1,keepdims=False)
-            offpulse_V[good_chans] = np.mean(V[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_I[good_chans] = np.mean(I.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_Q[good_chans] = np.mean(Q.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_U[good_chans] = np.mean(U.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_V[good_chans] = np.mean(V.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
 
 
-            offpulse_std_I = np.ones(I.shape[0])
-            offpulse_std_Q = np.ones(I.shape[0])
-            offpulse_std_U = np.ones(I.shape[0])
-            offpulse_std_V = np.ones(I.shape[0])
+            offpulse_I_std = np.ones(I.shape[0])
+            offpulse_Q_std = np.ones(I.shape[0])
+            offpulse_U_std = np.ones(I.shape[0])
+            offpulse_V_std = np.ones(I.shape[0])
 
-            offpulse_std_I[good_chans] = np.std(I[good_chans,:n_off],axis=1,keepdims=False)
-            offpulse_std_Q[good_chans] = np.std(Q[good_chans,:n_off],axis=1,keepdims=False)
-            offpulse_std_U[good_chans] = np.std(U[good_chans,:n_off],axis=1,keepdims=False)
-            offpulse_std_V[good_chans] = np.std(V[good_chans,:n_off],axis=1,keepdims=False)
+            offpulse_I_std[good_chans] = np.std(I.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_Q_std[good_chans] = np.std(Q.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_U_std[good_chans] = np.std(U.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
+            offpulse_V_std[good_chans] = np.std(V.data[good_chans,:n_off],axis=1,keepdims=False,dtype=np.float32).astype(dtype)
 
 
         else:
-            offpulse_I = np.mean(I[:,:n_off],axis=1,keepdims=False)
-            offpulse_Q = np.mean(Q[:,:n_off],axis=1,keepdims=False)
-            offpulse_U = np.mean(U[:,:n_off],axis=1,keepdims=False)
-            offpulse_V = np.mean(V[:,:n_off],axis=1,keepdims=False)
+            offpulse_I = np.mean(I.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_Q = np.mean(Q.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_U = np.mean(U.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_V = np.mean(V.data[:,:n_off],axis=1,keepdims=False)
 
-            offpulse_I_std = np.std(I[:,:n_off],axis=1,keepdims=False)
-            offpulse_Q_std = np.std(Q[:,:n_off],axis=1,keepdims=False)
-            offpulse_U_std = np.std(U[:,:n_off],axis=1,keepdims=False)
-            offpulse_V_std = np.std(V[:,:n_off],axis=1,keepdims=False)
+            offpulse_I_std = np.std(I.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_Q_std = np.std(Q.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_U_std = np.std(U.data[:,:n_off],axis=1,keepdims=False)
+            offpulse_V_std = np.std(V.data[:,:n_off],axis=1,keepdims=False)
 
-        I = ((I.transpose() - offpulse_I)/offpulse_I_std).transpose()
-        Q = ((Q.transpose() - offpulse_Q)/offpulse_Q_std).transpose()
-        U = ((U.transpose() - offpulse_U)/offpulse_U_std).transpose()
-        V = ((V.transpose() - offpulse_V)/offpulse_V_std).transpose()
+
+        I = ((I - offpulse_I[..., np.newaxis])/offpulse_I_std[..., np.newaxis])
+        Q = ((Q - offpulse_Q[..., np.newaxis])/offpulse_Q_std[..., np.newaxis])
+        U = ((U - offpulse_U[..., np.newaxis])/offpulse_U_std[..., np.newaxis])
+        V = ((V - offpulse_V[..., np.newaxis])/offpulse_V_std[..., np.newaxis])
+
+
+        #I = ((I.transpose() - offpulse_I)/offpulse_I_std).transpose()
+        #Q = ((Q.transpose() - offpulse_Q)/offpulse_Q_std).transpose()
+        #U = ((U.transpose() - offpulse_U)/offpulse_U_std).transpose()
+        #V = ((V.transpose() - offpulse_V)/offpulse_V_std).transpose()
 
     #calculate frequency and wavelength arrays (separate array for each stokes parameter, but should be the same)
     c = (3e8) #m/s
