@@ -1905,7 +1905,8 @@ def PA_error_NKC_array(means,L0s,sigma,siglevel=0.68):
     return np.array(errs)
 
 
-#Calculate polarization angle vs frequency and time from 2D I Q U V arrays
+
+
 def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1):
     """
     This function calculates and plots the polarization angle averaged over both time and
@@ -2083,6 +2084,7 @@ def get_pol_angle_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,
     L_t = np.sqrt(Q_t**2 + U_t**2)#*I_w_t_filt
     L_t[L_t**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
     L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+    assert(len(L_t) == len(PA_t))
     PA_t_errs = PA_error_NKC_array(PA_t,L_t,np.std(I_t[:n_off]))
 
     if plot:
@@ -2098,7 +2100,7 @@ def get_pol_angle_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,
         if show:
             plt.show()
         plt.close(f)
-
+    """
     if weighted:
         if input_weights == []:
             I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
@@ -2144,8 +2146,8 @@ def get_pol_angle_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,
         avg_PA = np.nanmean(PA_t[intL:intR])
         #sigma_PA = np.nanstd(PA_t[intL:intR])
         sigma_PA = np.sqrt(np.nansum(((PA_t_errs[intL:intR]))**2))/(intR-intL)
-
-    return PA_t,PA_t_errs,avg_PA,sigma_PA
+    """
+    return PA_t,PA_t_errs#,avg_PA,sigma_PA
 
 
 """
