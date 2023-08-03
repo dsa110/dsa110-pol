@@ -62,7 +62,7 @@ chip_3C286 = 33*np.pi/180 #rad
 
 #Reads in stokes parameter data from specified directory
 #(Liam Connor)
-def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
+def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False):
     """
     This function reads in Stokes parameter data from a given directory. Stokes parameters
     are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
@@ -77,9 +77,14 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
     if verbose:
         print("Reading stokes parameters from " + sdir)
     stokes_arr=[]
+    if alpha:
+        labels=["I","Q","U","V"]
     for ii in range(4):
         print("Reading stokes param..." + str(ii),end="")
-        fn = '%s_%d.fil'%(sdir,ii)
+        if alpha:
+            fn = '%s_%s.fil'%(sdir,labels[ii])
+        else:
+            fn = '%s_%d.fil'%(sdir,ii)
         d = read_fil_data_dsa(fn, start=0, stop=nsamp)[0]
         #if d == 0:
             #print("Failed to read file: " + fn + ", returning 0")
@@ -90,7 +95,7 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
     return stokes_arr
 
 #read in Stokes I filterbank only
-def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
+def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False):
     """
     This function reads in Stokes parameter data from a given directory. Stokes parameters
     are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
@@ -107,7 +112,10 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
     stokes_arr=[]
     ii =0
     print("Reading stokes param..." + str(ii),end="")
-    fn = '%s_%d.fil'%(sdir,ii)
+    if alpha:
+        fn = '%s_%s.fil'%(sdir,"I")
+    else:
+        fn = '%s_%d.fil'%(sdir,ii)
     d = read_fil_data_dsa(fn, start=0, stop=nsamp)[0]
     #if d == 0:
         #print("Failed to read file: " + fn + ", returning 0")
@@ -118,7 +126,7 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32):
     #return stokes_arr
 
 #Creates freq, time axes
-def create_freq_time(sdir,nsamp=10240):#1500):
+def create_freq_time(sdir,nsamp=10240,alpha=False):#1500):
     """
     This function creates frequency and time axes from stokes filterbank headers
 
@@ -129,8 +137,13 @@ def create_freq_time(sdir,nsamp=10240):#1500):
     """
     freq=[]
     dt = []
+    if alpha:
+        labels=["I","Q","U","V"]
     for ii in range(4):
-        fn = '%s_%d.fil'%(sdir,ii)
+        if alpha:
+            fn = '%s_%s.fil'%(sdir,labels[ii])
+        else:
+            fn = '%s_%d.fil'%(sdir,ii)
         d = read_fil_data_dsa(fn, start=0, stop=nsamp)
         freq.append(d[1])
         dt.append(d[2])
@@ -139,7 +152,7 @@ def create_freq_time(sdir,nsamp=10240):#1500):
     return freq,dt
 
 #Creates freq, time axes for stokes I only
-def create_freq_time_I(sdir,nsamp=10240):#1500):
+def create_freq_time_I(sdir,nsamp=10240,alpha=False):#1500):
     """
     This function creates frequency and time axes from stokes filterbank headers
 
@@ -152,7 +165,10 @@ def create_freq_time_I(sdir,nsamp=10240):#1500):
     dt = []
     #for ii in range(4):
     ii = 0
-    fn = '%s_%d.fil'%(sdir,ii)
+    if alpha:
+        fn = '%s_%s.fil'%(sdir,"I")
+    else:
+        fn = '%s_%d.fil'%(sdir,ii)
     d = read_fil_data_dsa(fn, start=0, stop=nsamp)
     freq.append(d[1])
     dt.append(d[2])
@@ -189,73 +205,6 @@ def read_fil_data_dsa(fn, start=0, stop=1,verbose=True):
 
     return data, freq, delta_t, header
 
-"""
-#save IQUV to filterbank files with given header
-def save_fil(I,Q,U,V,hdr,datadir,ids,name,suffix="_calibrated_"):
-    prefix = ids + "_" + name
-
-    #Write Calibrated Stokes params to filterbank
-    hdr.prepOutfile
-    headerI = Header(hdr)
-    #headerI["Stokes"] = "I"
-    fnameI = datadir + prefix + suffix + "0.fil"
-    
-    headerI["filenames"] = headerI["filename"] = headerI["basename"] = fnameI
-    filI = FilterbankBlock(I_cal,headerI)
-    filI.toFile(fnameI)
-
-    headerQ = Header(hdr)
-    #headerQ["Stokes"] = "Q"
-    fnameQ = datadir + prefix + suffix + "1.fil"
-    headerQ["filenames"] = headerQ["filename"] = headerQ["basename"] = fnameQ
-    filQ =FilterbankBlock(Q_cal,headerQ)
-    filQ.toFile(fnameQ)
-
-    headerU = Header(hdr)
-    #headerU["Stokes"] = "U"
-    fnameU = datadir + prefix + suffix + "2.fil"
-    headerU["filenames"] = headerU["filename"] = headerU["basename"] = fnameU
-    filU = FilterbankBlock(U_cal,headerU)
-    filU.toFile(fnameU)
-
-    headerV = Header(hdr)
-    #headerV["Stokes"] = "V"
-    fnameV = datadir + prefix + suffix + "3.fil"
-    headerV["filenames"] = headerV["filename"] = headerV["basename"] = fnameV
-    filV = FilterbankBlock(V_cal,headerV)
-    filV.toFile(fnameV)
-
-    return fnameI,fnameQ,fnameU,fnameV#filI,filQ,filU,filV
-
-#reads in and calibrates data, resaves to calibrated IQUV filterbanks
-def cal_and_save(datadir,ids,nickname,npoints,caldate,RA,DEC,ibeam,RM,n_t=1,n_f=1,sub_offpulse_mean=True,n_off=int(12000)):
-    prefix = ids + "_dev"
-    (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = dsapol.get_stokes_2D(datadir,ids + "_dev",npoints,n_t=n_t,n_f=1,n_off=n_off,sub_offpulse_mean=sub_offpulse_mean)
-    Ical,Qcal,Ucal,Vcal = dsapol.calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
-    
-    I = dsapol.avg_freq(I,n_f)
-    Q = dsapol.avg_freq(Q,n_f)
-    U = dsapol.avg_freq(U,n_f)
-    V = dsapol.avg_freq(V,n_f)
-
-    Ical = dsapol.avg_freq(Ical,n_f)
-    Qcal = dsapol.avg_freq(Qcal,n_f)
-    Ucal = dsapol.avg_freq(Ucal,n_f)
-    Vcal = dsapol.avg_freq(Vcal,n_f)
-
-    Ical,Qcal,Ucal,Vcal,ParA = dsapol.calibrate_angle(Ical,Qcal,Ucal,Vcal,fobj,ibeam,RA,DEC)
-
-    if freq_test[0].shape[0]%n_f != 0:
-        for i in range(4):
-            freq_test[i] = freq_test[i][freq_test[i].shape[0]%n_f:]
-    freq_test =  [freq_test[0].reshape(len(freq_test[0])//n_f,n_f).mean(1)]*4
-
-
-    IcalRM,QcalRM,UcalRM,VcalRM = dsapol.calibrate_RM(Ical,Qcal,Ucal,Vcal,RM,phi,freq_test,stokes=True) #total derotation
-
-    fnameI,fnameQ,fnameU,fnameV = filIsave_fil(IcalRM,QcalRM,UcalRM,VcalRM,copy.deepcopy(fobj.header),datadir,ids,name)
-    return fnameI,fnameq,fnameU,fnameV
-"""
 #Bin 2d (n_f x n_t) array by n samples on n_t axis
 def avg_time(arr,n): #averages time axis over n samples
     """
@@ -331,7 +280,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -348,9 +297,12 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     """
     sdir = datadir + fn_prefix 
-    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype)
-    freq,dt = create_freq_time(sdir, nsamp=nsamps)
-    fobj=FilReader(sdir+"_0.fil") #need example object for header data
+    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha)
+    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha)
+    if alpha:
+        fobj=FilReader(sdir+"_I.fil")
+    else:
+        fobj=FilReader(sdir+"_0.fil") #need example object for header data
 
     #Bin in time and frequency
     #n_t = 1#8
@@ -495,22 +447,34 @@ def write_fil_data_dsa(arr,fn,fobj):
     b.toFile(fn)
     return
 
-def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal"):
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
 
-    sdir = datadir + fn_prefix + "_" + suffix
-    print("Writing Stokes I to " + sdir + "_0.fil")
-    write_fil_data_dsa(I,sdir + "_0.fil",fobj)
-    print("Writing Stokes Q to " + sdir + "_1.fil")
-    write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
-    print("Writing Stokes U to " + sdir + "_2.fil")
-    write_fil_data_dsa(U,sdir + "_2.fil",fobj)
-    print("Writing Stokes V to " + sdir + "_3.fil")
-    write_fil_data_dsa(V,sdir + "_3.fil",fobj)
+    if alpha:
+        sdir = datadir + fn_prefix + "_" + suffix
+        print("Writing Stokes I to " + sdir + "_I.fil")
+        write_fil_data_dsa(I,sdir + "_I.fil",fobj)
+        print("Writing Stokes Q to " + sdir + "_Q.fil")
+        write_fil_data_dsa(Q,sdir + "_Q.fil",fobj)
+        print("Writing Stokes U to " + sdir + "_U.fil")
+        write_fil_data_dsa(U,sdir + "_U.fil",fobj)
+        print("Writing Stokes V to " + sdir + "_V.fil")
+        write_fil_data_dsa(V,sdir + "_V.fil",fobj)
+
+    else:
+        sdir = datadir + fn_prefix + "_" + suffix
+        print("Writing Stokes I to " + sdir + "_0.fil")
+        write_fil_data_dsa(I,sdir + "_0.fil",fobj)
+        print("Writing Stokes Q to " + sdir + "_1.fil")
+        write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
+        print("Writing Stokes U to " + sdir + "_2.fil")
+        write_fil_data_dsa(U,sdir + "_2.fil",fobj)
+        print("Writing Stokes V to " + sdir + "_3.fil")
+        write_fil_data_dsa(V,sdir + "_3.fil",fobj)
     return
 
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True):
+def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -527,9 +491,12 @@ def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=T
 
     """
     sdir = datadir + fn_prefix
-    I = create_I_arr(sdir, nsamp=nsamps)
-    freq,dt = create_freq_time_I(sdir, nsamp=nsamps)
-    fobj=FilReader(sdir+"_0.fil") #need example object for header data
+    I = create_I_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha)
+    freq,dt = create_freq_time_I(sdir, nsamp=nsamps,alpha=alpha)
+    if alpha:
+        fobj=FilReader(sdir+"_I.fil")
+    else:
+        fobj=FilReader(sdir+"_0.fil") #need example object for header data
 
     #Bin in time and frequency
     #n_t = 1#8
@@ -764,6 +731,8 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
     #take absolute value (negative weights meaningless)
     I_t_weight = np.abs(I_t_weight)
 
+    #mark any points where I<0 as invalid
+    I_t_weight[I.mean(0)<0] = 0
     #repeat over frequency
     #I_weight = np.abs(np.array([I_t_weight]*I.shape[0]))
     #Q_weight = np.abs(np.array([Q_t_weight]*Q.shape[0]))
@@ -865,6 +834,8 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
     #take absolute value (negative weights meaningless)
     I_t_weight = np.abs(I_t_weight)
 
+    #mark any points where I<0 as invalid
+    I_t_weight[I_t_init<0] = 0
     #repeat over frequency
     #I_weight = np.abs(np.array([I_t_weight]*I.shape[0]))
     #Q_weight = np.abs(np.array([Q_t_weight]*Q.shape[0]))
@@ -5621,7 +5592,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
 
 #plotting functions
-def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True):
+def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title=""):
     datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     #parse results
     RMsynth_snrs, RMtools_snrs = RMsnrs
@@ -5631,24 +5602,27 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         RMsynth_zoomsnrs, RMSNR_zoomsnrs = RMzoomsnrs
 
 
-    fig, axs = plt.subplots(2,1,figsize=(38,24), gridspec_kw={'height_ratios': [1, 1]})
+    fig, axs = plt.subplots(2,1,figsize=(38,28), gridspec_kw={'height_ratios': [1, 1]})
 
     ax4= axs[0]# = plt.subplot2grid(shape=(2, 2), loc=(0, 0), colspan=2)
     ax5 =axs[1]#= plt.subplot2grid(shape=(2, 2), loc=(1, 0), colspan=2,rowspan=2)
 
     #set title
-    if nickname == "220912A" and ids == "221018aaaj":
-        ax4.set_title("FRB20220912A Burst 1 RM Analysis")
-    elif nickname == "220912A":
-        ax4.set_title("FRB20220912A Burst 2 RM Analysis")
-    else:
-        ax4.set_title("FRB20" + ids[:6] + " RM Analysis")
+    if title != None:
+        if title != "":
+            ax4.set_title(title)
+        elif nickname == "220912A" and ids == "221018aaaj":
+            ax4.set_title("FRB20220912A Burst 1 RM Analysis")
+        elif nickname == "220912A":
+            ax4.set_title("FRB20220912A Burst 2 RM Analysis")
+        else:
+            ax4.set_title("FRB20" + ids[:6] + " RM Analysis")
 
     #full range plot
     ax4.plot(trial_RM1,RMsynth_snrs,label="RM synthesis",color="black")
     ax4.plot(trial_RMtools1,RMtools_snrs,alpha=0.5,label="RM Tools",color="blue") 
     ax4.legend(loc="upper right")
-    ax4.set_xlabel("RM (rad/m^2)")
+    ax4.set_xlabel(r'$RM\,(rad/m^2)$')
     ax4.set_ylabel(r'$F(\phi)$')
     ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
 
@@ -5677,7 +5651,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
     ax5_1.set_ylabel(r'$F(\phi)$')
 
     ax5.legend(lns, labs, loc="upper right")
-    ax5.set_xlabel("RM (rad/m^2)")
+    ax5.set_xlabel("$RM\,(rad/m^2)$")
     ax5.set_ylabel("Linear S/N")
 
 
@@ -5692,7 +5666,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
@@ -5738,6 +5712,18 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     C_t_unbiased = C_t_unbiased*I_t
     C_f_unbiased = C_f_unbiased*I_f
 
+    
+    L_t = np.sqrt(Q_t**2 + U_t**2)
+    L_t[L_t**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
+    L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
+    L_f = np.sqrt(Q_f**2 + U_f**2)
+    L_f[L_f**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
+    L_f = np.sqrt(L_f**2 - np.std(I_t[:n_off])**2)
+
+
+    C_t = V_t
+    C_f = V_f
+
 
     #get PA vs time and freq
     PA_f,PA_t,PA_f_errs,PA_t_errs,avg_PA,PA_err = get_pol_angle(I,Q,U,V,width_native,fobj.header.tsamp,n_t,n_f,freq_test,n_off=n_off,plot=False,show=False,datadir=datadir,normalize=True,buff=buff,weighted=weighted,input_weights=I_t_weights,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights,label="")
@@ -5754,22 +5740,31 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
     ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
     ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
-    ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4)
+    ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
 
 
     intL = int(intL)
     intR = int(intR)
 
     if sigflag:
-        if mask_flag:
-            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > 0.005],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > 0.005],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > 0.005],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+        if short_labels:
+            l = "PPA"
         else:
-            ax0.errorbar(tshifted[intL:intR],(180/np.pi)*PA_t[intL:intR],yerr=(180/np.pi)*PA_t_errs[intL:intR],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+            l = "Intrinsic PPA"
+        if mask_flag:
+            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > 0.005],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > 0.005],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > 0.005],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
+        else:
+            ax0.errorbar(tshifted[intL:intR],(180/np.pi)*PA_t[intL:intR],yerr=(180/np.pi)*PA_t_errs[intL:intR],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
     else:
-        if mask_flag:
-            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > 0.005],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > 0.005],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > 0.005],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+        if short_labels:
+            l = "PA"
         else:
-            ax0.errorbar(tshifted[intL:intR],(180/np.pi)*PA_t[intL:intR],yerr=(180/np.pi)*PA_t_errs[intL:intR],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+            l = "Measured PA"
+
+        if mask_flag:
+            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > 0.005],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > 0.005],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > 0.005],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
+        else:
+            ax0.errorbar(tshifted[intL:intR],(180/np.pi)*PA_t[intL:intR],yerr=(180/np.pi)*PA_t_errs[intL:intR],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
 
     ax0.set_xlim(((timestart - np.argmax(I_t))*(t_samp*1e6)*n_t)/1000-wind,((timestop - np.argmax(I_t))*(t_samp*1e6)*n_t)/1000 +wind)
     ax0.set_ylabel("degrees")
@@ -5784,13 +5779,19 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax6.set_xlabel("degrees")
     ax6.set_xlim(-1.1*180,1.1*180)
     ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
-    
-    
+
     #pol fracs
-    ax1.step(tshifted,I_t,label=r'Intensity (I)',color="black",linewidth=3)
-    #plt.plot(t,T_t,label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)')
-    ax1.step(tshifted,L_t,label=r'Linear Polarization (L)',color="blue",linewidth=2.5)
-    ax1.step(tshifted,C_t,label=r'Circular Polarization (V)',color="orange",linewidth=2)
+    if short_labels:
+        ax1.step(tshifted,I_t,label=r'$I$',color="black",linewidth=3)#label=r'Intensity (I)',color="black",linewidth=3)
+        #plt.plot(t,T_t,label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)')
+        ax1.step(tshifted,L_t,label=r'$L$',color="blue",linewidth=2.5)#label=r'Linear Polarization (L)',color="blue",linewidth=2.5)
+        ax1.step(tshifted,C_t,label=r'$V$',color="orange",linewidth=2)#label=r'Circular Polarization (V)',color="orange",linewidth=2)
+    else:
+        ax1.step(tshifted,I_t,label=r'Intensity (I)',color="black",linewidth=3)
+        #plt.plot(t,T_t,label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)')
+        ax1.step(tshifted,L_t,label=r'Linear Polarization (L)',color="blue",linewidth=2.5)
+        ax1.step(tshifted,C_t,label=r'Circular Polarization (V)',color="orange",linewidth=2)
+
     if plot_weights and weighted:
         ax1.step(tshifted,I_t_weights*np.max(I_t)/np.max(I_t_weights),label=r'Weights',color="red",linewidth=4)
     ax1.legend(loc="upper right")
@@ -5839,17 +5840,20 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
         plt.show()
     plt.close(fig)
 
-    return
+    return I_f,Q_f,U_f,L_f,V_f
 
 
 ##############***************************************************************************************************************************************************************************************************############################
 #deprecated
-def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,RM_in=None,phi_in=0,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1,extra='',clean=True,padwidth=10,peakheight=2,n_t_down=8,sf_window_weights=45):
+def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,RM_in=None,phi_in=0,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1,extra='',clean=True,padwidth=10,peakheight=2,n_t_down=8,sf_window_weights=45,alpha=False):
     if n_trial_RM_zoom == -1:
         n_trial_RM_zoom = len(trial_RM)
     
     #Get filterbank header
-    hdr_dict = read_fil_data_dsa(datadir + prefix + "_0.fil")[-1] 
+    if alpha:
+        hdr_dict = read_fil_data_dsa(datadir + prefix + "_I.fil")[-1]
+    else:
+        hdr_dict = read_fil_data_dsa(datadir + prefix + "_0.fil")[-1] 
 
     label = prefix + "_" + nickname
     cal1str = ''
@@ -6108,28 +6112,40 @@ def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=F
     #Write Calibrated Stokes params to filterbank
     headerI = Header(hdr_dict)
     headerI["Stokes"] = "I"
-    fnameI = datadir + prefix +"_calibrated_0.fil"
+    if alpha:
+        fnameI = datadir + prefix +"_calibrated_I.fil"
+    else:
+        fnameI = datadir + prefix +"_calibrated_0.fil"
     headerI["filenames"] = headerI["filename"] = headerI["basename"] = fnameI
     filI = FilterbankBlock(I_cal,headerI)
     filI.toFile(fnameI)
 
     headerQ = Header(hdr_dict)
     headerQ["Stokes"] = "Q"
-    fnameQ = datadir + prefix + "_calibrated_1.fil"
+    if alpha:
+        fnameQ = datadir + prefix + "_calibrated_Q.fil"
+    else:
+        fnameQ = datadir + prefix + "_calibrated_1.fil"
     headerQ["filenames"] = headerQ["filename"] = headerQ["basename"] = fnameQ
     filQ =FilterbankBlock(Q_cal,headerQ)
     filQ.toFile(fnameQ)
 
     headerU = Header(hdr_dict)
     headerU["Stokes"] = "U"
-    fnameU = datadir + prefix + "_calibrated_2.fil"
+    if alpha:
+        fnameU = datadir + prefix + "_calibrated_U.fil"
+    else:
+        fnameU = datadir + prefix + "_calibrated_2.fil"
     headerU["filenames"] = headerU["filename"] = headerU["basename"] = fnameU
     filU = FilterbankBlock(U_cal,headerU)
     filU.toFile(fnameU)
 
     headerV = Header(hdr_dict)
     headerV["Stokes"] = "V"
-    fnameV = datadir + prefix + "_calibrated_3.fil"
+    if alpha:
+        fnameV = datadir + prefix + "_calibrated_3.fil"
+    else:
+        fnameV = datadir + prefix + "_calibrated_3.fil"
     headerV["filenames"] = headerV["filename"] = headerV["basename"] = fnameV
     filV = FilterbankBlock(V_cal,headerV)
     filV.toFile(fnameV)
