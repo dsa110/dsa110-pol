@@ -11,14 +11,14 @@ interfacing with filterbank data should be portable to any system.
 
 The following modules are required:
 
-  numpy
-  matplotlib
-  pylab
-  sigpyproc
-  os
-  sys
-  pickle
-  argparse
+- numpy
+- matplotlib
+- pylab
+- sigpyproc
+- os
+- sys
+- pickle
+- argparse
 
 These can be installed by running:
 
