@@ -5666,7 +5666,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
@@ -5768,7 +5768,7 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
 
     ax0.set_xlim(((timestart - np.argmax(I_t))*(t_samp*1e6)*n_t)/1000-wind,((timestop - np.argmax(I_t))*(t_samp*1e6)*n_t)/1000 +wind)
     ax0.set_ylabel("degrees")
-    ax0.set_ylim(-1.1*180,1.1*180)
+    ax0.set_ylim(-1.1*95,1.1*95)
     ax0.legend(loc="upper right")
 
     if sigflag:
@@ -5777,8 +5777,9 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
         ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
 
     ax6.set_xlabel("degrees")
-    ax6.set_xlim(-1.1*180,1.1*180)
+    ax6.set_xlim(-1.1*95,1.1*95)
     ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
+    #ax6.tick_params(axis='x', labelrotation = 45)
 
     #pol fracs
     if short_labels:
@@ -5801,12 +5802,14 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax2.set_xlabel(r'Time ($m s$)')
     ax2.set_ylabel(r'Frequency (MHz)')
     ax2.set_xlim(timestart- wind*1000/((t_samp*1e6)*n_t),timestop+ wind*1000/((t_samp*1e6)*n_t))
+    #ax2.tick_params(axis='x', labelrotation = 45)
 
     color1=ax3.step(I_f,freq_test[0],label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)',color="black",linewidth=3)
     color2 = ax3.step(L_f,freq_test[0],label=r'Linear Polarization ($\sqrt{Q^2 + U^2}/I$)',color="blue",linewidth=2.5)
     color3=ax3.step(C_f,freq_test[0],label=r'Circular Polarization ($V/I$)',color="orange",linewidth=2)
     ax3.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
     ax3.set_xlabel(r'S/N')
+    #ax3.tick_params(axis='x', labelrotation = 45)
 
     ticklabelsx = np.array(ax1.get_xticks(),dtype=int)[1:-1]
     ticksx = np.array(np.argmax(I_t) + np.array(ticklabelsx)/(32.7*n_t/1000),dtype=float)
@@ -5824,12 +5827,13 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
 
 
     fig.tight_layout()
-    if nickname == "220912A" and ids== "221018aaaj":
-        fig.text(0.5,1, "FRB20220912A Burst 1",ha ='center')
-    elif nickname == "220912A":
-        fig.text(0.5,1, "FRB20220912A Burst 2",ha ='center')
-    else:
-        fig.text(0.5, 1, "FRB20" + ids[:6], ha='center')
+    if add_title:
+        if nickname == "220912A" and ids== "221018aaaj":
+            fig.text(0.5,1, "FRB20220912A Burst 1",ha ='center')
+        elif nickname == "220912A":
+            fig.text(0.5,1, "FRB20220912A Burst 2",ha ='center')
+        else:
+            fig.text(0.5, 1, "FRB20" + ids[:6], ha='center')
     ax1.xaxis.set_major_locator(ticker.NullLocator())
     ax3.yaxis.set_major_locator(ticker.NullLocator())
     ax6.yaxis.set_major_locator(ticker.NullLocator())
