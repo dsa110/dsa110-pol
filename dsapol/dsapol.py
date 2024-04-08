@@ -68,7 +68,7 @@ chip_3C286 = 33*np.pi/180 #rad
 
 #Reads in stokes parameter data from specified directory
 #(Liam Connor)
-def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False):
+def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False,start=0):
     """
     This function reads in Stokes parameter data from a given directory. Stokes parameters
     are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
@@ -91,7 +91,7 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=Fal
             fn = '%s_%s.fil'%(sdir,labels[ii])
         else:
             fn = '%s_%d.fil'%(sdir,ii)
-        d = read_fil_data_dsa(fn, start=0, stop=nsamp)[0]
+        d = read_fil_data_dsa(fn, start=start, stop=nsamp)[0]
         #if d == 0:
             #print("Failed to read file: " + fn + ", returning 0")
          
@@ -101,7 +101,7 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=Fal
     return stokes_arr
 
 #read in Stokes I filterbank only
-def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False):
+def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False,start=0):
     """
     This function reads in Stokes parameter data from a given directory. Stokes parameters
     are saved in high resolution filterbank files with the same prefix and numbered 0,1,2,3
@@ -122,7 +122,7 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False):
         fn = '%s_%s.fil'%(sdir,"I")
     else:
         fn = '%s_%d.fil'%(sdir,ii)
-    d = read_fil_data_dsa(fn, start=0, stop=nsamp)[0]
+    d = read_fil_data_dsa(fn, start=start, stop=nsamp)[0]
     #if d == 0:
         #print("Failed to read file: " + fn + ", returning 0")
     return d.astype(np.float16)
@@ -132,7 +132,7 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False):
     #return stokes_arr
 
 #Creates freq, time axes
-def create_freq_time(sdir,nsamp=10240,alpha=False):#1500):
+def create_freq_time(sdir,nsamp=10240,alpha=False,start=0):#1500):
     """
     This function creates frequency and time axes from stokes filterbank headers
 
@@ -150,7 +150,7 @@ def create_freq_time(sdir,nsamp=10240,alpha=False):#1500):
             fn = '%s_%s.fil'%(sdir,labels[ii])
         else:
             fn = '%s_%d.fil'%(sdir,ii)
-        d = read_fil_data_dsa(fn, start=0, stop=nsamp)
+        d = read_fil_data_dsa(fn, start=start, stop=nsamp)
         freq.append(d[1])
         dt.append(d[2])
         #print(len(freq[ii]))
@@ -158,7 +158,7 @@ def create_freq_time(sdir,nsamp=10240,alpha=False):#1500):
     return freq,dt
 
 #Creates freq, time axes for stokes I only
-def create_freq_time_I(sdir,nsamp=10240,alpha=False):#1500):
+def create_freq_time_I(sdir,nsamp=10240,alpha=False,start=0):#1500):
     """
     This function creates frequency and time axes from stokes filterbank headers
 
@@ -175,7 +175,7 @@ def create_freq_time_I(sdir,nsamp=10240,alpha=False):#1500):
         fn = '%s_%s.fil'%(sdir,"I")
     else:
         fn = '%s_%d.fil'%(sdir,ii)
-    d = read_fil_data_dsa(fn, start=0, stop=nsamp)
+    d = read_fil_data_dsa(fn, start=start, stop=nsamp)
     freq.append(d[1])
     dt.append(d[2])
     #print(len(freq[ii]))
@@ -286,7 +286,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -303,8 +303,8 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     """
     sdir = datadir + fn_prefix 
-    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha)
-    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha)
+    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha,start=start)
+    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha,start=start)
     if alpha:
         fobj=FilReader(sdir+"_I.fil")
     else:
@@ -337,12 +337,22 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
 
         #mask
-        mask = np.zeros(I.shape)
-        mask[bad_chans,:] = 1
-        I = ma.masked_array(I,mask)
-        Q = ma.masked_array(Q,mask)
-        U = ma.masked_array(U,mask)
-        V = ma.masked_array(V,mask)
+        #mask = np.zeros(I.shape)
+        #mask[bad_chans,:] = 1
+        #I = ma.masked_array(I,mask)
+        #Q = ma.masked_array(Q,mask)
+        #U = ma.masked_array(U,mask)
+        #V = ma.masked_array(V,mask)
+    else:
+        bad_chans = np.array([],dtype=int)
+    
+    #mask
+    mask = np.zeros(I.shape)
+    mask[bad_chans,:] = 1
+    I = ma.masked_array(I,mask)
+    Q = ma.masked_array(Q,mask)
+    U = ma.masked_array(U,mask)
+    V = ma.masked_array(V,mask)
 
     #Subtract off-pulse mean
     if sub_offpulse_mean:
@@ -442,19 +452,37 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
         wav_arr.append(list(c/(np.array(freq_arr[i])*(1e6))))
 
     
-    return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr)
+    return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr,bad_chans)
 
 
 
 #functions for rewriting data to filterbanks
 def write_fil_data_dsa(arr,fn,fobj):
+    """
+    This function writes a 2D array to a filterbank file at the 
+    given file path.
+
+    Inputs: arr --> array-like, arbitrary 2D array
+            fn --> str, path to filterbank file to write the array to; should end with '.fil'
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+    """
     #create filterbank block object with identical header
     b = FilterbankBlock(arr,header=fobj.header)
     b.toFile(fn)
     return
 
 def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
+    """ 
+    This function writes the provided Stokes dynamic spectra to 
+    filterbank files in the given directory.
 
+    Inputs: I,Q,U,V --> array-like, 2D dynamic spectra for I,Q,U,V
+            fobj -->filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            datadir --> str, path to directory to write filterbank files to
+            fn_prefix --> str, prefix of filterbank files, e.g. '220319aaeb_dev' for file '220319aaeb_dev_0/1/2/3.fil'
+            suffix --> str, suffix to be appended to end of filterbank file name (before 0/1/2/3)
+            alpha --> bool, True if desired filterbanks should end with 'I,Q,U,V', False if desired filterbanks should end with '0,1,2,3' (default=False)
+    """
     if alpha:
         sdir = datadir + fn_prefix + "_" + suffix
         print("Writing Stokes I to " + sdir + "_I.fil")
@@ -486,13 +514,16 @@ def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=T
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
     would not recommend this for calibrators.
 
-    Inputs: datadir --> str, path to directory containing all 4 stokes filterbank files
+    Inputs: datadir --> str, path to directory containing stokes I filterbank files
             fn_prefix -->str, prefix of filterbank files, e.g. '220319aaeb_dev' for file '220319aaeb_dev_0/1/2/3.fil'
             n_t --> int, number of time samples to bin by (average over)
             n_f --> int, number of frequency samples to bin by (average over)
             n_off --> int, specifies index of end of off-pulse samples
             sub_offpulse_mean --> bool, if True, subtracts mean of data up to n_off samples
-    Outputs: (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr) --> 2D dynamic spectra for I,Q,U,V; filterbank object for I file; time axis; frequency
+            fixchans --> bool, if True, masks any channels with 0 rms, 0 mean (i.e. correlator issue)
+            dtype --> dtype, default np.float32
+            alpha --> bool, True if desired filterbanks should end with 'I', False if desired filterbank should end with '0' (default=False)
+    Outputs: (I,fobj,timeaxis,freq_arr,wav_arr) --> 2D dynamic spectra for I; filterbank object for I file; time axis; frequency
                                                         and wavelength axes for each stokes param
 
     """
@@ -593,7 +624,7 @@ def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=T
     return (I,fobj,timeaxis,freq_1D,wav_1D)
 
 #Get frequency averaged stokes params vs time; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,window=10):
+def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10):
     """
     This function calculates the frequency averaged time series for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -611,6 +642,9 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
             show --> bool, if True, displays images with matplotlib
             normalize --> bool, if True subtracts off-pulse mean averaged over frequency and divides by off-pulse standard deviation
             buff --> int, number of samples to buffer either side of pulse if needed
+            timeaxis --> array-like, time axis returned by get_stokes_2D
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            window --> int, window in samples around pulse to plot
     Outputs: (I_t,Q_t,U_t,V_t) --> 1D time series of each stokes parameter, IQUV respectively
                             
 
@@ -635,30 +669,6 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         U_t = (np.mean(U,axis=0))
         V_t = (np.mean(V,axis=0))
 
-    #optimal weighting
-#    if weighted:
-#        I,Q,U,V = weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
-
-        """
-        I_t_weights = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
-
-        I_rolled = np.roll(I,-np.argmax(I.mean(0)),axis=1)
-        Q_rolled = np.roll(Q,-np.argmax(Q.mean(0)),axis=1)
-        U_rolled = np.roll(U,-np.argmax(U.mean(0)),axis=1)
-        V_rolled = np.roll(V,-np.argmax(V.mean(0)),axis=1)
-        I_t_weights_rolled = np.roll(I_t_weights,-np.argmax(I_t_weights))
-
-        I = convolve1d(I_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
-        Q = convolve1d(Q_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
-        U = convolve1d(U_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
-        V = convolve1d(V_rolled,I_t_weights_rolled,axis=1,mode="constant",cval=0)
-
-
-        #I = I*I_t_weights
-        #Q = Q*I_t_weights
-        #U = U*I_t_weights
-        #V = V*I_t_weights
-        """
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -684,6 +694,24 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
 
 #Get optimal SNR weights using binning that maximizes SNR
 def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45,padded=True,norm=True):
+    """
+    This function calculates ideal weights by downsampling and smoothing the 
+    pulse profile. This uses a Savitsky-Golay (Savgol) filter for smoothing and
+    interpolates back to the initial time resolution.
+    Input: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
+           width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
+           t_samp -->  float, sampling time
+           n_f --> int, number of frequency samples binned by
+            n_t --> int, number of time samples binned by (average over)
+            freq_test --> list, frequency axes for each stokes parameter 
+            n_off --> int, specifies index of end of off-pulse samples
+            buff --> int, number of samples to buffer either side of pulse if needed
+            n_t_weight --> int, number of time samples to bin time series by for smoothing
+            sf_window_weights --> int, width of 3rd order SavGol filter in samples
+            padded --> bool, pad the filter weights with zeros to the original number of timesamples; if False, returns a size timestop-timesart window around the peak
+            norm --> bool, normalize weights so they sum to 1
+    Output: weights --> 1D array of weights
+    """
     (peak,timestart,timestop) = find_peak(I,width_native,t_samp,n_t,buff=buff)
     #Bin to optimal time binning
     Ib,Qb,Ub,Vb = avg_time(I,n_t_weight),avg_time(Q,n_t_weight),avg_time(U,n_t_weight),avg_time(V,n_t_weight)
@@ -769,6 +797,29 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
 
 
 def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45,padded=True,norm=True):
+    """
+    This function calculates ideal weights by downsampling and smoothing the
+    pulse profile, taking pre-computed time-series as input. To use 2D filterbanks 
+    as inputs, use get_weights. This uses a Savitsky-Golay (Savgol) filter for smoothing and
+    interpolates back to the initial time resolution.
+    Input: I_t_init,Q_t_init,U_t_init,V_t_init --> 1D arrays, frequency averaged time series of I,Q,U,V generated e.g. with get_stokes_vs_time()
+           timestart, timestop --> int, bounding sample numbers of burst returned from find_peak()
+           width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
+           t_samp -->  float, sampling time
+           n_f --> int, number of frequency samples binned by
+            n_t --> int, number of time samples binned by (average over)
+            freq_test --> list, frequency axes for each stokes parameter
+            timeaxis --> array-like, time sample array returned e.g. from get_stokes_2D()
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            n_off --> int, specifies index of end of off-pulse samples
+            buff --> int, number of samples to buffer either side of pulse if needed
+            n_t_weight --> int, number of time samples to bin time series by for smoothing
+            sf_window_weights --> int, width of 3rd order SavGol filter in samples
+            padded --> bool, pad the filter weights with zeros to the original number of timesamples; if False, returns a size timestop-timesart window around the peak
+            norm --> bool, normalize weights so they sum to 1
+    Output: weights --> 1D array of weights
+    """
+
     if timestart==-1 or timestop==-1:
         peak,timestart,timestop = find_peak((I_t_init,I_t_init),width_native,t_samp,n_t,buff=buff,pre_calc_tf=True)
 
@@ -872,6 +923,25 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
 
 #Weight dynamic spectrum using get_weights
 def weight_spectra_2D(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=3000,buff=0,n_t_weight=1,sf_window_weights=45):
+    """
+    This function applies ideal filter weights to Stokes dynamic
+    spectra. This is a helper function for get_stokes_vs_freq().
+
+    Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
+            width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
+            t_samp --> float, sampling time
+            n_f --> int, number of frequency samples to bin by (average over)
+            n_t --> int, number of time samples to bin by (average over)
+            freq_test --> list, frequency axes for each stokes parameter
+            timeaxis --> array-like, time sample array returned e.g. from get_stokes_2D()
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            n_off --> int, specifies index of end of off-pulse samples
+            buff --> int, number of samples to buffer either side of pulse if needed
+            n_t_weight --> int, number of time samples to bin time series by for smoothing
+            sf_window_weights --> int, width of 3rd order SavGol filter in samples
+    Outputs: (I,Q,U,V) --> 2D filterbanks weighted for I,Q,U,V
+
+    """
     peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)
     I_t_weights = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
 
@@ -898,10 +968,11 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
     This function calculates the time averaged (over width of pulse) frequency spectra for each stokes
     parameter. Outputs plots if specified in region around the pulse.
 
-    Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
+    Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with plot_spectra_2D()
             width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
             t_samp --> float, sampling time
             n_f --> int, number of frequency samples to bin by (average over)
+            n_t --> int, number of time samples to bin by (average over)
             freq_test --> list, frequency axes for each stokes parameter
             n_off --> int, specifies index of end of off-pulse samples
             plot --> bool, if True, outputs plots of time series into datadir
@@ -912,8 +983,13 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
             show --> bool, if True, displays images with matplotlib
             normalize --> bool, if True subtracts off-pulse mean on each channel and divides by off-pulse standard deviation
             buff --> int, number of samples to buffer either side of pulse if needed
-            weigthed --> bool, if True, obtains optimal spectrum by weighting by frequency averaged SNR
-    Outputs: (I_f,Q_f,U_f,V_f) --> 1D frequency spectra of each stokes parameter, IQUV respectively
+            weighted --> bool, if True, obtains optimal spectrum by weighting by frequency averaged SNR; uses input_weights if non-empty
+            n_t_weight --> int, number of time samples to bin time series by for smoothing
+            timeaxis --> array-like, time sample array returned e.g. from get_stokes_2D()
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            sf_window_weights --> int, width of 3rd order SavGol filter in samples
+            input_weights --> array-like, array of weights used to compute the frequency spectrum. If empty, manually computes weights with get_weights()
+    Outputs: (I_f,Q_f,U_f,V_f) --> 1D frequency spectra of each stokes parameter, I,Q,U,V respectively
 
 
     """
@@ -1265,7 +1341,7 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
 def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1):
     """
     This function calculates and plots the polarization fraction averaged over both time and 
-    frequency, and the average polarization fraction within the peak.
+    frequency, the total an polarized signal-to-noise, and the average polarization fraction within the peak.
     Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
             width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
             t_samp --> float, sampling time
@@ -1282,9 +1358,35 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
             show --> bool, if True, displays images with matplotlib
             buff --> int, number of samples to buffer either side of pulse if needed
             full --> bool, if True, calculates polarization vs frequency and time before averaging
-    Outputs: pol_f --> 1D array, frequency dependent polarization
-             pol_t --> 1D array, time dependent polarization
-             avg --> float, frequency and time averaged polarization fraction
+            weighted --> bool, if True, computes weighted average polarization fraction; if False, computes unweighted average
+            n_t_weight --> int, number of time samples to bin time series by for smoothing
+            timeaxis --> array-like, time sample array returned e.g. from get_stokes_2D()
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            sf_window_weights --> int, width of 3rd order SavGol filter in samples
+            multipeaks --> bool, set True if sub-burst has multiple peaks, pol fraction will be computed between lower bound of first peak and upper bound of last peak
+            height --> float, minimum height of sub-burst peak if multipeaks is True, default 0.03
+            window --> int, window in samples around pulse to plot
+            unbias --> bool, if True, unbiases linear polarization according to Simmons & Stewart, default True
+            input_weights --> array-like, array of weights used to compute the frequency spectrum. If empty, manually computes weights with get_weights()
+            allowed_err --> float, fractional overpolarization allowed, default 100%
+            unbias_factor --> float, unbiasing offset term applied if unbias=True
+    Outputs:pol_f --> 1D array, frequency dependent total polarization
+            pol_t --> 1D array, time dependent total polarization
+            avg_frac --> float, frequency and time averaged total polarization fraction
+            sigma_frac --> float, error in average total polarization fraction
+            snr_frac --> float, total polarization signal-to-noise
+            L_f --> 1D array, frequency dependent linear polarization
+            L_t --> 1D array, time dependent linear polarization
+            avg_L --> float, frequency and time averaged linear polarization fraction
+            sigma_L --> float, error in average linear polarization fraction
+            snr_L --> float, linear polarization signal-to-noise
+            C_f --> 1D array, frequency dependent circular polarization
+            C_t --> 1D array, time dependent circular polarization
+            avg_C_abs --> float, frequency and time averaged absolute value circular polarization fraction
+            sigma_C_abs --> float, error in average absolute value circular polarization fraction
+            snr_C --> float, circular polarization signal-to-noise
+            snr --> float, intensity signal-to-noise
+            outputs are returned as a list in the format: [(pol_f,pol_t,avg_frac,sigma_frac,snr_frac),(L_f,L_t,avg_L,sigma_L,snr_L),(C_f,C_t,avg_C_abs,sigma_C_abs,snr_C),(C_f,C_t,avg_C,sigma_C,snr_C),snr]
     """
     if isinstance(buff, int):
         buff1 = buff
@@ -1580,7 +1682,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
 #Calculate polarization fraction vs time from 2D I Q U V arrays
 def get_pol_fraction_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1):
     """
-    This function calculates and plots the polarization fraction averaged over both time and 
+    This function calculates and plots the polarization fraction averaged over
     frequency, and the average polarization fraction within the peak.
     Inputs: I,Q,U,V --> 2D arrays, dynamic spectra of I,Q,U,V generated with get_stokes_2D()
             width_native --> int, width in samples of pulse in native sampling rate; equivalent to ibox parameter
@@ -1596,9 +1698,33 @@ def get_pol_fraction_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=Fal
             show --> bool, if True, displays images with matplotlib
             buff --> int, number of samples to buffer either side of pulse if needed
             full --> bool, if True, calculates polarization vs frequency and time before averaging
-    Outputs: pol_f --> 1D array, frequency dependent polarization
-             pol_t --> 1D array, time dependent polarization
-             avg --> float, frequency and time averaged polarization fraction
+            weighted --> bool, if True, computes weighted average polarization fraction; if False, computes unweighted average
+            n_t_weight --> int, number of time samples to bin time series by for smoothing
+            timeaxis --> array-like, time sample array returned e.g. from get_stokes_2D()
+            fobj --> filterbank object containing the object header (this can be obtained by reading a separate filterbank file, or using sigpyproc)
+            sf_window_weights --> int, width of 3rd order SavGol filter in samples
+            multipeaks --> bool, set True if sub-burst has multiple peaks, pol fraction will be computed between lower bound of first peak and upper bound of last peak
+            height --> float, minimum height of sub-burst peak if multipeaks is True, default 0.03
+            window --> int, window in samples around pulse to plot
+            unbias --> bool, if True, unbiases linear polarization according to Simmons & Stewart, default True
+            input_weights --> array-like, array of weights used to compute the frequency spectrum. If empty, manually computes weights with get_weights()
+            allowed_err --> float, fractional overpolarization allowed, default 100%
+            unbias_factor --> float, unbiasing offset term applied if unbias=True
+    Outputs:pol_t --> 1D array, time dependent total polarization
+            avg_frac --> float, frequency and time averaged total polarization fraction
+            sigma_frac --> float, error in average total polarization fraction
+            snr_frac --> float, total polarization signal-to-noise
+            L_t --> 1D array, time dependent linear polarization
+            avg_L --> float, frequency and time averaged linear polarization fraction
+            sigma_L --> float, error in average linear polarization fraction
+            snr_L --> float, linear polarization signal-to-noise
+            C_t --> 1D array, time dependent circular polarization
+            avg_C_abs --> float, frequency and time averaged absolute value circular polarization fraction
+            sigma_C_abs --> float, error in average absolute value circular polarization fraction
+            snr_C --> float, circular polarization signal-to-noise
+            snr --> float, intensity signal-to-noise
+            outputs are returned as a list in the format: [(pol_t,avg_frac,sigma_frac,snr_frac),(L_t,avg_L,sigma_L,snr_L),(C_t,avg_C_abs,sigma_C_abs,snr_C),(C_t,avg_C,sigma_C,snr_C),snr]
+
     """
     if isinstance(buff, int):
         buff1 = buff
@@ -1853,6 +1979,18 @@ def get_pol_fraction_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=Fal
 
 #1sigma PA error calculation 
 def PA_error_NKC(mean,L0,sigma,siglevel=0.68,plot=False):
+    """
+    This function computes the error in the position angle given the 
+    mean value, linear polarization, and off-pulse RMS. This follows the
+    definition from NKC.
+    Inputs: mean --> float, mean position angle in radians
+            L0 --> float, linear polarization fraction
+            sigma --> float, off-pulse RMS in Stokes I
+            siglevel --> float, between 0 and 1; defines significance level for error estimate. Default is 1sigma errors (68% significance)
+            plot --> bool, set to plot position angle distribution
+    Outputs: avg_eror,upper_limit,lower_limit
+
+    """
 
     PA_axis = np.linspace(mean-np.pi/2,mean+np.pi/2,1000)
     P0 = (L0/sigma/np.sqrt(2))
@@ -1875,6 +2013,16 @@ def PA_error_NKC(mean,L0,sigma,siglevel=0.68,plot=False):
     return (upp-low)/2,upp,low
 
 def PA_error_NKC_array(means,L0s,sigma,siglevel=0.68):
+    """
+    This function computes the error in the position angle given an array of 
+    mean values, linear polarization, and off-pulse RMS. This follows the
+    definition from NKC.
+    Inputs: means --> array-like, mean position angles in radians
+            L0s --> array-like, linear polarization fractions
+            sigma --> float, off-pulse RMS in Stokes I
+            siglevel --> float, between 0 and 1; defines significance level for error estimate. Default is 1sigma errors (68% significance)
+    Outputs: errors --> 1D array of errors
+    """
     errs = []
     for i in range(len(means)):
         err,upp,low = PA_error_NKC(means[i],L0s[i],sigma,siglevel)
@@ -1883,8 +2031,24 @@ def PA_error_NKC_array(means,L0s,sigma,siglevel=0.68):
 
 
 
+def fitfunc(x,amp,scale):
+    return amp*np.exp(-x/scale)
 
-def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1):
+
+def PA_err_fit(LSNR,popt1=[ 0.2685898,  28.71010826],popt2=[0.93328853 ,9.92364144],boundary=19):
+    if LSNR > boundary:
+        return fitfunc(LSNR,popt1[0],popt1[1])
+    else:
+        return fitfunc(LSNR,popt2[0],popt2[1])
+    
+def PA_err_fit_array(LSNR_arr,popt1=[ 0.2685898,  28.71010826],popt2=[0.93328853 ,9.92364144],boundary=19):
+    PAerrs = []
+    for LSNR in LSNR_arr:
+        PAerrs.append(PA_err_fit(LSNR,popt1,popt2,boundary))
+    return np.array(PAerrs)
+
+
+def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1,errormethod='MC'):
     """
     This function calculates and plots the polarization angle averaged over both time and
     frequency, and the average polarization angle within the peak.
@@ -1933,13 +2097,23 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
     L_t = np.sqrt(Q_t**2 + U_t**2)#*I_w_t_filt
     L_t[L_t**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
     L_t = np.sqrt(L_t**2 - np.std(I_t[:n_off])**2)
-    PA_t_errs = PA_error_NKC_array(PA_t,L_t,np.std(I_t[:n_off]))
-
+    if errormethod == 'NKC':
+        PA_t_errs = PA_error_NKC_array(PA_t,L_t,np.std(I_t[:n_off]))
+    elif errormethod == 'MC':
+        PA_t_errs = PA_err_fit_array(L_t)
+    else:
+        print("Invalid PA error method")
+        return None
     L_f = np.sqrt(Q_f**2 + U_f**2)
     L_f[L_f**2 <= (unbias_factor*np.std(I_t[:n_off]))**2] = np.std(I_t[:n_off])
     L_f = np.sqrt(L_f**2 - np.std(I_t[:n_off])**2)
-    PA_f_errs = PA_error_NKC_array(PA_f,L_f,np.std(I_t[:n_off]))
-
+    if errormethod == 'NKC':
+        PA_f_errs = PA_error_NKC_array(PA_f,L_f,np.std(I_t[:n_off]))
+    elif errormethod == 'MC':
+        PA_f_errs = PA_err_fit_array(L_f)
+    else:
+        print("Invalid PA error method")
+        return None
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -2577,7 +2751,7 @@ def absgaincal(gain_dir,source_name,obs_name,n_t,n_f,nsamps,deg,ibeam,suffix="_d
 
 
     #read in 3C48 observation
-    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(gain_dir,source_name + obs_name + "_dev",5,n_t=n_t,n_f=n_t_down,sub_offpulse_mean=False)
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test,wav_test,badchans) = get_stokes_2D(gain_dir,source_name + obs_name + "_dev",5,n_t=n_t,n_f=n_t_down,sub_offpulse_mean=False)
 
     #PA correction
     Ical,Qcal,Ucal,Vcal,ParA = calibrate_angle(Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,ibeam,RA,DEC)
@@ -2670,7 +2844,7 @@ def absgaincal(gain_dir,source_name,obs_name,n_t,n_f,nsamps,deg,ibeam,suffix="_d
             plt.show()
         
     #interpolate
-    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test) = get_stokes_2D(gain_dir,source_name + obs_name + "_dev",5,n_t=n_t,n_f=n_f,sub_offpulse_mean=False)
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = get_stokes_2D(gain_dir,source_name + obs_name + "_dev",5,n_t=n_t,n_f=n_f,sub_offpulse_mean=False)
 
     idx = np.isfinite(GX)
     f_GX= interp1d(freq_test[0][idx],GX[idx],kind="linear",fill_value="extrapolate")
@@ -2970,7 +3144,7 @@ def gaincal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev",
     for i in range(len(obs_names)):
         label = source_name + obs_names[i] + suffix
         sdir = datadir + label
-        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
+        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
         if mask != []:
             I = ma.masked_array(I,mask)
             Q = ma.masked_array(Q,mask)
@@ -3055,7 +3229,7 @@ def phasecal_full(datadir,source_name,obs_names,n_t,n_f,nsamps,deg,suffix="_dev"
     for i in range(len(obs_names)):
         label = source_name + obs_names[i] + suffix
         sdir = datadir + label
-        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
+        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = get_stokes_2D(datadir,label,nsamps,n_t=n_t,n_f=n_f,n_off=-1,sub_offpulse_mean=False)
         if mask != []:
             I = ma.masked_array(I,mask)
             Q = ma.masked_array(Q,mask)
@@ -4047,7 +4221,7 @@ def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n
     
     #Read data
     #datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
-    (I_fullres,Q_fullres,U_fullres,V_fullres,fobj,timeaxis,freq_test_fullres,wav_test) = get_stokes_2D(datadir,ids + "_dev",20480,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=True)
+    (I_fullres,Q_fullres,U_fullres,V_fullres,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = get_stokes_2D(datadir,ids + "_dev",20480,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=True)
     
     #gain/phase and PA calibrate
     Ical_fullres,Qcal_fullres,Ucal_fullres,Vcal_fullres = calibrate(I_fullres,Q_fullres,U_fullres,V_fullres,(gxx,gyy),stokes=True)
@@ -5672,7 +5846,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
@@ -5752,13 +5926,18 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     intL = int(intL)
     intR = int(intR)
 
+    if ghostPA:
+        ax0.errorbar(tshifted,(180/np.pi)*PA_t,yerr=(180/np.pi)*PA_t_errs,fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+
     if sigflag:
         if short_labels:
             l = "PPA"
         else:
             l = "Intrinsic PPA"
         if mask_flag:
-            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > 0.005],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > 0.005],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > 0.005],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
+            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > mask_th],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > mask_th],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > mask_th],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
+        elif SNRCUT!=None:
+            ax0.errorbar(tshifted[intL:intR][L_t[intL:intR]>=SNRCUT],(180/np.pi)*PA_t[intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*PA_t_errs[intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
         else:
             ax0.errorbar(tshifted[intL:intR],(180/np.pi)*PA_t[intL:intR],yerr=(180/np.pi)*PA_t_errs[intL:intR],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
     else:
@@ -5768,22 +5947,44 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
             l = "Measured PA"
 
         if mask_flag:
-            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > 0.005],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > 0.005],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > 0.005],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
+            ax0.errorbar(tshifted[intL:intR][I_t_weights[intL:intR] > mask_th],(180/np.pi)*PA_t[intL:intR][I_t_weights[intL:intR] > mask_th],yerr=(180/np.pi)*PA_t_errs[intL:intR][I_t_weights[intL:intR] > mask_th],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
+        elif SNRCUT != None:
+            ax0.errorbar(tshifted[intL:intR][L_t[intL:intR]>=SNRCUT],(180/np.pi)*PA_t[intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*PA_t_errs[intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
         else:
             ax0.errorbar(tshifted[intL:intR],(180/np.pi)*PA_t[intL:intR],yerr=(180/np.pi)*PA_t_errs[intL:intR],fmt='o',label=l,color="blue",markersize=10,linewidth=2)
 
     ax0.set_xlim(((timestart - np.argmax(I_t))*(t_samp*1e6)*n_t)/1000-wind,((timestop - np.argmax(I_t))*(t_samp*1e6)*n_t)/1000 +wind)
-    ax0.set_ylabel("degrees")
-    ax0.set_ylim(-1.1*95,1.1*95)
-    ax0.legend(loc="upper right")
+    if sigflag:
+        ax0.set_ylabel(r'PPA ($^\circ$)')
+    else:
+        ax0.set_ylabel(r'PA ($^\circ$)')
+
+
+    #ax0.set_ylim(-1.1*95,1.1*95)
+    ax0.set_ylim(-1.4*95,1.1*95)
+    #ax0.legend(loc="upper right")
+
+    if ghostPA:
+        ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
 
     if sigflag:
-        ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+        if SNRCUT != None:
+            ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+        else:
+            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
     else:
-        ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+        if SNRCUT != None:
+            ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+        else:
+            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
 
-    ax6.set_xlabel("degrees")
+    if sigflag:
+        ax6.set_xlabel(r'PPA ($^\circ$)')
+    else:
+        ax6.set_xlabel(r'PA ($^\circ$)')
+    #ax6.set_xlabel("degrees")
     ax6.set_xlim(-1.1*95,1.1*95)
+    ax6.set_xlim(-1.4*95,1.1*95)
     ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
     #ax6.tick_params(axis='x', labelrotation = 45)
 
@@ -5852,315 +6053,3 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
 
     return I_f,Q_f,U_f,L_f,V_f
 
-
-##############***************************************************************************************************************************************************************************************************############################
-#deprecated
-def FRB_plot_all(datadir,prefix,nickname,nsamps,n_t,n_f,n_off,width_native,cal=False,gain_dir='.',gain_source_name="",gain_obs_names=[],phase_dir='.',phase_source_name="",phase_obs_names=[],deg=10,suffix="_dev",use_fit=False,RM_in=None,phi_in=0,get_RM=True,RM_cal=True,trial_RM=np.linspace(-10000,10000,10000),trial_phi=[0],n_trial_RM_zoom=-1,zoom_window=75,fit_window=100,cal_2D=True,sub_offpulse_mean=True,window=10,lim=500,buff=0,DM=-1,weighted=False,n_t_weight=1,use_sf=False,sfwindow=-1,extra='',clean=True,padwidth=10,peakheight=2,n_t_down=8,sf_window_weights=45,alpha=False):
-    if n_trial_RM_zoom == -1:
-        n_trial_RM_zoom = len(trial_RM)
-    
-    #Get filterbank header
-    if alpha:
-        hdr_dict = read_fil_data_dsa(datadir + prefix + "_I.fil")[-1]
-    else:
-        hdr_dict = read_fil_data_dsa(datadir + prefix + "_0.fil")[-1] 
-
-    label = prefix + "_" + nickname
-    cal1str = ''
-    RM_calstr = ''
-    cal_2Dstr = ''
-    cal_fitstr = ''
-    if cal:
-        cal1str = 'calibrated'
-        hdr_dict["calibrated"] = True
-    if RM_cal:
-        RM_calstr = 'RM_calibrated'
-        hdr_dict["RM calibrated"] = True
-    if cal_2D:
-        cal_2Dstr = '2D_calibrated'
-        hdr_dict["2D calibrated"] = True
-    if not use_fit:
-        cal_fitstr = 'nocalfit'
-    
-    #Modify header parameters
-    hdr_dict["tsamp"] = hdr_dict["tsamp"]*n_t
-    hdr_dict["nsamples"] = int(hdr_dict["nsamples"]/n_t)
-    hdr_dict["nsampleslist"] = [int(hdr_dict["nsamples"]/n_t)]
-    hdr_dict["nchans"] = int(hdr_dict["nchans"]/n_f)
-
-
-    calstr = "_" + cal1str + "_" + RM_calstr + "_" + cal_2Dstr + "_" + cal_fitstr + "_" + extra + "_"
-    
-    outdata =dict()
-    outdata["calibration"]=dict()
-   
-    #Get 2D I Q U V array
-    (I,Q,U,V,fobj,timeaxis,freq_test,wav_test) = get_stokes_2D(datadir=datadir,fn_prefix=prefix,nsamps=nsamps,n_t=n_t,n_f=n_f,n_off=n_off,sub_offpulse_mean=True)
-    outdata["freq_test"] = arr_to_list_check(freq_test[0])    
-    hdr_dict["fch1"] = np.max(freq_test[0])
-    hdr_dict["foff"] = -np.abs(freq_test[0][1] - freq_test[0][0])
-    
-    
-    t_samp = fobj.header.tsamp
-    outdata["pre-cal"] = dict()
-    outdata["pre-cal"]["I"] = arr_to_list_check(I)
-    outdata["pre-cal"]["Q"] = arr_to_list_check(Q)
-    outdata["pre-cal"]["U"] = arr_to_list_check(U)
-    outdata["pre-cal"]["V"] = arr_to_list_check(V)
-
-    if cal:
-        outdata["calibration"] = dict()
-        outdata["calibration"]["use fit"] = True
-        #Get calibrator solutions
-        ratio,ratio_fit_params,ratio_sf = gaincal_full(datadir=gain_dir,source_name=gain_source_name,obs_names=gain_obs_names,n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix=suffix,average=True,plot=True,sfwindow=sfwindow,clean=clean,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down)
-
-
-       
-
-        if use_fit:
-            ratio_fit = np.zeros(np.shape(freq_test[0]))
-            for i in range(deg+1):
-                ratio_fit += ratio_fit_params[i]*(freq_test[0]**(deg-i))
-            ratio_use = ratio_fit
-        elif use_sf:
-            ratio_use = ratio_sf
-        else:
-            ratio_use = ratio
-        outdata["calibration"]["gain cal"] = dict()
-        outdata["calibration"]["gain cal source"] = gain_source_name
-        outdata["calibration"]["gain cal observations"] = arr_to_list_check(gain_obs_names)
-        outdata["calibration"]["gain cal"]["ratio"] = arr_to_list_check(ratio)
-        outdata["calibration"]["gain cal"]["fit params"] = arr_to_list_check(ratio_fit_params)
-        outdata["calibration"]["gain cal"]["savgol ratio"] = arr_to_list_check(ratio_sf)
-        #hdr_dict["gain_cal_source"] = gain_source_name
-        #hdr_dict["gain_cal_observations"] = arr_to_list_check(gain_obs_names)
-
-        phase_diff,phase_fit_params,phase_sf = phasecal_full(datadir=phase_dir,source_name=phase_source_name,obs_names=phase_obs_names,n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix=suffix,average=True,plot=True,sfwindow=sfwindow,clean=clean,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down) 
-        if use_fit:
-            phase_fit = np.zeros(np.shape(freq_test[0]))
-            for i in range(deg+1):
-                phase_fit += phase_fit_params[i]*(freq_test[0]**(deg-i))
-            phase_use = phase_fit
-        elif use_sf:
-            phase_use = phase_sf
-        else:
-            phase_use = phase_diff
-        outdata["calibration"]["phase cal"] = dict()
-        outdata["calibration"]["phase cal source"] = phase_source_name
-        outdata["calibration"]["phase cal observations"] = arr_to_list_check(phase_obs_names)
-        outdata["calibration"]["phase cal"]["phase diff"] = arr_to_list_check(phase_diff)
-        outdata["calibration"]["phase cal"]["fit params"] = arr_to_list_check(phase_fit_params)
-        outdata["calibration"]["phase cal"]["savgol phase diff"] = arr_to_list_check(phase_sf)
-        #hdr_dict["phase_cal_source"] = phase_source_name
-        #hdr_dict["phase_cal_observations"] = arr_to_list_check(phase_obs_names)
-
-        (gxx,gyy) = get_calmatrix_from_ratio_phasediff(ratio_use,phase_use)
-        outdata["calibration"]["gxx"] = arr_to_list_check(gxx)
-        outdata["calibration"]["gyy"] = arr_to_list_check(gyy)
-
-
-        #calibrate if no RM cal
-        if cal_2D:
-            outdata["calibration"]["2D cal"] = True
-            (I_cal,Q_cal,U_cal,V_cal) = calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
-            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
-            (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff) 
-        
-            if get_RM and RM_in == None:# RM_cal:
-                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_cal,Q_cal,U_cal,V_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,normalize=True,DM=DM,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,RM_tools=True,trial_RM_tools=trial_RM)
-                if RM_cal:
-                    (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM,phi,freq_test,stokes=True)
-                (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
-                (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
-                outdata["calibration"]["RM cal"] = dict()
-                outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM))
-                outdata["calibration"]["RM cal"]["RMerr"] = float(np.real(RMerr))
-                outdata["calibration"]["RM cal"]["phi"] = float(np.real(phi))
-                outdata["calibration"]["RM cal"]["trial RM"] = arr_to_list_check(trial_RM)
-                outdata["calibration"]["RM cal"]["trial phi"] = arr_to_list_check(trial_phi)
-                outdata["calibration"]["RM cal"]["SNRs"] = arr_to_list_check(SNRs)
-                outdata["calibration"]["RM cal"]["p-value"] = float(significance)
-                if DM != -1:
-                    outdata["calibration"]["RM cal"]["B field (uG)"] = float(B)
-                #hdr_dict["RM"] = float(np.real(RM))
-                #hdr_dict["RMerr"] = float(np.real(RMerr))
-                #hdr_dict["phi"] = float(np.real(phi))
-            elif RM_cal and RM_in != None:
-                print("RM cal using input " + str(RM_in) + " rad/m^2")
-                outdata["calibration"]["RM cal"] = dict()
-                outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM_in))
-                outdata["calibration"]["RM cal"]["phi"] = float(np.real(phi_in))
-                (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM_in,phi_in,freq_test,stokes=True)
-                (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_f,n_t,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
-                (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,plot=True,datadir=datadir,label=label,calstr=calstr,buff=buff)
-                if DM != -1:
-                    outdata["calibration"]["RM cal"]["B field (uG)"] = float(RM_in/(0.81*DM))
-        else:
-            outdata["calibration"]["2D cal"] = False
-            (I_cal,Q_cal,U_cal,V_cal) = (I,Q,U,V)#calibrate(I,Q,U,V,(gxx,gyy),stokes=True)
-            (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
-            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
-            (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate(I_f,Q_f,U_f,V_f,(gxx,gyy),stokes=True)
-            
-            if get_RM and RM_in == None:#RM_cal: 
-                (RM,phi,SNRs,RMerr,significance,B) = faradaycal_full(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,freq_test,trial_RM,trial_phi,width_native,t_samp,n_trial_RM_zoom,zoom_window=zoom_window,plot=True,datadir=datadir,calstr=calstr,label=label,n_f=n_f,n_t=n_t,fit_window=fit_window,buff=buff,DM=DM,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,RM_tools=True,trial_RM_tools=trial_RM)
-                if RM_cal:
-                    (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = calibrate_RM(I_f_cal,Q_f_cal,U_f_cal,V_f_cal,RM,phi,freq_test,stokes=True)
-                outdata["calibration"]["RM cal"] = dict()
-                outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM))
-                outdata["calibration"]["RM cal"]["phi"] = float(np.real(phi))
-                outdata["calibration"]["RM cal"]["trial RM"] = arr_to_list_check(trial_RM)
-                outdata["calibration"]["RM cal"]["trial phi"] =arr_to_list_check(trial_phi)
-                outdata["calibration"]["RM cal"]["SNRs"] = arr_to_list_check(SNRs)
-                outdata["calibration"]["RM cal"]["RM error"] = float(np.real(RM_err))
-                outdata["calibration"]["RM cal"]["p-value"] = float(significance)
-                if DM != -1:
-                    outdata["calibration"]["RM cal"]["B field (uG)"] = float(B)
-                #hdr_dict["RM"] = float(np.real(RM))
-                #hdr_dict["RMerr"] = float(np.real(RMerr))
-                #hdr_dict["phi"] = float(np.real(phi))
-            elif RM_cal and RM_in != None:
-                outdata["calibration"]["RM cal"] = dict()
-                outdata["calibration"]["RM cal"]["RM"] = float(np.real(RM_in))
-                outdata["calibration"]["RM cal"]["phi"] = float(np.real(phi_in))
-                (I_cal,Q_cal,U_cal,V_cal) = calibrate_RM(I_cal,Q_cal,U_cal,V_cal,RM_in,phi_in,freq_test,stokes=True)
-
-        outdata["post-cal"] = dict()
-        outdata["post-cal"]["I"] = arr_to_list_check(I)
-        outdata["post-cal"]["Q"] = arr_to_list_check(Q)
-        outdata["post-cal"]["U"] = arr_to_list_check(U)
-        outdata["post-cal"]["V"] = arr_to_list_check(V)
-    
-        outdata["post-cal"]["time"] = dict()
-        outdata["post-cal"]["time"]["I_t"] = arr_to_list_check(I_t_cal)
-        outdata["post-cal"]["time"]["Q_t"] = arr_to_list_check(Q_t_cal)
-        outdata["post-cal"]["time"]["U_t"] = arr_to_list_check(U_t_cal)
-        outdata["post-cal"]["time"]["V_t"] = arr_to_list_check(V_t_cal)
-    
-        outdata["post-cal"]["frequency"] = dict()
-        outdata["post-cal"]["frequency"]["I_f"] = arr_to_list_check(I_f_cal)
-        outdata["post-cal"]["frequency"]["Q_f"] = arr_to_list_check(Q_f_cal)
-        outdata["post-cal"]["frequency"]["U_f"] = arr_to_list_check(U_f_cal)
-        outdata["post-cal"]["frequency"]["V_f"] = arr_to_list_check(V_f_cal)
-
-    else:
-        (I_cal,Q_cal,U_cal,V_cal) = (I,Q,U,V)
-        (I_t_cal,Q_t_cal,U_t_cal,V_t_cal) = get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff)
-        (I_f_cal,Q_f_cal,U_f_cal,V_f_cal) = get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,plot=(not RM_cal),datadir=datadir,label=label,calstr=calstr,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj,sf_window_weights=sf_window_weights)
-
-
-
-        outdata["pre-cal"]["time"] = dict()
-        outdata["pre-cal"]["time"]["I_t"] = arr_to_list_check(I_t_cal)
-        outdata["pre-cal"]["time"]["Q_t"] = arr_to_list_check(Q_t_cal)
-        outdata["pre-cal"]["time"]["U_t"] = arr_to_list_check(U_t_cal)
-        outdata["pre-cal"]["time"]["V_t"] = arr_to_list_check(V_t_cal)
-    
-        outdata["pre-cal"]["frequency"] = dict()
-        outdata["pre-cal"]["frequency"]["I_f"] = arr_to_list_check(I_f_cal)
-        outdata["pre-cal"]["frequency"]["Q_f"] = arr_to_list_check(Q_f_cal)
-        outdata["pre-cal"]["frequency"]["U_f"] = arr_to_list_check(U_f_cal)
-        outdata["pre-cal"]["frequency"]["V_f"] = arr_to_list_check(V_f_cal)
-
-    #Dynamic Spectra
-    plot_spectra_2D(I_cal,Q_cal,U_cal,V_cal,width_native,t_samp,n_t,n_f,freq_test,datadir=datadir,label=label,calstr='calstr',ext=ext,window=window,lim=lim,buff=buff)
-
-    #Polarization Angle and fraction
-    PA_f,PA_t,PA_f_errs,PA_t_errs,avg_PA,sigma_PA=get_pol_angle((I_t_cal,I_f_cal),(Q_t_cal,Q_f_cal),(U_t_cal,U_f_cal),(V_t_cal,V_f_cal),width_native,t_samp,n_t,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,pre_calc_tf=True,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
-    (total,linear,circular)=get_pol_fraction((I_t_cal,I_f_cal),(Q_t_cal,Q_f_cal),(U_t_cal,U_f_cal),(V_t_cal,V_f_cal),width_native,t_samp,n_t,n_f,freq_test,plot=True,datadir=datadir,label=label,calstr=calstr,pre_calc_tf=True,buff=buff,weighted=weighted,n_t_weight=n_t_weight,timeaxis=timeaxis,fobj=fobj)
-    outdata["PA"] = dict()
-    outdata["PA"]["frequency"] = arr_to_list_check(PA_f)
-    outdata["PA"]["time"] = arr_to_list_check(PA_t)
-    outdata["PA"]["average"] = float(avg_PA)
-    #hdr_dict["PA"] = float(avg_PA)
-    print("PA: " + str(avg_PA))
-    print(np.nanstd(PA_t))
-
-    (pol_f,pol_t,avg_pol,sigma_pol,snr_pol) = total
-    (L_f,L_t,avg_L,sigma_L,snr_L) = linear
-    (C_f,C_t,avg_C,sigma_C,snr_C) = circular
-    outdata["polarization"] = dict()
-    outdata["polarization"]["frequency"] = arr_to_list_check(pol_f)
-    outdata["polarization"]["time"] = arr_to_list_check(pol_t)
-    outdata["polarization"]["average"] = float(avg_pol)
-    outdata["polarization"]["error"] = float(sigma_pol)
-    outdata["polarization"]["snr"] = float(snr_pol)
-    print("Polarization:")
-    print(avg_pol)
-    print(sigma_pol)
-
-    outdata["linear polarization"] = dict()
-    outdata["linear polarization"]["frequency"] = arr_to_list_check(L_f)
-    outdata["linear polarization"]["time"] = arr_to_list_check(L_t)
-    outdata["linear polarization"]["average"] = float(avg_L)
-    outdata["linear polarization"]["error"] = float(sigma_L)
-    outdata["linear polarization"]["snr"] = float(snr_L)
-    print("Linear:")
-    print(avg_L)
-    print(sigma_L)
-
-    outdata["circular polarization"] = dict()
-    outdata["circular polarization"]["frequency"] = arr_to_list_check(C_f)
-    outdata["circular polarization"]["time"] = arr_to_list_check(C_t)
-    outdata["circular polarization"]["average"] = float(avg_C)
-    outdata["circular polarization"]["error"] = float(sigma_C)
-    outdata["circular polarization"]["snr"] = float(snr_C)
-    print("Circular:")
-    print(avg_C)
-    print(sigma_C)
-
-    #hdr_dict["polarization"] = float(avg_pol)
-
-    #print(outdata)
-    #Save to json
-    fname_json = datadir + label + calstr + "_polanalysis_out.json"
-    print("Writing output data to " + fname_json)
-    with open(fname_json, "w") as outfile:
-        json.dump(outdata, outfile)
-
-
-    #Write Calibrated Stokes params to filterbank
-    headerI = Header(hdr_dict)
-    headerI["Stokes"] = "I"
-    if alpha:
-        fnameI = datadir + prefix +"_calibrated_I.fil"
-    else:
-        fnameI = datadir + prefix +"_calibrated_0.fil"
-    headerI["filenames"] = headerI["filename"] = headerI["basename"] = fnameI
-    filI = FilterbankBlock(I_cal,headerI)
-    filI.toFile(fnameI)
-
-    headerQ = Header(hdr_dict)
-    headerQ["Stokes"] = "Q"
-    if alpha:
-        fnameQ = datadir + prefix + "_calibrated_Q.fil"
-    else:
-        fnameQ = datadir + prefix + "_calibrated_1.fil"
-    headerQ["filenames"] = headerQ["filename"] = headerQ["basename"] = fnameQ
-    filQ =FilterbankBlock(Q_cal,headerQ)
-    filQ.toFile(fnameQ)
-
-    headerU = Header(hdr_dict)
-    headerU["Stokes"] = "U"
-    if alpha:
-        fnameU = datadir + prefix + "_calibrated_U.fil"
-    else:
-        fnameU = datadir + prefix + "_calibrated_2.fil"
-    headerU["filenames"] = headerU["filename"] = headerU["basename"] = fnameU
-    filU = FilterbankBlock(U_cal,headerU)
-    filU.toFile(fnameU)
-
-    headerV = Header(hdr_dict)
-    headerV["Stokes"] = "V"
-    if alpha:
-        fnameV = datadir + prefix + "_calibrated_3.fil"
-    else:
-        fnameV = datadir + prefix + "_calibrated_3.fil"
-    headerV["filenames"] = headerV["filename"] = headerV["basename"] = fnameV
-    filV = FilterbankBlock(V_cal,headerV)
-    filV.toFile(fnameV)
-
-
-
-    
-    return outdata,fname_json,fnameI,fnameQ,fnameU,fnameV
