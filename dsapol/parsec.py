@@ -326,6 +326,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
     state_dict['DEC'] = FRB_DEC[FRB_IDS.index(state_dict['ids'])]
     state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
+    state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
     state_dict['buff'] = [buff_L_slider.value,buff_R_slider.value]
     state_dict['width_native'] = 2**logibox_slider.value
@@ -346,8 +347,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_U'] = U
         state_dict['base_V'] = V
         state_dict['fobj'] = fobj
-        state_dict['freq_test'] = freq_test
-        state_dict['wav_test'] = wav_test
+        state_dict['base_freq_test'] = freq_test
+        state_dict['base_wav_test'] = wav_test
         state_dict['badchans'] = badchans
 
         state_dict['current_state'] += 1
@@ -360,6 +361,37 @@ Dedispersion Tuning state
 def get_min_DM_step(n_t,fminGHz=1.307,fmaxGHz=1.493,res=32.7e-3):
     return np.around((res)*n_t/(4.15)/((1/fminGHz**2) - (1/fmaxGHz**2)),2)
 
+def dedisperse(dyn_spec,DM,tsamp,freq_axis):
+    """
+    This function dedisperses a dynamic spectrum of shape nsamps x nchans by brute force without accounting for edge effects
+    """
+
+    #get delay axis
+    tdelays = DM*4.15*(((np.min(freq_axis)*1e-3)**(-2)) - ((freq_axis*1e-3)**(-2)))#(8.3*(chanbw)*burst_DMs[i]/((freq_axis*1e-3)**3))*(1e-3) #ms
+    tdelays_idx_hi = np.array(np.ceil(tdelays/tsamp),dtype=int)
+    tdelays_idx_low = np.array(np.floor(tdelays/tsamp),dtype=int)
+    tdelays_frac = tdelays/tsamp - tdelays_idx_low
+    print("Trial DM: " + str(DM) + " pc/cc, DM delays (ms): " + str(tdelays) + "...",end='')
+    nchans = len(freq_axis)
+    print(dyn_spec.shape)
+    dyn_spec_DM = np.zeros(dyn_spec.shape)
+
+    #shift each channel
+    for k in range(nchans):
+        if tdelays_idx_low[k] >= 0:
+            arrlow =  np.pad(dyn_spec[k,:],((0,tdelays_idx_low[k])),mode="constant",constant_values=0)[tdelays_idx_low[k]:]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+        else:
+            arrlow =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_low[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_low[k]]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+
+        if tdelays_idx_hi[k] >= 0:
+            arrhi =  np.pad(dyn_spec[k,:],((0,tdelays_idx_hi[k])),mode="constant",constant_values=0)[tdelays_idx_hi[k]:]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+        else:
+            arrhi =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_hi[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_hi[k]]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+
+        dyn_spec_DM[k,:] = arrlow*(1-tdelays_frac[k]) + arrhi*(tdelays_frac[k])
+    print("Done!")
+    return dyn_spec_DM
+
 
 def dedisp_screen(n_t_slider,logn_f_slider,ddm_num,DM_input_display,DM_new_display):
     """
@@ -370,6 +402,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,ddm_num,DM_input_display,DM_new_displ
     #update time, freq resolution
     state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
     state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
+    state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//state_dict['n_f'],state_dict['n_f']).mean(1)]*4
     state_dict['I'] = dsapol.avg_time(state_dict['base_I'],state_dict['n_t'])
     state_dict['I'] = dsapol.avg_freq(state_dict['I'],state_dict['n_f'])
     state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],state_dict['n_t'])
@@ -384,9 +417,23 @@ def dedisp_screen(n_t_slider,logn_f_slider,ddm_num,DM_input_display,DM_new_displ
 
     #update DM step size
     ddm_num.step = get_min_DM_step(n_t_slider.value)
+    state_dict['dDM'] = ddm_num.value
     
     #update new DM
     DM_new_display.data = DM_input_display.data + ddm_num.value
+    state_dict['DM'] = DM_new_display.data
+
+    #dedisperse
+    state_dict['I'] = dedisperse(state_dict['I'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['Q'] = dedisperse(state_dict['Q'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['U'] = dedisperse(state_dict['U'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['V'] = dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+
+    #get time series
+    (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(12000//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+    state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
+
+
 
     #get timestart, timestop
     (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['base_I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['base_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
