@@ -314,7 +314,7 @@ def get_frbfiles(path=frbpath):
     return [frbfiles[i][frbfiles[i].index('us/2')+3:] for i in range(len(frbfiles))]
 
 
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider,buff_R_slider,logwindow_slider,RA_display,DEC_display,ibeam_display,loadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider,buff_R_slider,RA_display,DEC_display,ibeam_display,loadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -330,7 +330,6 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
     state_dict['buff'] = [buff_L_slider.value,buff_R_slider.value]
     state_dict['width_native'] = 2**logibox_slider.value
-    state_dict['window'] = 2**logwindow_slider.value
 
     #update displays
     RA_display.data = state_dict['RA']
@@ -339,7 +338,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
     #if button is clicked, load FRB data and go to next screen
     if loadbutton.clicked:
-        
+
         #load data at base resolution
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + "_dev",5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(2000//state_dict['base_n_t']),sub_offpulse_mean=True,fixchans=True)
         state_dict['base_I'] = I
@@ -352,7 +351,10 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['badchans'] = badchans
 
         state_dict['current_state'] += 1
+
+
         
+
     return
     
 """
@@ -379,49 +381,51 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
     #shift each channel
     for k in range(nchans):
         if tdelays_idx_low[k] >= 0:
-            arrlow =  np.pad(dyn_spec[k,:],((0,tdelays_idx_low[k])),mode="constant",constant_values=0)[tdelays_idx_low[k]:]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+            arrlow =  np.pad(dyn_spec[k,:],((0,tdelays_idx_low[k])),mode="constant",constant_values=0)[tdelays_idx_low[k]:]/nchans
         else:
-            arrlow =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_low[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_low[k]]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+            arrlow =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_low[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_low[k]]/nchans
 
         if tdelays_idx_hi[k] >= 0:
-            arrhi =  np.pad(dyn_spec[k,:],((0,tdelays_idx_hi[k])),mode="constant",constant_values=0)[tdelays_idx_hi[k]:]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+            arrhi =  np.pad(dyn_spec[k,:],((0,tdelays_idx_hi[k])),mode="constant",constant_values=0)[tdelays_idx_hi[k]:]/nchans
         else:
-            arrhi =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_hi[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_hi[k]]/nchans#np.roll(image_tesseract_intrinsic[:,:,:,k],tdelays_idx[k],axis=2)
+            arrhi =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_hi[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_hi[k]]/nchans
 
         dyn_spec_DM[k,:] = arrlow*(1-tdelays_frac[k]) + arrhi*(tdelays_frac[k])
     print("Done!")
     return dyn_spec_DM
 
 
-def dedisp_screen(n_t_slider,logn_f_slider,ddm_num,DM_input_display,DM_new_display):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DM_input_display,DM_new_display,DMdonebutton):
     """
     This function updates the dedispersion screen when resolution
     or dm step are changed
     """
-    
-    #update time, freq resolution
-    state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
-    state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
-    state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//state_dict['n_f'],state_dict['n_f']).mean(1)]*4
-    state_dict['I'] = dsapol.avg_time(state_dict['base_I'],state_dict['n_t'])
-    state_dict['I'] = dsapol.avg_freq(state_dict['I'],state_dict['n_f'])
-    state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],state_dict['n_t'])
-    state_dict['Q'] = dsapol.avg_freq(state_dict['Q'],state_dict['n_f'])
-    state_dict['U'] = dsapol.avg_time(state_dict['base_U'],state_dict['n_t'])
-    state_dict['U'] = dsapol.avg_freq(state_dict['U'],state_dict['n_f'])
-    state_dict['V'] = dsapol.avg_time(state_dict['base_V'],state_dict['n_t'])
-    state_dict['V'] = dsapol.avg_freq(state_dict['V'],state_dict['n_f'])
 
-    (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(12000//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
-    state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
+    
 
     #update DM step size
-    ddm_num.step = get_min_DM_step(n_t_slider.value)
     state_dict['dDM'] = ddm_num.value
-    
+    ddm_num.step = get_min_DM_step(n_t_slider.value*state_dict['base_n_t'])
+
     #update new DM
     DM_new_display.data = DM_input_display.data + ddm_num.value
     state_dict['DM'] = DM_new_display.data
+
+    #update time, freq resolution
+    state_dict['window'] = 2**logwindow_slider.value
+    state_dict['rel_n_t'] = n_t_slider.value
+    state_dict['rel_n_f'] = (2**logn_f_slider.value)
+    state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
+    state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
+    state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(2**logn_f_slider.value),(2**logn_f_slider.value)).mean(1)]*4
+    state_dict['I'] = dsapol.avg_time(state_dict['base_I'],n_t_slider.value)#state_dict['n_t'])
+    state_dict['I'] = dsapol.avg_freq(state_dict['I'],2**logn_f_slider.value)#state_dict['n_f'])
+    state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],n_t_slider.value)#state_dict['n_t'])
+    state_dict['Q'] = dsapol.avg_freq(state_dict['Q'],2**logn_f_slider.value)#state_dict['n_f'])
+    state_dict['U'] = dsapol.avg_time(state_dict['base_U'],n_t_slider.value)#state_dict['n_t'])
+    state_dict['U'] = dsapol.avg_freq(state_dict['U'],2**logn_f_slider.value)#state_dict['n_f'])
+    state_dict['V'] = dsapol.avg_time(state_dict['base_V'],n_t_slider.value)#state_dict['n_t'])
+    state_dict['V'] = dsapol.avg_freq(state_dict['V'],2**logn_f_slider.value)#state_dict['n_f'])
 
     #dedisperse
     state_dict['I'] = dedisperse(state_dict['I'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
@@ -429,27 +433,30 @@ def dedisp_screen(n_t_slider,logn_f_slider,ddm_num,DM_input_display,DM_new_displ
     state_dict['U'] = dedisperse(state_dict['U'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
     state_dict['V'] = dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
 
+
+
     #get time series
-    (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(12000//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
-    state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
-
-
+    (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(12000//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+    state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_t']))
 
     #get timestart, timestop
-    (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['base_I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['base_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
-
-    
+    (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
     #display dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,18))
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I')
+            state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['Q_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Q')
+            state_dict['Q_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Q')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['U_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='U')
+            state_dict['U_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='U')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['V_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V')
+            state_dict['V_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V')
+    a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    a0.set_xticks([])
+    a0.legend(loc="upper right")
+    
     a1.imshow(state_dict['I'][:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
             extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
                 32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3,
@@ -460,8 +467,16 @@ def dedisp_screen(n_t_slider,logn_f_slider,ddm_num,DM_input_display,DM_new_displ
     plt.show(fig)
 
 
+    if DMdonebutton.clicked:
+        #dedisperse base dyn spectrum
+        state_dict['base_I'] = dedisperse(state_dict['base_I'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+        state_dict['base_Q'] = dedisperse(state_dict['base_Q'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+        state_dict['base_U'] = dedisperse(state_dict['base_U'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+        state_dict['base_V'] = dedisperse(state_dict['base_V'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
 
 
+
+        state_dict['current_state'] += 1
     return
 
 
@@ -498,7 +513,7 @@ def read_polcal(polcaldate,path=default_path):
 
 
 
-def polcal_screen(polcaldate_menu):
+def polcal_screen(polcaldate_menu,polcalbutton,ParA_display):
     """
     This function updates the polarization calibration screen
     whenever the cal file is selected
@@ -526,5 +541,66 @@ def polcal_screen(polcaldate_menu):
     plt.subplots_adjust(hspace=0)
     plt.show()
 
+    if polcalbutton.clicked:
+
+        #calibrate at native resolution
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True)
+
+        #parallactic angle calibration
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA[deg]'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['fobj'],state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
+        ParA_display.data = state_dict['ParA[deg]']
+
+        #get downsampled versions
+        state_dict['Ical'] = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
+        state_dict['Ical'] = dsapol.avg_freq(state_dict['Ical'],state_dict['rel_n_f'])
+        state_dict['Qcal'] = dsapol.avg_time(state_dict['base_Qcal'],state_dict['rel_n_t'])
+        state_dict['Qcal'] = dsapol.avg_freq(state_dict['Qcal'],state_dict['rel_n_f'])
+        state_dict['Ucal'] = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
+        state_dict['Ucal'] = dsapol.avg_freq(state_dict['Ucal'],state_dict['rel_n_f'])
+        state_dict['Vcal'] = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
+        state_dict['Vcal'] = dsapol.avg_freq(state_dict['Vcal'],state_dict['rel_n_f'])
+
+
+        #get time series
+        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(12000//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
+
+        #get timestart, timestop
+        (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+
+        state_dict['current_state'] += 1
+
+    return
+
+
+"""
+Filter Weights State
+"""
+
+def filter_screen():
+
+    #display dynamic spectrum
+    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,18))
+    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I')
+    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['Q_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Q')
+    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['U_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='U')
+    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['V_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V')
+    a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    a0.set_xticks([])
+    a0.legend(loc="upper right")
+
+    a1.imshow(state_dict['Ical'][:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
+            extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+                32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3,
+                np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0])])
+    a1.set_xlabel("Time (ms)")
+    a1.set_ylabel("Frequency (MHz)")
+    plt.subplots_adjust(hspace=0)
+    plt.show(fig)
 
     return
