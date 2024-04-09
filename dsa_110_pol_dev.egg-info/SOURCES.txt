@@ -25,6 +25,8 @@ dsa_110_pol_dev.egg-info/top_level.txt
 dsapol/dsapol.py
 dsapol/parsec.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
+interface/PARSEC_Interface-InteractiveMercury.ipynb
+interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
 scripts/FRB_quick_pol_analysis.py
 scripts/FRB_upper_limits.py
 scripts/RMSNR_all_FRBs.py
