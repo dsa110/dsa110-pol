@@ -1,5 +1,5 @@
 from dsapol import dsapol
-
+from dsapol import polbeamform
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import correlate
@@ -328,7 +328,7 @@ def get_frbfiles(path=frbpath):
     return [frbfiles[i][frbfiles[i].index('us/2')+3:] for i in range(len(frbfiles))]
 
 
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider,buff_R_slider,RA_display,DEC_display,ibeam_display,loadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider,buff_R_slider,RA_display,DEC_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -344,11 +344,23 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
     state_dict['buff'] = [buff_L_slider.value,buff_R_slider.value]
     state_dict['width_native'] = 2**logibox_slider.value
+    state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
 
     #update displays
     RA_display.data = state_dict['RA']
     DEC_display.data = state_dict['DEC']
     ibeam_display.data = state_dict['ibeam']
+    mjd_display.data = state_dict['mjd']
+
+    #see if filterbanks exist
+    state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
+
+    #find beamforming weights date
+    state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
+
+    #if update button is clicked, refresh FRB data from csv
+    if updatebutton.clicked:
+        update_FRB_params()
 
     #if button is clicked, load FRB data and go to next screen
     if loadbutton.clicked:
@@ -366,8 +378,10 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
         state_dict['current_state'] += 1
 
-
-        
+    #if filbutton is clicked, run the offline beamformer to make fil files
+    if filbutton.clicked:
+        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'])
+        print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
     return
     
@@ -383,7 +397,7 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
     """
 
     #get delay axis
-    tdelays = DM*4.15*(((np.min(freq_axis)*1e-3)**(-2)) - ((freq_axis*1e-3)**(-2)))#(8.3*(chanbw)*burst_DMs[i]/((freq_axis*1e-3)**3))*(1e-3) #ms
+    tdelays = -DM*4.15*(((np.min(freq_axis)*1e-3)**(-2)) - ((freq_axis*1e-3)**(-2)))#(8.3*(chanbw)*burst_DMs[i]/((freq_axis*1e-3)**3))*(1e-3) #ms
     tdelays_idx_hi = np.array(np.ceil(tdelays/tsamp),dtype=int)
     tdelays_idx_low = np.array(np.floor(tdelays/tsamp),dtype=int)
     tdelays_frac = tdelays/tsamp - tdelays_idx_low
