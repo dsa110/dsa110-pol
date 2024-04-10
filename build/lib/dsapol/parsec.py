@@ -1,5 +1,6 @@
 from dsapol import dsapol
 from dsapol import polbeamform
+from dsapol import polcal
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import correlate
@@ -311,6 +312,32 @@ df = pd.DataFrame(
     },
         index=['All']
     )
+corrarray = ["corr03",
+               "corr04",
+               "corr05",
+               "corr06",
+               "corr07",
+               "corr08",
+               "corr10",
+               "corr11",
+               "corr12" ,
+               "corr14", 
+               "corr15", 
+               "corr16", 
+               "corr18", 
+               "corr19", 
+               "corr21", 
+               "corr22"]
+df_polcal = pd.DataFrame(
+    {
+        r'3C48': [],#*len(corrarray),
+        r'3C286': [],#*len(corrarray),
+    },
+        index=[]#copy.deepcopy(corrarray)
+    )
+
+
+
 
 #Exception to quietly exit cell so that we can short circuit output cells
 class StopExecution(Exception):
@@ -401,7 +428,7 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
     tdelays_idx_hi = np.array(np.ceil(tdelays/tsamp),dtype=int)
     tdelays_idx_low = np.array(np.floor(tdelays/tsamp),dtype=int)
     tdelays_frac = tdelays/tsamp - tdelays_idx_low
-    print("Trial DM: " + str(DM) + " pc/cc, DM delays (ms): " + str(tdelays) + "...",end='')
+    print("Trial DM: " + str(DM) + " pc/cc...",end='')#, DM delays (ms): " + str(tdelays) + "...",end='')
     nchans = len(freq_axis)
     print(dyn_spec.shape)
     dyn_spec_DM = np.zeros(dyn_spec.shape)
@@ -549,6 +576,15 @@ def polcal_screen(polcaldate_menu,polcalbutton,ParA_display):
 
     #update polcal parameters in state dict
     state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = read_polcal(polcaldate_menu.value)
+
+
+    #look for new calibrator files
+    vtimes3C48,vfiles3C48 = polcal.get_voltages("3C48")
+    vtimes3C286,vfiles3C286 = polcal.get_voltages("3C286")
+    mapping3C48 = polcal.iso_voltages(vtimes3C48,vfiles3C48)
+    mapping3C286 = polcal.iso_voltages(vtimes3C286,vfiles3C286)
+    for k in mapping3C48.keys():
+        df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48[k]),'<br/>'.join(mapping3C286[k])]
 
     #display
     fig=plt.figure(figsize=(18,14))
