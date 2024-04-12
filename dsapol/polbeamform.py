@@ -50,8 +50,9 @@ def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir):
     and the command is run in the background. Returns 0 on success, 1 on failure
     """
     #return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/for_testing.bash 2>&1 > /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/beamforming_logfile.txt &")
+    clear_logfile()
     return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
             + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + 
-            " 2>&1 > /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/beamforming_logfile.txt &")
+            " 2>&1 > " + logfile + " &")
 
 

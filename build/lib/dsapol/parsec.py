@@ -335,8 +335,17 @@ df_polcal = pd.DataFrame(
     },
         index=[]#copy.deepcopy(corrarray)
     )
-
-
+polcal_dict = dict()
+#populate w/ calibrator files
+vtimes3C48_init,vfiles3C48_init = polcal.get_voltages("3C48")
+vtimes3C286_init,vfiles3C286_init = polcal.get_voltages("3C286")
+mapping3C48_init = polcal.iso_voltages(vtimes3C48_init,vfiles3C48_init)
+mapping3C286_init = polcal.iso_voltages(vtimes3C286_init,vfiles3C286_init)
+for k in mapping3C48_init.keys():
+    df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48_init[k]),'<br/>'.join(mapping3C286_init[k])]
+    polcal_dict[str(k)] = dict()
+    polcal_dict[str(k)]['3C48'] = mapping3C48_init[k]
+    polcal_dict[str(k)]['3C286'] = mapping3C286_init[k]
 
 
 #Exception to quietly exit cell so that we can short circuit output cells
@@ -568,7 +577,8 @@ def read_polcal(polcaldate,path=default_path):
 
 
 
-def polcal_screen(polcaldate_menu,polcalbutton,ParA_display):
+def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcalbutton,polcopybutton,ParA_display):
+    
     """
     This function updates the polarization calibration screen
     whenever the cal file is selected
@@ -576,7 +586,7 @@ def polcal_screen(polcaldate_menu,polcalbutton,ParA_display):
 
     #update polcal parameters in state dict
     state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = read_polcal(polcaldate_menu.value)
-
+    state_dict['polcalfile'] = polcaldate_menu.value
 
     #look for new calibrator files
     vtimes3C48,vfiles3C48 = polcal.get_voltages("3C48")
@@ -585,6 +595,12 @@ def polcal_screen(polcaldate_menu,polcalbutton,ParA_display):
     mapping3C286 = polcal.iso_voltages(vtimes3C286,vfiles3C286)
     for k in mapping3C48.keys():
         df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48[k]),'<br/>'.join(mapping3C286[k])]
+        polcal_dict[str(k)] = dict()
+        polcal_dict[str(k)]['3C48'] = mapping3C48[k]
+        polcal_dict[str(k)]['3C286'] = mapping3C286[k]
+    #update calibrator date
+    polcal_dict['polcal_create_file'] = polcaldate_create_menu.value
+    
 
     #display
     fig=plt.figure(figsize=(18,14))
@@ -633,6 +649,13 @@ def polcal_screen(polcaldate_menu,polcalbutton,ParA_display):
         (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
         state_dict['current_state'] += 1
+
+    #if copy button clicked, copy voltages from T3
+    if polcopybutton.clicked:
+
+        #copy from T3 to scratch dir
+        polcal.copy_voltages(polcal_dict[polcal_dict['polcal_create_file']]['3C48'],polcal_dict['polcal_create_file'],'3C48')
+        polcal.copy_voltages(polcal_dict[polcal_dict['polcal_create_file']]['3C286'],polcal_dict['polcal_create_file'],'3C286')
 
     return
 
