@@ -331,7 +331,9 @@ corrarray = ["corr03",
 df_polcal = pd.DataFrame(
     {
         r'3C48': [],#*len(corrarray),
+        r'3C48 beamformer weights':[],
         r'3C286': [],#*len(corrarray),
+        r'3C286 beamformer weights':[]
     },
         index=[]#copy.deepcopy(corrarray)
     )
@@ -342,11 +344,23 @@ vtimes3C286_init,vfiles3C286_init = polcal.get_voltages("3C286")
 mapping3C48_init = polcal.iso_voltages(vtimes3C48_init,vfiles3C48_init)
 mapping3C286_init = polcal.iso_voltages(vtimes3C286_init,vfiles3C286_init)
 for k in mapping3C48_init.keys():
-    df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48_init[k]),'<br/>'.join(mapping3C286_init[k])]
+    if len(mapping3C48_init[k]) == 0: continue
+    #find corresponding bf weights
+    bfweights3C48 = polcal.get_bfweights(mapping3C48_init[k],'3C48')
+    bfweights3C286 = polcal.get_bfweights(mapping3C286_init[k],'3C286')
+    print(['<br/>'.join(mapping3C48_init[k]),
+                             '<br/>'.join(bfweights3C48),
+                             '<br/>'.join(mapping3C286_init[k]),
+                             '<br/>'.join(bfweights3C286)])
+    df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48_init[k]),
+                             '<br/>'.join(bfweights3C48),
+                             '<br/>'.join(mapping3C286_init[k]),
+                             '<br/>'.join(bfweights3C286)]
     polcal_dict[str(k)] = dict()
     polcal_dict[str(k)]['3C48'] = mapping3C48_init[k]
     polcal_dict[str(k)]['3C286'] = mapping3C286_init[k]
-
+    polcal_dict[str(k)]['3C48_bfweights'] = bfweights3C48
+    polcal_dict[str(k)]['3C286_bfweights'] = bfweights3C286
 
 #Exception to quietly exit cell so that we can short circuit output cells
 class StopExecution(Exception):
@@ -594,10 +608,22 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcalbutton,polcopybut
     mapping3C48 = polcal.iso_voltages(vtimes3C48,vfiles3C48)
     mapping3C286 = polcal.iso_voltages(vtimes3C286,vfiles3C286)
     for k in mapping3C48.keys():
-        df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48[k]),'<br/>'.join(mapping3C286[k])]
+        if len(mapping3C48[k]) == 0: continue
+        #find corresponding bf weights
+        bfweights3C48 = polcal.get_bfweights(mapping3C48[k],'3C48')
+        bfweights3C286 = polcal.get_bfweights(mapping3C286[k],'3C286')
+    
+        df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48[k]),
+                             '<br/>'.join(bfweights3C48),
+                             '<br/>'.join(mapping3C286[k]),
+                             '<br/>'.join(bfweights3C286)]
         polcal_dict[str(k)] = dict()
         polcal_dict[str(k)]['3C48'] = mapping3C48[k]
         polcal_dict[str(k)]['3C286'] = mapping3C286[k]
+        polcal_dict[str(k)]['3C48_bfweights'] = bfweights3C48
+        polcal_dict[str(k)]['3C286_bfweights'] = bfweights3C286
+
+
     #update calibrator date
     polcal_dict['polcal_create_file'] = polcaldate_create_menu.value
     
@@ -653,9 +679,14 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcalbutton,polcopybut
     #if copy button clicked, copy voltages from T3
     if polcopybutton.clicked:
 
-        #copy from T3 to scratch dir
+        #copy voltages from T3 to scratch dir
         polcal.copy_voltages(polcal_dict[polcal_dict['polcal_create_file']]['3C48'],polcal_dict['polcal_create_file'],'3C48')
         polcal.copy_voltages(polcal_dict[polcal_dict['polcal_create_file']]['3C286'],polcal_dict['polcal_create_file'],'3C286')
+
+        #copy beamformer weights from generated directory to scratch dir
+        polcal.copy_bfweights(polcal_dict[polcal_dict['polcal_create_file']]['3C48_bfweights'])
+        polcal.copy_bfweights(polcal_dict[polcal_dict['polcal_create_file']]['3C286_bfweights'])
+
 
     return
 

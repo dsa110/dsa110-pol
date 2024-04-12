@@ -30,6 +30,8 @@ dsapol/__pycache__/dsapol.cpython-38.pyc
 interface/PARSEC_Interface-InteractiveMercury.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
 offline_beamforming/beamforming_logfile.txt
+offline_beamforming/move_cal_voltages.bash
+offline_beamforming/polcal_logfile.txt
 offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash
 scripts/FRB_quick_pol_analysis.py
 scripts/FRB_upper_limits.py
