@@ -19,7 +19,7 @@ with previous solutions.
 data_path = "/dataz/dsa110/T3/"
 voltage_copy_path = "/media/ubuntu/ssd/sherman/polcal_voltages/"
 logfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/polcal_logfile.txt"
-output_path = "/media/ubuntu/ssd/sherman/code/scratch_weights_update_2022-06-03_32-7us/"
+output_path = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 bfweights_path = "/dataz/dsa110/operations/beamformer_weights/generated/"
 bfweights_output_path = "/media/ubuntu/ssd/sherman/code/pol_self_calibs_FOR_PAPER/"
 
@@ -138,17 +138,94 @@ def copy_bfweights(bfweights,path=bfweights_path,new_path=bfweights_output_path)
         #os.system("cp " + path + fname + " " + new_path)
     return
 
-def get_source_beams(filenames,caldate,calname,path=output_path):
+
+#functions to calibrate voltage data
+def get_avail_caldates(path=voltage_copy_path):
+    """
+    This function gets and returns lists of dates available and their corresponding
+    beamformer weights.
+    """
+    caldates = [f.path[-10:] for f in os.scandir(path) if f.is_dir()]
+    
+    return caldates
+
+def get_all_calfiles(caldate,calname,path=voltage_copy_path,bfpath=bfweights_output_path):
+    """
+    This function gets and returns all the voltage files and beamformer files for a given cal date.
+    """
+
+    #first get paths for all the voltage files
+    vfiles = glob.glob(path + caldate + "/*/corr*/")
+    vfilejson = ""
+    for v in vfiles:
+        if 'json' in v: vfilejson = v
+    if vfilejson == "": 
+        print("No JSON files")
+        return [],[]
+
+
+    #then get all bf weight files
+    bffiles = get_bfweights([v],calname,path=bfpath,voltage_path=path)
+    return vfiles,bffiles
+
+def beamform_polcal(vfiles,bffiles,calname,caldate,path=output_path):
+    """
+    This function forms beams for the polarization calibrators
+    """
+    if len(vfiles) == 0 or len(bffiles) == 0: return
+    #collect the observation names
+    cal_id_dict = dict()
+    for f in vfiles:
+        if f[:len(calname)+3] in cal_id_dict.keys():
+            cal_id_dict[f[:len(calname)+3]] = dict()
+            cal_id_dict[f[:len(calname)+3]]['files'] = []
+        cal_id_dict[f[:len(calname)+3]].append(f)
+
+        #find mjd
+        if ('json' in f) and ('mjd' not in cal_id_dict[f[:len(calname)+3]].keys()):
+            fobj = open(f,'r')
+            cal_id_dict[f[:len(calname)+3]]['mjd'] = json.load(f)[f[:len(calname)+3]]['mjds']
+            fobj.close()
+
+    #find beamformer timestamp
+    bftstamp = bffiles[0][bffiles[0].index(VLANAME_DICT[calname]):bffiles[0].index('.')]
+
+    #clear log files
+    polbeamform.clear_logfile(logfile)
+
+    #for each observation, make voltage files
+    for k in cal_id_dict.keys():
+        print("./offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " " + str(caldate) + " 2>&1 > " + logfile + " &")
+        #os.system("./offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " 2>&1 > " + logfile + " &")
+    return
+
+
+#functions to get beam numbers from existing files
+def get_beamfinding_files(path=output_path):
+    """
+    This function gets all the folder dates in scratch dir that have correlator files
+    """
+    all_files = [f.path[-10:] for f in os.scandir(path) if (f.is_dir() and (('3C286' in f.path) or ('3C48' in f.path)))]
+    return np.unique(all_files)
+
+def get_source_beams(caldate,calname,path=output_path):
     """
     This function calls find_beam() for each of the voltage files copied to
     get the beam number for each observation. 
     """
+    #get observation names
+    obs_files = glob.glob(path + calname + "_" + caldate + "/corr03_" + calname + "*.out")
+    obs_ids = [f[-len(calname)-3-4:-4] for f in obs_files]
 
     #loop through files and get beam numbers
     beam_dict = dict()
-    for f in filenames:
-        beam_dict[f] = dsapol.find_beam("_" + f[:len(calname)+3],shape=(16,7680,256),path=path + calname + "_" + caldate + "/",plot=False)[0]
-
+    for obs_id in obs_ids:
+        print("Finding beam for " + obs_id + "...",end='')
+        bout = dsapol.find_beam("_" + obs_id,shape=(16,7680,256),path=path + calname + "_" + caldate + "/",plot=False)
+        beam_dict[obs_id] = dict()
+        beam_dict[obs_id]['beam'] = bout[0]
+        beam_dict[obs_id]['beamspectrum'] = bout.mean(0).mean(0)
+        print("Done, beam = " + str(beam_dict[obs_id]['beam']))
     return beam_dict
 
 

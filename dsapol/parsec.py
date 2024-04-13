@@ -338,6 +338,7 @@ df_polcal = pd.DataFrame(
         index=[]#copy.deepcopy(corrarray)
     )
 polcal_dict = dict()
+polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
 #populate w/ calibrator files
 vtimes3C48_init,vfiles3C48_init = polcal.get_voltages("3C48")
 vtimes3C286_init,vfiles3C286_init = polcal.get_voltages("3C286")
@@ -591,7 +592,8 @@ def read_polcal(polcaldate,path=default_path):
 
 
 
-def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcalbutton,polcopybutton,ParA_display):
+def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,
+        polcalbutton,polcopybutton,bfcal_button,findbeams_button,ParA_display):
     
     """
     This function updates the polarization calibration screen
@@ -628,6 +630,13 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcalbutton,polcopybut
     polcal_dict['polcal_create_file'] = polcaldate_create_menu.value
     
 
+    #update polcal dict with calibrator files that have voltages, bf weights available
+    if polcaldate_bf_menu.value != "":
+        polcal_dict['polcal_avail_date'] = polcaldate_bf_menu.value
+        polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_bf_3C48'] = polcal.get_all_calfiles(polcaldate_bf_menu.value,'3C48')
+        polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C286'] = polcal.get_all_calfiles(polcaldate_bf_menu.value,'3C286')
+    else:
+        polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
     #display
     fig=plt.figure(figsize=(18,14))
     plt.subplot(311)
@@ -686,6 +695,39 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcalbutton,polcopybut
         #copy beamformer weights from generated directory to scratch dir
         polcal.copy_bfweights(polcal_dict[polcal_dict['polcal_create_file']]['3C48_bfweights'])
         polcal.copy_bfweights(polcal_dict[polcal_dict['polcal_create_file']]['3C286_bfweights'])
+    
+    
+    #if bfcal button clicked beamform calibration files at low res
+    if bfcal_button.clicked:
+        
+        #beamform 3C48 and 3C286
+        polcal.beamform_polcal(polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_bf_3C48'],'3C48',polcal_dict['polcal_avail_date'])
+        polcal.beamform_polcal(polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C286'],'3C286',polcal_dict['polcal_avail_date'])
+    
+    #if findbeam button clicked find the beams for each cal observation
+    if findbeams_button.clicked:
+
+        #find beams and plot 
+        plt.figure(figsize=(12,12))
+        beam_dict_3C48 = polcal.get_source_beams(polcaldate_findbeams_menu.value,'3C48')
+        beam_dict_3C286 = polcal.get_source_beams(polcaldate_findbeams_menu.value,'3C286')
+        
+        plt.subplot(211)
+        for k in beam_dict_3C48.keys():
+            plt.plot(np.linspace(256),beam_dict_3C48[k]['beamspectrum'],label=k)
+        plt.legend()
+        plt.title('3C48')
+        plt.xlabel("Beam Number")
+
+        plt.subplot(212)
+        for k in beam_dict_3C48.keys():
+            plt.plot(np.linspace(256),beam_dict_3C48[k]['beamspectrum'],label=k)
+        plt.legend()
+        plt.title('3C286')
+        plt.xlabel("Beam Number")
+        plt.show()
+
+
 
 
     return
