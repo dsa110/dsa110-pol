@@ -39,6 +39,7 @@ scripts/FRB_upper_limits.py
 scripts/RMSNR_all_FRBs.py
 scripts/RM_all_FRBs.py
 scripts/cal_pol.py
+scripts/find_beams.py
 scripts/plot_pol.py
 scripts/process_all_FRBs.py
 scripts/process_all_FRBs_V2.py

@@ -366,6 +366,13 @@ for k in mapping3C48_init.keys():
     polcal_dict[str(k)]['3C286'] = mapping3C286_init[k]
     polcal_dict[str(k)]['3C48_bfweights'] = bfweights3C48
     polcal_dict[str(k)]['3C286_bfweights'] = bfweights3C286
+df_beams = pd.DataFrame(
+        {r'beam':[],
+            r'mjd':[],
+            r'beamformer weights':[]},
+        index=[]
+        )
+
 
 #Exception to quietly exit cell so that we can short circuit output cells
 class StopExecution(Exception):
@@ -597,7 +604,7 @@ def read_polcal(polcaldate,path=default_path):
 
 
 def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,
-        polcalbutton,polcopybutton,bfcal_button,findbeams_button,ParA_display):
+        polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display):
     
     """
     This function updates the polarization calibration screen
@@ -725,36 +732,58 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
         
     #look to see if beam dicts have been saved 
-    fs = os.listdir(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/")
+    try:
+        fs = os.listdir(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/")
+    except:
+        fs = []
     if "3C48_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl" in fs:
         f = open(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/3C48_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl","rb")
         beam_dict_3C48 = pkl.load(f)
         f.close()
 
-    fs = os.listdir(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/")
+    try:
+        fs = os.listdir(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/")
+    except:
+        fs = []
     if "3C286_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl" in fs:
         f = open(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/3C286_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl","rb")
         beam_dict_3C286 = pkl.load(f)
         f.close()
 
+
     #plot
-    plt.figure(figsize=(18,9))
+    plt.figure(figsize=(20,9))
     plt.subplot(121)
     for k in beam_dict_3C48.keys():
+        df_beams.loc[str(k)] = [beam_dict_3C48[k]['beam'],beam_dict_3C48[k]['mjd'],beam_dict_3C48[k]['bf_weights']]
         plt.plot(beam_dict_3C48[k]['beamspectrum'],label=k)
-    plt.legend()
-    plt.title('3C48')
+    plt.legend(loc='upper left')
+    plt.title('3C48 ' + str(polcal_dict['polcal_findbeams_file']))
     plt.xlabel("Beam Number")
 
     plt.subplot(122)
     for k in beam_dict_3C286.keys():
+        df_beams.loc[str(k)] = [beam_dict_3C286[k]['beam'],beam_dict_3C286[k]['mjd'],beam_dict_3C286[k]['bf_weights']]
         plt.plot(beam_dict_3C286[k]['beamspectrum'],label=k)
-    plt.legend()
-    plt.title('3C286')
+    plt.legend(loc='upper left')
+    plt.title('3C286 ' + str(polcal_dict['polcal_findbeams_file']))
     plt.yticks([])
     plt.xlabel("Beam Number")
     plt.subplots_adjust(wspace=0)
     plt.show()
+
+
+    #if make filt button pushed, make filterbanks for pol cals
+    if filcalbutton.clicked:
+
+        #make 3C48 filterbanks
+        for k in beam_dict_3C48.keys():
+            make_cal_filterbanks('3C48',polcal_dict['polcal_findbeams_file'],str(k)[4:],beam_dict_3C48[k]['bf_weights'],beam_dict_3C48[k]['beam'],beam_dict_3C48[k]['mjd'])
+
+        #make 3C286 filterbanks
+        for k in beam_dict_3C48.keys():
+            make_cal_filterbanks('3C286',polcal_dict['polcal_findbeams_file'],str(k)[5:],beam_dict_3C286[k]['bf_weights'],beam_dict_3C286[k]['beam'],beam_dict_3C286[k]['mjd'])
+
 
 
 

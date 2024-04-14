@@ -21,7 +21,7 @@ voltage_copy_path = "/media/ubuntu/ssd/sherman/polcal_voltages/"
 logfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/polcal_logfile.txt"
 output_path = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 bfweights_path = "/dataz/dsa110/operations/beamformer_weights/generated/"
-bfweights_output_path = "/media/ubuntu/ssd/sherman/code/pol_self_calibs_FOR_PAPER/"
+bfweights_output_path = "/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/"
 
 
 #### Functions for copying voltages from T3 to working dir for given observing date ####
@@ -84,6 +84,7 @@ def copy_voltages(filenames,caldate,calname,path=data_path,new_path=voltage_copy
         if 'header' not in f:
             os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
         #print("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
+
     #return output directory
     return new_path + caldate + "/" + calname + "/"     
 
@@ -126,7 +127,32 @@ def get_bfweights(filenames,calname,path=bfweights_path,voltage_path=data_path):
     #now get all files
     bestbfweights = glob.glob(path + "*beamformer_weights_sb*" + VLANAME_DICT[calname] + "*" + allbfweightdates[bestidx].isot + ".dat")
     bestbfweights = np.array([bestbfweights[i][len(path):] for i in range(len(bestbfweights))]) 
+    
     return bestbfweights
+
+
+def get_bfweight_isot(calname,mjd,path=bfweights_output_path):
+    """
+    Given the mjd, this returns the most recent self-calibrated beamformer weights
+    in the provided directory
+    """
+    #get list of relevant bf weights
+    allbfweightfiles = glob.glob(path + "*beamformer_weights_sb00*" + VLANAME_DICT[calname] + "*")
+
+    #make a list of their isot times
+    allbfweightdates = np.array([Time(allbfweightfiles[i][-23:-4],format='isot') for i in range(len(allbfweightfiles))])
+
+    #convert mjd to time
+    obstime = Time(mjd,format='mjd').datetime
+
+    #find bf weights with smallest date diff
+    tdeltas = np.array([(obstime - allbfweightdates[i].datetime).total_seconds() for i in range(len(allbfweightdates))])
+
+    #ignore those from after the observation
+    tdeltas[tdeltas < 0] = np.inf
+    bestidx = np.argmin(tdeltas)
+
+    return allbfweightdates[bestidx].isot
 
 def copy_bfweights(bfweights,path=bfweights_path,new_path=bfweights_output_path):
     """
@@ -195,8 +221,13 @@ def beamform_polcal(vfiles,bffiles,calname,caldate,path=output_path):
 
     #for each observation, make voltage files
     for k in cal_id_dict.keys():
-        print("./offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " " + str(caldate) + " 2>&1 > " + logfile + " &")
+        print("./offline_beamforming/run_beamformer_offline_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " " + str(caldate) + " 2>&1 > " + logfile + " &")
         #os.system("./offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " 2>&1 > " + logfile + " &")
+
+    #make a copy of jsons so we have access to the mjd
+    for f in vfiles:
+        if ('json' in f) and ('corr03' in f):
+            os.system("cp " + f + " " + path + calname + "_" + caldate + "/")
     return
 
 
@@ -231,4 +262,26 @@ def get_source_beams(caldate,calname,path=output_path):
 
     return beam_dict
 
+def get_cal_mjd(calname,caldate,calid,path=output_path):
+    """
+    Pulls mjd for a given cal observation from json file
+    """
+    f = path + calname + "_" + caldate + "/" + calname + calid + "_header.json.sav"
+    fobj = open(f,'r')
+    mjd = json.load(fobj)[calname+calid]['mjds']
+    fobj.close()
+    return mjd
 
+#null zcj 3C48 0137+331_2024-01-30T00:57:05 72 60339.0366192841 0
+def make_cal_filterbanks(calname,caldate,calid,bfweights,ibeam,mjd,path=output_path):
+    """
+    This function takes FRB parameters and the beamformer weights to run the
+    offline beamforming script. Outputs polarized filterbanks to the path provided.
+    Output is redirected to a logfile at /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/polcal_logfile.txt,
+    and the command is run in the background. Returns 0 on success, 1 on failure
+    """
+
+    clear_logfile()
+    return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash NA "
+            + str(calid) + " " + str(calname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " 0 " + str(caldate) +
+            " 2>&1 > " + logfile + " &")
