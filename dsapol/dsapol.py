@@ -4125,17 +4125,22 @@ def get_calibs(gaincal_fn,phasecal_fn,freq_test,use_fit=True):
 #function to get beam of calibrator
 def find_beam(file_suffix,shape=(16,7680,256),path='/home/ubuntu/sherman/scratch_weights_update_2022-06-03/',plot=False,show=False):
     #file_suffix = ""
+    f=open('/media/ubuntu/ssd/sherman/code/testoutput.txt','a')
+    print("Starting find beam process...",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
     d = np.zeros(shape)
     i = 0
     for corrs in ['corr03', 'corr04', 'corr05', 'corr06', 'corr07',
                   'corr08', 'corr10', 'corr11', 'corr12', 'corr14',
                   'corr15', 'corr16', 'corr18', 'corr19', 'corr21',
                   'corr22']:
+        print("Path: " + path + corrs + file_suffix + '.out',end="",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
         data = np.loadtxt(path + corrs + file_suffix + '.out').reshape((7680,256))
+        print("load complete",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
         #print(data.sum())
         d[i,:,:] = data
         #print(corrs)
         i += 1
+    f.close()
 
     if plot:
         f=plt.figure(figsize=(12,6))

@@ -1,97 +1,12 @@
-3C286 gbf 2022-12-18 /media/ubuntu/ssd/sherman/polcal_voltages/ /dataz/dsa110/T3/
-corr03
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr03
-/dataz/dsa110/T3//corr03/3C286gbf
-/dataz/dsa110/T3//corr03/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr03/3C286gbf_header.json.sav
- 
-corr04
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr04
-/dataz/dsa110/T3//corr04/3C286gbf
-/dataz/dsa110/T3//corr04/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr04/3C286gbf_header.json.sav
- 
-corr05
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr05
-/dataz/dsa110/T3//corr05/3C286gbf
-/dataz/dsa110/T3//corr05/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr05/3C286gbf_header.json.sav
- 
-corr06
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr06
-/dataz/dsa110/T3//corr06/3C286gbf
-/dataz/dsa110/T3//corr06/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr06/3C286gbf_header.json.sav
- 
-corr07
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr07
-/dataz/dsa110/T3//corr07/3C286gbf
-/dataz/dsa110/T3//corr07/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr07/3C286gbf_header.json.sav
- 
-corr08
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr08
-/dataz/dsa110/T3//corr08/3C286gbf
-/dataz/dsa110/T3//corr08/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr08/3C286gbf_header.json.sav
- 
-corr10
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr10
-/dataz/dsa110/T3//corr10/3C286gbf
-/dataz/dsa110/T3//corr10/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr10/3C286gbf_header.json.sav
- 
-corr11
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr11
-/dataz/dsa110/T3//corr11/3C286gbf
-/dataz/dsa110/T3//corr11/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr11/3C286gbf_header.json.sav
- 
-corr12
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr12
-/dataz/dsa110/T3//corr12/3C286gbf
-/dataz/dsa110/T3//corr12/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr12/3C286gbf_header.json.sav
- 
-corr14
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr14
-/dataz/dsa110/T3//corr14/3C286gbf
-/dataz/dsa110/T3//corr14/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr14/3C286gbf_header.json.sav
- 
-corr15
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr15
-/dataz/dsa110/T3//corr15/3C286gbf
-/dataz/dsa110/T3//corr15/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr15/3C286gbf_header.json.sav
- 
-corr16
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr16
-/dataz/dsa110/T3//corr16/3C286gbf
-/dataz/dsa110/T3//corr16/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr16/3C286gbf_header.json.sav
- 
-corr18
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr18
-/dataz/dsa110/T3//corr18/3C286gbf
-/dataz/dsa110/T3//corr18/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr18/3C286gbf_header.json.sav
- 
-corr19
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr19
-/dataz/dsa110/T3//corr19/3C286gbf
-/dataz/dsa110/T3//corr19/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr19/3C286gbf_header.json.sav
- 
-corr21
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr21
-/dataz/dsa110/T3//corr21/3C286gbf
-/dataz/dsa110/T3//corr21/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr21/3C286gbf_header.json.sav
- 
-corr22
-/media/ubuntu/ssd/sherman/polcal_voltages/2022-12-18/3C286/corr22
-/dataz/dsa110/T3//corr22/3C286gbf
-/dataz/dsa110/T3//corr22/3C286gbf_data.out.sav
-/dataz/dsa110/T3//corr22/3C286gbf_header.json.sav
- 
+['/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286_2024-01-30/corr03_3C286fzg.out', '/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286_2024-01-30/corr03_3C286jgp.out', '/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286_2024-01-30/corr03_3C286jsr.out', '/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286_2024-01-30/corr03_3C286ouf.out', '/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/3C286_2024-01-30/corr03_3C286zrz.out']
+['3C286fzg', '3C286jgp', '3C286jsr', '3C286ouf', '3C286zrz']
+Finding beam for 3C286fzg...
+Done, beam = 227
+Finding beam for 3C286jgp...
+Done, beam = 19
+Finding beam for 3C286jsr...
+Done, beam = 175
+Finding beam for 3C286ouf...
+Done, beam = 123
+Finding beam for 3C286zrz...
+Done, beam = 71

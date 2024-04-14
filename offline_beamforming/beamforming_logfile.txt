@@ -1,0 +1,22 @@
+NA 240203aacl chromatica 2024-02-01T15:09:30 162 60343.831822 272.25
+/dataz/dsa110/operations/beamformer_weights/applied /dataz/dsa110/candidates/240203aacl/Level2/voltages/ /media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/240203aacl_chromatica
+/dataz/dsa110/candidates/240203aacl/Level2/voltages//240203aacl_sb00_data.out /dataz/dsa110/operations/beamformer_weights/applied/beamformer_weights_sb00_2024-02-01T15:09:30.dat
+AFTER TOOLKIT
+/dataz/dsa110/candidates/240203aacl/Level2/voltages//240203aacl_sb01_data.out /dataz/dsa110/operations/beamformer_weights/applied/beamformer_weights_sb01_2024-02-01T15:09:30.dat
+Using GPU 1
+Reading from /dataz/dsa110/candidates/240203aacl/Level2/voltages//240203aacl_sb01_data.out, no visibilities written
+Will write coherent filterbank to /media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/240203aacl_chromatica/corr04.out
+Using Stokes parameter 0
+Minimum baseline (m): 0
+Integrating by 1 ints - check that this is power of 2
+Assuming fch1 1487.031250 MHz
+Will weight voltages using /dataz/dsa110/operations/beamformer_weights/applied/beamformer_weights_sb01_2024-02-01T15:09:30.dat
+Will flag antennas using /home/ubuntu/proj/dsa110-shell/dsa110-xengine/scripts/flagants.dat
+Will rotate voltages to beam 162
+Will dedisperse to DM 272.250000, adding delay to 1530MHz
+initial memory allocation - please stay patient...
+Reading from file...
+Reading onto GPU...
+Dedispersing...
+Loaded antenna positions and weights
+starting loop

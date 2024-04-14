@@ -15,7 +15,7 @@ import copy
 import glob
 import csv
 import pandas as pd
-
+import pickle as pkl
 from numpy.ma import masked_array as ma
 from scipy.stats import kstest
 from scipy.optimize import curve_fit
@@ -45,7 +45,7 @@ from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u
-
+import os
 """
 This file contains code for the Polarization Analysis and RM Synthesis Enabled for Calibration (PARSEC)
 user interface to the dsa110-pol module. The interface will use Mercury and a jupyter notebook to 
@@ -82,6 +82,10 @@ RMSF_generated = False
 unbias_factor = 1 #1.57
 default_path = "/media/ubuntu/ssd/sherman/code/"
 
+"""
+Repo path
+"""
+repo_path = "/media/ubuntu/ssd/sherman/code/dsa110-pol/"
 
 """
 Read FRB parameters
@@ -628,6 +632,9 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
     #update calibrator date
     polcal_dict['polcal_create_file'] = polcaldate_create_menu.value
+
+    #update find beam data
+    polcal_dict['polcal_findbeams_file'] = polcaldate_findbeams_menu.value 
     
 
     #update polcal dict with calibrator files that have voltages, bf weights available
@@ -705,28 +712,49 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         polcal.beamform_polcal(polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C286'],'3C286',polcal_dict['polcal_avail_date'])
     
     #if findbeam button clicked find the beams for each cal observation
+    beam_dict_3C48 = dict()
+    beam_dict_3C286 = dict()
     if findbeams_button.clicked:
 
-        #find beams and plot 
-        plt.figure(figsize=(12,12))
-        beam_dict_3C48 = polcal.get_source_beams(polcaldate_findbeams_menu.value,'3C48')
-        beam_dict_3C286 = polcal.get_source_beams(polcaldate_findbeams_menu.value,'3C286')
         
-        plt.subplot(211)
-        for k in beam_dict_3C48.keys():
-            plt.plot(np.linspace(256),beam_dict_3C48[k]['beamspectrum'],label=k)
-        plt.legend()
-        plt.title('3C48')
-        plt.xlabel("Beam Number")
+        #run beam finder in the background
+        print("python " + repo_path + "/scripts/find_beams.py " + str('3C48') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
+        os.system("python " + repo_path + "/scripts/find_beams.py " + str('3C48') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
+        print("python " + repo_path + "/scripts/find_beams.py " + str('3C286') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
+        os.system("python " + repo_path + "/scripts/find_beams.py " + str('3C286') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
 
-        plt.subplot(212)
-        for k in beam_dict_3C48.keys():
-            plt.plot(np.linspace(256),beam_dict_3C48[k]['beamspectrum'],label=k)
-        plt.legend()
-        plt.title('3C286')
-        plt.xlabel("Beam Number")
-        plt.show()
+        
+    #look to see if beam dicts have been saved 
+    fs = os.listdir(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/")
+    if "3C48_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl" in fs:
+        f = open(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/3C48_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl","rb")
+        beam_dict_3C48 = pkl.load(f)
+        f.close()
 
+    fs = os.listdir(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/")
+    if "3C286_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl" in fs:
+        f = open(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/3C286_" + polcal_dict['polcal_findbeams_file'] + "_beams.pkl","rb")
+        beam_dict_3C286 = pkl.load(f)
+        f.close()
+
+    #plot
+    plt.figure(figsize=(18,9))
+    plt.subplot(121)
+    for k in beam_dict_3C48.keys():
+        plt.plot(beam_dict_3C48[k]['beamspectrum'],label=k)
+    plt.legend()
+    plt.title('3C48')
+    plt.xlabel("Beam Number")
+
+    plt.subplot(122)
+    for k in beam_dict_3C286.keys():
+        plt.plot(beam_dict_3C286[k]['beamspectrum'],label=k)
+    plt.legend()
+    plt.title('3C286')
+    plt.yticks([])
+    plt.xlabel("Beam Number")
+    plt.subplots_adjust(wspace=0)
+    plt.show()
 
 
 

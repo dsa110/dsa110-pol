@@ -216,16 +216,19 @@ def get_source_beams(caldate,calname,path=output_path):
     #get observation names
     obs_files = glob.glob(path + calname + "_" + caldate + "/corr03_" + calname + "*.out")
     obs_ids = [f[-len(calname)-3-4:-4] for f in obs_files]
+    print(obs_files)
+    print(obs_ids)
 
     #loop through files and get beam numbers
     beam_dict = dict()
-    for obs_id in obs_ids:
-        print("Finding beam for " + obs_id + "...",end='')
+    for obs_id in obs_ids:#[0:1]:
+        print("Finding beam for " + obs_id + "...")
         bout = dsapol.find_beam("_" + obs_id,shape=(16,7680,256),path=path + calname + "_" + caldate + "/",plot=False)
         beam_dict[obs_id] = dict()
         beam_dict[obs_id]['beam'] = bout[0]
-        beam_dict[obs_id]['beamspectrum'] = bout.mean(0).mean(0)
+        beam_dict[obs_id]['beamspectrum'] = bout[1].mean(0).mean(0)
         print("Done, beam = " + str(beam_dict[obs_id]['beam']))
+
     return beam_dict
 
 
