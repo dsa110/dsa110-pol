@@ -22,7 +22,7 @@ logfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/polcal_
 output_path = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 bfweights_path = "/dataz/dsa110/operations/beamformer_weights/generated/"
 bfweights_output_path = "/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/"
-
+middle_beam = 125
 
 #### Functions for copying voltages from T3 to working dir for given observing date ####
 def get_voltages(calname,timespan=timedelta(days=365*2),path=data_path):
@@ -91,7 +91,7 @@ def copy_voltages(filenames,caldate,calname,path=data_path,new_path=voltage_copy
 
 #### Functions to find and copy beamformer weights for given observation ####
 VLANAME_DICT = {"3C48":"0137+331","3C286":"1331+305"}
-def get_bfweights(filenames,calname,path=bfweights_path,voltage_path=data_path):
+def get_bfweights(filenames,calname,path=bfweights_path,voltage_path=data_path,xtend='corr03'):
     """
     This function finds the beamformer weights most recent before the 
     observation.
@@ -102,17 +102,18 @@ def get_bfweights(filenames,calname,path=bfweights_path,voltage_path=data_path):
     
     #make a list of their isot times
     allbfweightdates = np.array([Time(allbfweightfiles[i][-23:-4],format='isot') for i in range(len(allbfweightfiles))])
-
+    #print(allbfweightfiles)
     #get mjd from one of the json file (b/c dict only saves the day, not time)
     mjd = np.nan
-    print(filenames)
+    #print(filenames)
     for fname in filenames:
         if 'json' in fname:
-            f = open(voltage_path + "corr03/" + fname,'r')
+            f = open(voltage_path + xtend + "/" + fname,'r')
             mjd = json.load(f)[fname[:len(calname)+3]]['mjds']
             f.close()
             break
     if np.isnan(mjd):
+        #print(voltage_path + "corr03/" + fname,mjd)
         #raise ValueError("No json with mjd found")
         return []
     obstime = Time(mjd,format='mjd').datetime
@@ -123,9 +124,10 @@ def get_bfweights(filenames,calname,path=bfweights_path,voltage_path=data_path):
     #ignore those from after the observation
     tdeltas[tdeltas < 0] = np.inf
     bestidx = np.argmin(tdeltas)
+    #print(path + "*beamformer_weights_sb*" + VLANAME_DICT[calname] + "*" + allbfweightdates[bestidx].isot + ".dat")
 
     #now get all files
-    bestbfweights = glob.glob(path + "*beamformer_weights_sb*" + VLANAME_DICT[calname] + "*" + allbfweightdates[bestidx].isot + ".dat")
+    bestbfweights = glob.glob(path + "*beamformer_weights_sb*" + VLANAME_DICT[calname] + "*" + allbfweightdates[bestidx].isot[:19] + ".dat")
     bestbfweights = np.array([bestbfweights[i][len(path):] for i in range(len(bestbfweights))]) 
     
     return bestbfweights
@@ -285,3 +287,31 @@ def make_cal_filterbanks(calname,caldate,calid,bfweights,ibeam,mjd,path=output_p
     return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash NA "
             + str(calid) + " " + str(calname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " 0 " + str(caldate) +
             " 2>&1 > " + logfile + " &")
+
+
+
+### Functions to compute, filter, and combine solutions ###
+
+def get_best_beam(beam_dict):
+    """
+    Returns the obs id and beam closest to middle_beam (125 for DSA-64)
+    """
+
+    names = []
+    beams = []
+    for k in beam_dict.keys():
+        names.append(str(k))
+        beams.append(beam_dict[k]['beam'])
+    idx = np.argmin(np.abs(np.array(beams) - middle_beam))
+    return names[idx],beams[idx]
+
+def get_calfil_files(calname,caldate,path=output_path):
+    """
+    This function returns the filterbank files available for a given calibrator and 
+    observation date
+    """
+
+    obs_files = glob.glob(path + calname + "_" + caldate + "/" + calname + "*0.fil")
+    obs_ids = [f[-len(calname)-3-10:-10] for f in obs_files]
+
+    return obs_files,obs_ids

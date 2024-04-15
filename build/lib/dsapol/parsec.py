@@ -603,7 +603,7 @@ def read_polcal(polcaldate,path=default_path):
 
 
 
-def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,
+def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
         polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display):
     
     """
@@ -750,25 +750,54 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         beam_dict_3C286 = pkl.load(f)
         f.close()
 
+    """
+    #add best beams to dict
+    if len(beam_dict_3C48.keys()) > 0:
+        polcal_dict['cal_name_3C48_center'],polcal_dict['cal_beam_3C48_center'] = polcal.get_best_beam(beam_dict_3C48)
+    if len(beam_dict_3C286.keys()) > 0:
+        polcal_dict['cal_name_3C286_center'],polcal_dict['cal_beam_3C286_center'] = polcal.get_best_beam(beam_dict_3C286)
+    """
+
+    #but use the obs selected from the menu
+    polcal_dict['cal_name_3C48'] = obsid3C48_menu.value
+    polcal_dict['cal_name_3C286'] = obsid3C286_menu.value
+    if polcal_dict['cal_name_3C48'] != '':
+        polcal_dict['cal_beam_3C48'] = beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam']
+    else:
+        polcal_dict['cal_beam_3C48'] = np.nan
+    if polcal_dict['cal_name_3C286'] != '':
+        polcal_dict['cal_beam_3C286'] = beam_dict_3C286[polcal_dict['cal_name_3C286']]['beam']
+    else:
+        polcal_dict['cal_beam_3C286'] = np.nan
 
     #plot
     plt.figure(figsize=(20,9))
     plt.subplot(121)
     for k in beam_dict_3C48.keys():
         df_beams.loc[str(k)] = [beam_dict_3C48[k]['beam'],beam_dict_3C48[k]['mjd'],beam_dict_3C48[k]['bf_weights']]
-        plt.plot(beam_dict_3C48[k]['beamspectrum'],label=k)
+        if str(k) == polcal_dict['cal_name_3C48']:
+            plt.plot(beam_dict_3C48[k]['beamspectrum'],label=k,linewidth=5)
+        else:
+            plt.plot(beam_dict_3C48[k]['beamspectrum'],label=k)
     plt.legend(loc='upper left')
     plt.title('3C48 ' + str(polcal_dict['polcal_findbeams_file']))
     plt.xlabel("Beam Number")
+    plt.axvline(polcal.middle_beam,color='black')
 
     plt.subplot(122)
     for k in beam_dict_3C286.keys():
         df_beams.loc[str(k)] = [beam_dict_3C286[k]['beam'],beam_dict_3C286[k]['mjd'],beam_dict_3C286[k]['bf_weights']]
-        plt.plot(beam_dict_3C286[k]['beamspectrum'],label=k)
+        if str(k) == polcal_dict['cal_name_3C286']:
+            plt.plot(beam_dict_3C286[k]['beamspectrum'],label=k,linewidth=5)
+        else:
+            plt.plot(beam_dict_3C286[k]['beamspectrum'],label=k)
     plt.legend(loc='upper left')
     plt.title('3C286 ' + str(polcal_dict['polcal_findbeams_file']))
     plt.yticks([])
     plt.xlabel("Beam Number")
+    plt.axvline(polcal.middle_beam,color='black')
+
+
     plt.subplots_adjust(wspace=0)
     plt.show()
 
@@ -786,8 +815,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
 
 
-
-    return
+    return beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 
 
 """
