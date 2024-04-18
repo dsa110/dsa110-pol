@@ -599,15 +599,16 @@ def read_polcal(polcaldate,path=default_path):
                 gyy = np.array(row[1:],dtype="complex")
             if row[0] == "freq_axis":
                 freq_axis = np.array(row[1:],dtype="float")
+        
     return gxx,gyy,freq_axis
 
 
-
 def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
-        polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,makesolbutton,ParA_display,
+        polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display,
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
-        phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider):
+        phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider,savecalsolnbutton,
+                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag):
     
     """
     This function updates the polarization calibration screen
@@ -654,24 +655,6 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C286'] = polcal.get_all_calfiles(polcaldate_bf_menu.value,'3C286')
     else:
         polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
-    #display
-    fig=plt.figure(figsize=(18,14))
-    plt.subplot(311)
-    plt.xticks([])
-    plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
-    plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gxx'])/np.abs(state_dict['gyy']))
-
-    plt.subplot(312)
-    plt.xticks([])
-    plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
-    plt.plot(state_dict['cal_freq_axis'],np.angle(state_dict['gxx'])-np.angle(state_dict['gyy']))
-
-    plt.subplot(313)
-    plt.xlabel("Frequency (MHz)")
-    plt.ylabel(r'$|g_{yy}|$')
-    plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']))
-    plt.subplots_adjust(hspace=0)
-    plt.show()
 
     if polcalbutton.clicked:
 
@@ -820,51 +803,93 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     #if make solution button pushed, make solution and plot
     if (polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "":
         plt.figure(figsize=(18,20))
+        
+        #get previous cal solution
+        last_caldate,last_calobs1,last_calobs2,last_calnum = polcal.get_last_calmeta()
+        last_calnum =int(last_calnum)
+
+        #read cal solution
+        last_gxx,last_gyy,last_cal_freq_axis = read_polcal('POLCAL_PARAMETERS_' + last_caldate + '.csv')#,fit=False)
+        #last_gxx_fit,last_gyy_fit,last_cal_freq_axis_fit = read_polcal('POLCAL_PARAMETERS_' + last_caldate + '.csv') 
+        
         plt.subplot(311)
+        plt.plot(last_cal_freq_axis,np.abs(last_gyy),color='grey',label='Old Soln (' + last_caldate + ')')
+        #plt.plot(last_cal_freq_axis_fit,np.abs(last_gyy_fit),color='black',label='Old Fit Soln (' + last_caldate + ')')
         plt.ylabel(r'$|g_{yy}|$')
         plt.xticks([])
 
         plt.subplot(312)
+        plt.plot(last_cal_freq_axis,np.abs(last_gxx)/np.abs(last_gyy),color='grey',label='Old Soln (' + last_caldate + ')')
+        #plt.plot(last_cal_freq_axis_fit,np.abs(last_gxx_fit)/np.abs(last_gyy_fit),color='black',label='Old Fit Soln (' + last_caldate + ')')
         plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
         plt.xticks([])
 
         plt.subplot(313)
+        plt.plot(last_cal_freq_axis,np.angle(last_gxx) - np.angle(last_gyy),color='grey',label='Old Soln (' + last_caldate + ')')
+        #plt.plot(last_cal_freq_axis_fit,np.angle(last_gxx_fit) - np.angle(last_gyy_fit),color='black',label='Old Fit Soln (' + last_caldate + ')')
         plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
         plt.xlabel(r'Frequency (MHz)')
 
         plt.subplots_adjust(hspace=0)
     if polcal_dict['cal_name_3C48'] != "" and polcal_dict['polcal_findbeams_file'] != "":
         #make abs gain solution
-        GY_fit,GY_fullres,freq_test = polcal.abs_gyy_solution(polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C48'],beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam'],
+        GY_fit,GY_fit_sf, GY_fullres,GY_fullres_sf,GY_fullres_i,freq_test = polcal.abs_gyy_solution(np.abs(last_gyy),last_calnum,polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C48'],beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam'],
                                                             edgefreq=edgefreq_slider.value,
                                                             breakfreq=breakfreq_slider.value,
                                                             sf_window_weights=sf_window_weight_cals.value,sf_order=sf_order_cals.value,peakheight=peakheight_slider.value,
-                                                            padwidth=peakwidth_slider.value,deg=polyfitorder_slider.value)
+                                                            padwidth=peakwidth_slider.value,deg=polyfitorder_slider.value,sfflag=sfflag.value,polyfitflag=polyfitflag.value)
         polcal_dict['GY'] = GY_fullres
         polcal_dict['GY_fit'] = GY_fit
+        polcal_dict['GY_fit_sf'] = GY_fit_sf
+        polcal_dict['GY_sf'] = GY_fullres_sf
         polcal_dict['cal_freq_axis'] = freq_test[0]
         
         #make gain ratio solution
-        ratio_fit,ratio_fullres,freq_test = polcal.gain_solution(polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C48'],beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam'],
+        ratio_fit,ratio_fit_sf,ratio_fullres,ratio_fullres_sf,ratio_fullres_i,freq_test = polcal.gain_solution(np.abs(last_gxx)/np.abs(last_gyy),last_calnum,polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C48'],beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam'],
                                                             edgefreq=ratio_edgefreq_slider.value,
                                                             breakfreq=ratio_breakfreq_slider.value,
                                                             sf_window_weights=ratio_sf_window_weight_cals.value,sf_order=ratio_sf_order_cals.value,peakheight=ratio_peakheight_slider.value,
-                                                            padwidth=ratio_peakwidth_slider.value,deg=ratio_polyfitorder_slider.value)
+                                                            padwidth=ratio_peakwidth_slider.value,deg=ratio_polyfitorder_slider.value,sfflag=ratio_sfflag.value,polyfitflag=ratio_polyfitflag.value)
         polcal_dict['ratio'] = ratio_fullres
         polcal_dict['ratio_fit'] = ratio_fit
+        polcal_dict['ratio_fit_sf'] = ratio_fit_sf
+        polcal_dict['ratio_sf'] = ratio_fullres_sf
         polcal_dict['cal_freq_axis'] = freq_test[0]
 
         plt.subplot(311)
-        plt.plot(freq_test[0],GY_fullres)
-        plt.plot(freq_test[0],GY_fit)
+        plt.plot(freq_test[0],GY_fullres_i,label='New Soln')
+        lw=1
+        if (not polyfitflag.value) and (not sfflag.value): lw = 3
+        c=plt.plot(freq_test[0],GY_fullres,label='Mean Soln',lw=lw)
+        lw=1
+        if (not polyfitflag.value) and (sfflag.value): lw = 3
+        plt.plot(freq_test[0],GY_fullres_sf,label='Mean SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
+        lw=1
+        if (polyfitflag.value) and (not sfflag.value): lw = 3
+        c=plt.plot(freq_test[0],GY_fit,label='Mean Fit Soln',lw=lw)
+        lw=1
+        if (polyfitflag.value) and (sfflag.value): lw = 3
+        plt.plot(freq_test[0],GY_fit_sf,label='Mean Fit SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
         plt.ylabel(r'$|g_{yy}|$')
         plt.xticks([])
         plt.axvline(edgefreq_slider.value,color='black',linewidth=3)
         plt.axvline(breakfreq_slider.value,color='red',linewidth=3)
+        plt.legend(loc='upper left',fontsize=20,frameon=True,ncol=2)
         
         plt.subplot(312)
-        plt.plot(freq_test[0],ratio_fullres)
-        plt.plot(freq_test[0],ratio_fit)
+        plt.plot(freq_test[0],ratio_fullres_i,label='New Soln')
+        lw=1
+        if (not ratio_polyfitflag.value) and (not ratio_sfflag.value): lw = 3
+        c=plt.plot(freq_test[0],ratio_fullres,label='Mean Soln',lw=lw)
+        lw=1
+        if (not ratio_polyfitflag.value) and (ratio_sfflag.value): lw = 3
+        plt.plot(freq_test[0],ratio_fullres_sf,label='Mean SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
+        lw=1
+        if (ratio_polyfitflag.value) and (not ratio_sfflag.value): lw = 3
+        c=plt.plot(freq_test[0],ratio_fit,label='Mean Fit Soln',lw=lw)
+        lw=1
+        if (ratio_polyfitflag.value) and (ratio_sfflag.value): lw = 3
+        plt.plot(freq_test[0],ratio_fit_sf,label='Mean Fit SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
         plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
         plt.xticks([])
         plt.axvline(ratio_edgefreq_slider.value,color='black',linewidth=3)
@@ -873,20 +898,77 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     if polcal_dict['cal_name_3C286'] != "" and polcal_dict['polcal_findbeams_file'] != "":
 
         #make phase diff solution
-        phase_fit,phase_fullres,freq_test = polcal.phase_solution(polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C286'],beam_dict_3C286[polcal_dict['cal_name_3C286']]['beam'],
+        phase_fit,phase_fit_sf,phase_fullres,phase_fullres_sf,phase_fullres_i,freq_test = polcal.phase_solution(np.angle(last_gxx)-np.angle(last_gyy),last_calnum,polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C286'],beam_dict_3C286[polcal_dict['cal_name_3C286']]['beam'],
                                                             sf_window_weights=phase_sf_window_weight_cals.value,sf_order=phase_sf_order_cals.value,peakheight=phase_peakheight_slider.value,
-                                                            padwidth=phase_peakwidth_slider.value,deg=phase_polyfitorder_slider.value)
+                                                            padwidth=phase_peakwidth_slider.value,deg=phase_polyfitorder_slider.value,sfflag=phase_sfflag.value,polyfitflag=phase_polyfitflag.value)
         polcal_dict['phase'] = phase_fullres
+        polcal_dict['phase_fit_sf'] = phase_fit_sf
         polcal_dict['phase_fit'] = phase_fit
+        polcal_dict['phase_sf'] = phase_fullres_sf
         polcal_dict['cal_freq_axis'] = freq_test[0]
 
         plt.subplot(313)
-        plt.plot(freq_test[0],phase_fullres)
-        plt.plot(freq_test[0],phase_fit)
-
+        plt.plot(freq_test[0],phase_fullres_i,label='New Soln')
+        lw=1
+        if (not phase_polyfitflag.value) and (not phase_sfflag.value): lw = 3
+        c=plt.plot(freq_test[0],phase_fullres,label='Mean Soln',lw=lw)
+        lw=1
+        if (not phase_polyfitflag.value) and (phase_sfflag.value): lw = 3
+        plt.plot(freq_test[0],phase_fullres_sf,label='Mean SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
+        lw=1
+        if (phase_polyfitflag.value) and (not phase_sfflag.value): lw = 3
+        c=plt.plot(freq_test[0],phase_fit,label='Mean Fit Soln',lw=lw)
+        lw=1
+        if (phase_polyfitflag.value) and (phase_sfflag.value): lw = 3
+        plt.plot(freq_test[0],phase_fit_sf,label='Mean Fit SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
     plt.show()
 
+
+    #if save button clicked, write to file
+    if savecalsolnbutton.clicked:
+        if polyfitflag.value and sfflag.value: GY_USE=polcal_dict['GY_fit_sf']
+        elif polyfitflag.value: GY_USE = polcal_dict['GY_fit']
+        elif sfflag.value: GY_USE = polcal_dict['GY_sf'] 
+        else: GY_USE = polcal_dict['GY']
+
+        if ratio_polyfitflag.value and ratio_sfflag.value: ratio_USE = polcal_dict['ratio_fit_sf']
+        elif ratio_polyfitflag.value: ratio_USE = polcal_dict['ratio_fit']
+        elif ratio_sfflag.value: ratio_USE = polcal_dict['ratio_sf']
+        else: ratio_USE = polcal_dict['ratio']
+
+        if phase_polyfitflag.value and phase_sfflag.value: phase_USE = polcal_dict['phase_fit_sf']
+        elif phase_polyfitflag.value: phase_USE = polcal_dict['phase_fit']
+        elif phase_sfflag.value: phase_USE = polcal_dict['phase_sf']
+        else: phase_USE = polcal_dict['phase']
+
+        polcal_dict['gxx'],polcal_dict['gyy'] = dsapol.get_calmatrix_from_ratio_phasediff(ratio_USE,phase_USE,GY_USE)
+        polcal_dict['new_cal_file'] = polcal.write_polcal_solution(polcal_dict['cal_name_3C48'],polcal_dict['cal_name_3C286'],last_calnum,
+                                    polcal_dict['ratio'],polcal_dict['ratio_fit'],polcal_dict['ratio_sf'],polcal_dict['ratio_fit_sf'],
+                                    polcal_dict['phase'],polcal_dict['phase_fit'],polcal_dict['phase_sf'],polcal_dict['phase_fit_sf'],
+                                    polcal_dict['GY'],polcal_dict['GY_fit'],polcal_dict['GY_sf'],polcal_dict['GY_fit_sf'],
+                                    polcal_dict['gxx'],polcal_dict['gyy'],polcal_dict['cal_freq_axis'])
+        print(polcal_dict['new_cal_file'])
         
+    #if using current cal solution, display
+    fig=plt.figure(figsize=(18,14))
+    plt.subplot(312)
+    plt.title(state_dict['polcalfile'])
+    plt.xticks([])
+    plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+    plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gxx'])/np.abs(state_dict['gyy']))
+
+    plt.subplot(313)
+    plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+    plt.plot(state_dict['cal_freq_axis'],np.angle(state_dict['gxx'])-np.angle(state_dict['gyy']))
+    plt.xlabel("Frequency (MHz)")
+
+    plt.subplot(311)
+    plt.xticks([])
+    plt.ylabel(r'$|g_{yy}|$')
+    plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']))
+    plt.subplots_adjust(hspace=0)
+    plt.show()
+
 
     return beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 

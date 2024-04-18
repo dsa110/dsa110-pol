@@ -58,6 +58,8 @@ logfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/polcal_
 output_path = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 bfweights_path = "/dataz/dsa110/operations/beamformer_weights/generated/"
 bfweights_output_path = "/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/"
+lastcalfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/interface/last_cal_metadata.txt"
+
 middle_beam = 125
 
 #### Functions for copying voltages from T3 to working dir for given observing date ####
@@ -427,7 +429,7 @@ def piecewise_polyfit(GY_fullres,freq_test_fullres,edgefreq=1418,breakfreq=1418,
    
     return GY_fit,GY_fit1,GY_fit2
 
-def abs_gyy_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,p=p_3C48,chi=chi_3C48,RM=RM_3C48,RA=RA_3C48,DEC=DEC_3C48,path=output_path,edgefreq=1418,breakfreq=1418,sf_window_weights=255,sf_order=5,peakheight=2,padwidth=10,deg=5):
+def abs_gyy_solution(last_cal_soln,last_cal_num,caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,p=p_3C48,chi=chi_3C48,RM=RM_3C48,RA=RA_3C48,DEC=DEC_3C48,path=output_path,edgefreq=1418,breakfreq=1418,sf_window_weights=255,sf_order=5,peakheight=2,padwidth=10,deg=5,sfflag=False,polyfitflag=False):
     """
     This function uses the 3C48 calibrator observation given to compute the absolute gain in the y feed.
     """
@@ -471,22 +473,26 @@ def abs_gyy_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,p=p_3C
     (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = dsapol.get_stokes_2D(gain_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
     idx = np.isfinite(GX)
     f_GX= interp1d(freq_test[0][idx],GX[idx],kind="linear",fill_value="extrapolate")
-    GX_fullres = f_GX(freq_test_fullres[0])
+    GX_fullres_i = f_GX(freq_test_fullres[0])
 
     idx = np.isfinite(GY)
     f_GY= interp1d(freq_test[0][idx],GY[idx],kind="linear",fill_value="extrapolate")
-    GY_fullres = f_GY(freq_test_fullres[0])
+    GY_fullres_i = f_GY(freq_test_fullres[0])
+
+    #average with past solution
+    GY_fullres = average_cal_solution(GY_fullres_i,last_cal_soln,last_cal_num)
 
     #piecewise cubic spline fit
     GY_fit,GY_fit1,GY_fit2 = piecewise_polyfit(GY_fullres,freq_test_fullres,edgefreq=edgefreq,breakfreq=breakfreq,deg=deg) 
+    
+    if sf_window_weights >= 5 and sf_window_weights > sf_order:# and sfflag:
+        #savgol filter
+        GY_fit_sf = sf(GY_fit,sf_window_weights,sf_order)
+        GY_fullres_sf = sf(GY_fullres,sf_window_weights,sf_order)
+    return GY_fit, GY_fit_sf, GY_fullres, GY_fullres_sf, GY_fullres_i, freq_test_fullres
 
-    #savgol filter
-    GY_fit = sf(GY_fit,sf_window_weights,sf_order)
 
-    return GY_fit, GY_fullres,freq_test_fullres
-
-
-def gain_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=output_path,edgefreq=1360,breakfreq=1360,sf_window_weights=255,sf_order=5,peakheight=3,padwidth=10,deg=5):
+def gain_solution(last_cal_soln,last_cal_num,caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=output_path,edgefreq=1360,breakfreq=1360,sf_window_weights=255,sf_order=5,peakheight=3,padwidth=10,deg=5,sfflag=False,polyfitflag=False):
     """
     This function uses the 3C48 calibrator observation given to compute the ratio of gains in x and y feeds.
     """
@@ -503,19 +509,25 @@ def gain_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=outp
     (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = dsapol.get_stokes_2D(gain_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
     idx = np.isfinite(ratio_2)
     f_ratio = interp1d(freq_test[0][idx],ratio_2[idx],kind="linear",fill_value="extrapolate")
-    ratio_fullres = f_ratio(freq_test_fullres[0])
+    ratio_fullres_i = f_ratio(freq_test_fullres[0])
+
+    #average with past solution
+    ratio_fullres = average_cal_solution(ratio_fullres_i,last_cal_soln,last_cal_num)
 
     #piecewise fit
     ratio_fit,ratio_fit1,ratio_fit2 = piecewise_polyfit(ratio_fullres,freq_test_fullres,edgefreq=edgefreq,breakfreq=breakfreq,deg=deg)
 
-    #savgol filter
-    ratio_fit = sf(ratio_fit,sf_window_weights,sf_order)
+    if sf_window_weights >= 5 and sf_window_weights > sf_order:# and sfflag:
+        #savgol filter
+        ratio_fit_sf = sf(ratio_fit,sf_window_weights,sf_order)
+        ratio_fullres_sf = sf(ratio_fullres,sf_window_weights,sf_order)
 
-    return ratio_fit, ratio_fullres, freq_test_fullres
+
+    return ratio_fit, ratio_fit_sf, ratio_fullres, ratio_fullres_sf, ratio_fullres_i, freq_test_fullres
 
 
 
-def phase_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=output_path,sf_window_weights=255,sf_order=5,peakheight=3,padwidth=10,deg=5):
+def phase_solution(last_cal_soln,last_cal_num,caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=output_path,sf_window_weights=255,sf_order=5,peakheight=3,padwidth=10,deg=5,sfflag=False,polyfitflag=False):
     """
     This function uses the 3C286 calibrator observation given to compute the phase difference in x and y feeds.
     """
@@ -532,17 +544,92 @@ def phase_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=out
     (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = dsapol.get_stokes_2D(phase_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
     idx = np.isfinite(phase_2)
     f_phase = interp1d(freq_test[0][idx],phase_2[idx],kind="linear",fill_value="extrapolate")
-    phase_fullres = f_phase(freq_test_fullres[0])
+    phase_fullres_i = f_phase(freq_test_fullres[0])
+
+    #average with past solution
+    phase_fullres = average_cal_solution(phase_fullres_i,last_cal_soln,last_cal_num)
 
     # fit
     phase_fit = np.zeros(len(phase_2))
     for i in range(len(phase_params_2)):
         phase_fit += phase_params_2[i]*(freq_test_fullres[0]**(len(phase_params_2)-i-1))
 
-    #savgol filter
-    phase_fit = sf(phase_fit,sf_window_weights,sf_order)
+    if sf_window_weights >= 5 and sf_window_weights > sf_order:# and sfflag:
+        #savgol filter
+        phase_fit_sf = sf(phase_fit,sf_window_weights,sf_order)
+        phase_fullres_sf = sf(phase_fullres,sf_window_weights,sf_order)
 
-    return phase_fit, phase_fullres, freq_test_fullres
+    return phase_fit, phase_fit_sf, phase_fullres, phase_fullres_sf, phase_fullres_i, freq_test_fullres
 
 ### functions to merge with previous cal solution
 
+def get_last_calmeta(filename=lastcalfile):
+    """
+    This function pulls metadata for the previous calibrator observation needed to 
+    properly average with subsequent observations.
+    """
+
+    dat = []
+    with open(filename,"r") as f:
+        rdr = csv.reader(f,delimiter=',')
+        for row in rdr:
+            dat.append(row[0])
+    return dat
+
+def update_last_calmeta(caldate,calid1,calid2,lastnumobs,filename=lastcalfile):
+    """
+    This function updates the metadata with new calibrator observation. The caldate should be
+    given in the format YY-MM-DD
+    """
+
+    with open(filename,"w") as f:
+        wr = csv.writer(f,delimiter=',')
+        wr.writerow([caldate])
+        wr.writerow([calid1])
+        wr.writerow([calid2])
+        wr.writerow([lastnumobs+1])
+    return lastnumobs+1
+    
+def average_cal_solution(cal_new,cal_old,cal_numobs):
+    """
+    This function averages together the new calibration solution with the previous solution
+    """
+    
+    return (np.array(cal_new) + np.array(cal_old)*cal_numobs)/(cal_numobs + 1)
+
+def write_polcal_solution(calid1,calid2,lastnumobs,ratio_fullavg,ratio_fit,ratio_sf,ratio_fit_sf,
+                                                   phase_fullavg,phase_fit,phase_sf,phase_fit_sf,
+                                                   GY_fullavg,GY_fit,GY_sf,GY_fit_sf,gxx_final,gyy_final,freq_axis,metafilename=lastcalfile):
+    """
+    This function writes the new calibrator solution to a file labelled 'POLCAL_PARAMETERS' with today's date, and updates metadata
+    in the lastcalfile
+    """
+
+    #get today's date
+    today = Time.now().to_datetime()
+    new_date = str(today.year)[-2:] + "-" + f"{today.month:02}" + "-" + f"{today.day:02}"
+    new_filename = "POLCAL_PARAMETERS_" + new_date + ".csv"
+    
+    #write solution file
+    with open("/media/ubuntu/ssd/sherman/code/" + new_filename,'w',newline='') as csvfile:
+        writer = csv.writer(csvfile,delimiter=',')
+        writer.writerow(np.concatenate([["|gxx|/|gyy|"],ratio_fullavg]))
+        writer.writerow(np.concatenate([["|gxx|/|gyy| fit"],ratio_fit]))
+        writer.writerow(np.concatenate([["|gxx|/|gyy| sf"],ratio_sf]))
+        writer.writerow(np.concatenate([["|gxx|/|gyy| fit sf"],ratio_fit_sf]))
+        writer.writerow(np.concatenate([["phixx-phiyy"],phase_fullavg]))
+        writer.writerow(np.concatenate([["phixx-phiyy fit"],phase_fit]))
+        writer.writerow(np.concatenate([["phixx-phiyy sf"],phase_sf]))
+        writer.writerow(np.concatenate([["phixx-phiyy fit sf"],phase_fit_sf]))
+        writer.writerow(np.concatenate([["|gyy|"],GY_fullavg]))
+        writer.writerow(np.concatenate([["|gyy| fit"],GY_fit]))
+        writer.writerow(np.concatenate([["|gyy| sf"],GY_sf]))
+        writer.writerow(np.concatenate([["|gyy| fit sf"],GY_fit_sf]))
+        writer.writerow(np.concatenate([["gxx"],gxx_final]))
+        writer.writerow(np.concatenate([["gyy"],gyy_final]))
+        writer.writerow(np.concatenate([["freq_axis"],freq_axis]))
+
+    #update metadata
+    update_last_calmeta(caldate=new_date,calid1=calid1,calid2=calid2,lastnumobs=lastnumobs,filename=metafilename)
+
+    return new_filename
