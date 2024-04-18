@@ -86,17 +86,19 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=Fal
     if alpha:
         labels=["I","Q","U","V"]
     for ii in range(4):
-        print("Reading stokes param..." + str(ii),end="")
+        if verbose:
+            print("Reading stokes param..." + str(ii),end="")
         if alpha:
             fn = '%s_%s.fil'%(sdir,labels[ii])
         else:
             fn = '%s_%d.fil'%(sdir,ii)
-        d = read_fil_data_dsa(fn, start=start, stop=nsamp)[0]
+        d = read_fil_data_dsa(fn, start=start, stop=nsamp,verbose=verbose)[0]
         #if d == 0:
             #print("Failed to read file: " + fn + ", returning 0")
          
         stokes_arr.append(d.astype(dtype))
-        print("Done!")
+        if verbose:
+            print("Done!")
     stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
     return stokes_arr
 
@@ -117,12 +119,13 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False,st
         print("Reading stokes parameters from " + sdir)
     stokes_arr=[]
     ii =0
-    print("Reading stokes param..." + str(ii),end="")
+    if verbose:
+        print("Reading stokes param..." + str(ii),end="")
     if alpha:
         fn = '%s_%s.fil'%(sdir,"I")
     else:
         fn = '%s_%d.fil'%(sdir,ii)
-    d = read_fil_data_dsa(fn, start=start, stop=nsamp)[0]
+    d = read_fil_data_dsa(fn, start=start, stop=nsamp,verbose=verbose)[0]
     #if d == 0:
         #print("Failed to read file: " + fn + ", returning 0")
     return d.astype(np.float16)
@@ -132,7 +135,7 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False,st
     #return stokes_arr
 
 #Creates freq, time axes
-def create_freq_time(sdir,nsamp=10240,alpha=False,start=0):#1500):
+def create_freq_time(sdir,nsamp=10240,alpha=False,start=0,verbose=False):#1500):
     """
     This function creates frequency and time axes from stokes filterbank headers
 
@@ -150,7 +153,7 @@ def create_freq_time(sdir,nsamp=10240,alpha=False,start=0):#1500):
             fn = '%s_%s.fil'%(sdir,labels[ii])
         else:
             fn = '%s_%d.fil'%(sdir,ii)
-        d = read_fil_data_dsa(fn, start=start, stop=nsamp)
+        d = read_fil_data_dsa(fn, start=start, stop=nsamp,verbose=verbose)
         freq.append(d[1])
         dt.append(d[2])
         #print(len(freq[ii]))
@@ -194,7 +197,8 @@ def read_fil_data_dsa(fn, start=0, stop=1,verbose=True):
     Outputs: (data,freq,delta_t,header) --> 2D filterbank data, frequency axis, time axis, and header dictionary 
 
     """
-    print("Reading Filterbank File: " + fn)
+    if verbose:
+        print("Reading Filterbank File: " + fn)
     fil_obj = FilReader(fn)
     header = fil_obj.header
     delta_t = fil_obj.header['tsamp']
@@ -206,7 +210,8 @@ def read_fil_data_dsa(fn, start=0, stop=1,verbose=True):
     try:
         data = fil_obj.readBlock(start, stop)
     except(ValueError):
-        print("Read data failed, returning 0")
+        if verbose:
+            print("Read data failed, returning 0")
         data = 0
 
     return data, freq, delta_t, header
@@ -286,7 +291,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0,verbose=False):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -303,8 +308,8 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     """
     sdir = datadir + fn_prefix 
-    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha,start=start)
-    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha,start=start)
+    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha,start=start,verbose=verbose)
+    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha,start=start,verbose=verbose)
     if alpha:
         fobj=FilReader(sdir+"_I.fil")
     else:
@@ -313,8 +318,9 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     #Bin in time and frequency
     #n_t = 1#8
     #n_f = 1#32
-    print("Binning by " + str(n_t)  + " in time")
-    print("Binning by " + str(n_f) + " in frequency")
+    if verbose:
+        print("Binning by " + str(n_t)  + " in time")
+        print("Binning by " + str(n_f) + " in frequency")
     #timeaxis = np.arange(fobj.header.tstart*86400, fobj.header.tstart*86400 + fobj.header.tsamp*fobj.header.nsamples/n_t, fobj.header.tsamp*n_t)
     if fobj.header.nsamples == 5120:
         timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//n_t)
@@ -330,7 +336,8 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
         good_idxs = np.logical_not(bad_idxs)
         bad_chans = np.arange(I.shape[0])[bad_idxs]
         good_chans = np.arange(I.shape[0])[good_idxs]
-        print("Bad Channels: " + str(bad_chans))
+        if verbose:
+            print("Bad Channels: " + str(bad_chans))
         
 
 
@@ -3396,7 +3403,7 @@ def calibrate_matrix(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True):
     
 
 #Apply parallactic angle correction
-def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,stokes=True):
+def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,stokes=True,verbose=False):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3435,8 +3442,9 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
     #RA = FRB_RA[FRBidx]
     #DEC = FRB_DEC[FRBidx]
 
-    print("FRB RA: " + str(RA) + " degrees")
-    print("FRB DEC: " + str(DEC) + " degrees")
+    if verbose:
+        print("FRB RA: " + str(RA) + " degrees")
+        print("FRB DEC: " + str(DEC) + " degrees")
 
     RA = RA*np.pi/180
     DEC = DEC*np.pi/180
@@ -3445,23 +3453,28 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
     observing_time = Time(fobj.header.tstart, format='mjd', location=observing_location)#Time(fobj.header.tstart, format='mjd', location=observing_location)
     GST = Time(fobj.header.tstart, format='mjd').to_datetime().hour + Time(fobj.header.tstart, format='mjd').to_datetime().minute/60 + Time(fobj.header.tstart, format='mjd').to_datetime().second/3600#observing_time.sidereal_time('mean').hour
     LST = (GST + Lon*24/360)%24
-    print(observing_time.isot)
-    print(LST)
+    if verbose:
+        print(observing_time.isot)
+        print(LST)
 
     HA = (LST*360/24)*np.pi/180 - RA #rad
 
 
     elev = np.arcsin(np.sin(Lat*np.pi/180)*np.sin(DEC) + np.cos(Lat*np.pi/180)*np.cos(DEC)*np.cos(HA))
-    print("elevation est. : " + str(elev*180/np.pi) + " degrees")
+    if verbose:
+        print("elevation est. : " + str(elev*180/np.pi) + " degrees")
 
     #apply correction to azimuth due to beam offset
     az = np.arcsin(-np.cos(DEC)*np.sin(HA)/np.cos(elev))
     az_corr = (ibeam - centerbeam)*synth_beamsize
-    print("initial azimuth est. : " + str(az*180/np.pi) + " degrees")
-    print("corrected azimuth est. : " + str((az-az_corr)*180/np.pi) + " degrees")
+    
+    if verbose:
+        print("initial azimuth est. : " + str(az*180/np.pi) + " degrees")
+        print("corrected azimuth est. : " + str((az-az_corr)*180/np.pi) + " degrees")
 
     ParA = np.arcsin(np.sin(HA)*np.cos(Lat*np.pi/180)/np.cos(elev)) + chi_ant
-    print("initial parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
+    if verbose:
+        print("initial parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
 
     #ParA = np.arcsin(-np.sin(az-az_corr)*np.cos(Lat*np.pi/180)/np.cos(DEC)) + chi_ant
     arg = -np.sin(az-az_corr)*np.cos(Lat*np.pi/180)/np.cos(DEC)
@@ -3472,7 +3485,8 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
     ParA = np.arcsin(arg) + chi_ant
     
-    print("corrected parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
+    if verbose:
+        print("corrected parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
 
     #calibrate
     Qcal = Q_obs*np.cos(2*ParA) - U_obs*np.sin(2*ParA)
@@ -5851,7 +5865,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
@@ -5920,13 +5934,20 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     tshifted = (t - np.argmax(I_t)*(t_samp*1e6)*n_t)/1000
     tpeak = (np.argmax(I_t)*(t_samp*1e6)*n_t)/1000
     
-    fig= plt.figure(figsize=(42,36))
-    ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
-    ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
-    ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
-    ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
-    ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
-
+    if showspectrum:
+        fig= plt.figure(figsize=(42,36))
+        ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
+        ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+        ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
+        ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
+        ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
+    else:
+        fig= plt.figure(figsize=(24,36))
+        ax0 = plt.subplot2grid(shape=(8, 4), loc=(0, 0), colspan=4)
+        ax1 = plt.subplot2grid(shape=(8, 4), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+        ax2 = plt.subplot2grid(shape=(8, 4), loc=(3, 0), colspan=4, rowspan=4)
+        #ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
+        #ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
 
     intL = int(intL)
     intR = int(intR)
@@ -5969,29 +5990,30 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax0.set_ylim(-1.4*95,1.1*95)
     #ax0.legend(loc="upper right")
 
-    if ghostPA:
-        ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
-
-    if sigflag:
-        if SNRCUT != None:
-            ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+    if showspectrum:
+        if ghostPA:
+            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+    
+        if sigflag:
+            if SNRCUT != None:
+                ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+            else:
+                ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
         else:
-            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
-    else:
-        if SNRCUT != None:
-            ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
-        else:
-            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+            if SNRCUT != None:
+                ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+            else:
+                ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
 
-    if sigflag:
-        ax6.set_xlabel(r'PPA ($^\circ$)')
-    else:
-        ax6.set_xlabel(r'PA ($^\circ$)')
-    #ax6.set_xlabel("degrees")
-    ax6.set_xlim(-1.1*95,1.1*95)
-    ax6.set_xlim(-1.4*95,1.1*95)
-    ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
-    #ax6.tick_params(axis='x', labelrotation = 45)
+        if sigflag:
+            ax6.set_xlabel(r'PPA ($^\circ$)')
+        else:
+            ax6.set_xlabel(r'PA ($^\circ$)')
+        #ax6.set_xlabel("degrees")
+        ax6.set_xlim(-1.1*95,1.1*95)
+        ax6.set_xlim(-1.4*95,1.1*95)
+        ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
+        #ax6.tick_params(axis='x', labelrotation = 45)
 
     #pol fracs
     if short_labels:
@@ -6016,25 +6038,31 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax2.set_xlim(timestart- wind*1000/((t_samp*1e6)*n_t),timestop+ wind*1000/((t_samp*1e6)*n_t))
     #ax2.tick_params(axis='x', labelrotation = 45)
 
-    color1=ax3.step(I_f,freq_test[0],label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)',color="black",linewidth=3)
-    color2 = ax3.step(L_f,freq_test[0],label=r'Linear Polarization ($\sqrt{Q^2 + U^2}/I$)',color="blue",linewidth=2.5)
-    color3=ax3.step(C_f,freq_test[0],label=r'Circular Polarization ($V/I$)',color="orange",linewidth=2)
-    ax3.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
-    ax3.set_xlabel(r'S/N')
-    #ax3.tick_params(axis='x', labelrotation = 45)
+    if showspectrum:
+        color1=ax3.step(I_f,freq_test[0],label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)',color="black",linewidth=3)
+        color2 = ax3.step(L_f,freq_test[0],label=r'Linear Polarization ($\sqrt{Q^2 + U^2}/I$)',color="blue",linewidth=2.5)
+        color3=ax3.step(C_f,freq_test[0],label=r'Circular Polarization ($V/I$)',color="orange",linewidth=2)
+        ax3.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
+        ax3.set_xlabel(r'S/N')
+        #ax3.tick_params(axis='x', labelrotation = 45)
 
     ticklabelsx = np.array(ax1.get_xticks(),dtype=int)[1:-1]
     ticksx = np.array(np.argmax(I_t) + np.array(ticklabelsx)/(32.7*n_t/1000),dtype=float)
     print(ticklabelsx)
     print(ticksx)
 
-    ticklabelsy =np.array(ax3.get_yticks(),dtype=int)[1:-1]
-    print(ticklabelsy)
-    ticksy= np.array(((ticklabelsy - np.max(freq_test[0]))/(freq_test[0][1]-freq_test[0][0])),dtype=int)#(np.max(freq_test[0]) -np.min(freq_test[0]))
-    print(ticksy)
+    if showspectrum:
+        ticklabelsy =np.array(ax3.get_yticks(),dtype=int)[1:-1]
+        print(ticklabelsy)
+        ticksy= np.array(((ticklabelsy - np.max(freq_test[0]))/(freq_test[0][1]-freq_test[0][0])),dtype=int)#(np.max(freq_test[0]) -np.min(freq_test[0]))
+        print(ticksy)
+        
 
     ax2.imshow(I,aspect="auto",vmin=0,vmax=np.percentile(I,99),interpolation="nearest")
     ax2.set_xticks(ticksx,np.around(ticklabelsx,1))
+    if not showspectrum:
+        ticksy = ax2.get_yticks()[2:-1]
+        ticklabelsy = np.array(np.around(freq_test[0][np.array(ticksy,dtype=int)],0),dtype=int)
     ax2.set_yticks(ticksy,np.around(ticklabelsy,1))
 
 
@@ -6047,8 +6075,9 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
         else:
             fig.text(0.5, 1, "FRB20" + ids[:6], ha='center')
     ax1.xaxis.set_major_locator(ticker.NullLocator())
-    ax3.yaxis.set_major_locator(ticker.NullLocator())
-    ax6.yaxis.set_major_locator(ticker.NullLocator())
+    if showspectrum:
+        ax3.yaxis.set_major_locator(ticker.NullLocator())
+        ax6.yaxis.set_major_locator(ticker.NullLocator())
     fig.subplots_adjust(hspace=0)
     fig.subplots_adjust(wspace=0)
     plt.savefig(datadir + ids + "_" + nickname + "_pol_summary_plot"+ suffix + ".pdf")

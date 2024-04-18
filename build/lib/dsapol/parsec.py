@@ -169,7 +169,7 @@ def L_sigma(Q,U,timestart,timestop,plot=False,weighted=False,I_w_t_filt=None):
         L_trial_binned = convolve(L0_t,I_w_t_filt)
         sigbin = np.argmax(L_trial_binned)
         noise = np.std(np.concatenate([L_trial_binned[:sigbin],L_trial_binned[sigbin+1:]]))
-        print("weighted: " + str(noise))
+        #print("weighted: " + str(noise))
 
     else:
         L_trial_cut1 = L0_t[timestart%(timestop-timestart):]
@@ -177,7 +177,7 @@ def L_sigma(Q,U,timestart,timestop,plot=False,weighted=False,I_w_t_filt=None):
         L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(L_trial_binned)
         noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
-        print("not weighted: " + str(noise))
+        #print("not weighted: " + str(noise))
     return noise
 
 
@@ -200,7 +200,7 @@ def L_pdf(x,df,width,abs_max=10,numpoints=10000,plot=False):
             plt.plot(np.linspace(-abs_max,abs_max,2*numpoints),y2)#np.max(h)*y2/delta/np.max(y2/delta))
 
     fint = interp1d(np.linspace(-abs_max,abs_max,2*numpoints),y2/delta,fill_value="extrapolate")
-    print(x)
+    #print(x)
     if plot:
         plt.plot(x,np.max(h)*fint(x)/np.max(fint(x)),color="red",linewidth=2)
         plt.xlim(0,abs_max)
@@ -223,14 +223,14 @@ def L_pdf_weighted(x,df,width,weights,abs_max=10,numpoints=10000,plot=False):
         #h,b,p = plt.hist(x1,np.linspace(0,0.005,int(numpoints/100)))
         plt.plot(axis,y2/np.max(y2))
 
-        print((0,weights[0]))
+        #print((0,weights[0]))
     count = 1
     for i in range(1,width):
         #print(i)
         
         if np.abs(weights[i]) > 1e-6:
-            print((i,np.abs(weights[i])))
-            print("axis " + str((np.max(axis),np.min(axis))))
+            #print((i,np.abs(weights[i])))
+            #print("axis " + str((np.max(axis),np.min(axis))))
             #print(weights[i])
             #print(y2/weights[i])
             #print(weights[i])
@@ -243,8 +243,8 @@ def L_pdf_weighted(x,df,width,weights,abs_max=10,numpoints=10000,plot=False):
                 plt.plot(axis,y3/np.max(y3))#np.max(h)*y2/np.max(y2))
                 #plt.plot(axis,y2)
             count += 1
-        else: 
-            print("Skipping: " + str((i,weights[i])))
+        #else: 
+        #    print("Skipping: " + str((i,weights[i])))
         if np.any(np.abs(y2) > 1.7976931348623157e+308):
             print("OVERFLOW")
             
@@ -260,7 +260,7 @@ def L_pdf_weighted(x,df,width,weights,abs_max=10,numpoints=10000,plot=False):
     plt.xlim(-0.001,0.005)
     plt.show()
     
-    print("Total count :  " + str(count) + "/" + str(len(weights)))
+    #print("Total count :  " + str(count) + "/" + str(len(weights)))
     return fint(x)
 
     
@@ -353,10 +353,10 @@ for k in mapping3C48_init.keys():
     #find corresponding bf weights
     bfweights3C48 = polcal.get_bfweights(mapping3C48_init[k],'3C48')
     bfweights3C286 = polcal.get_bfweights(mapping3C286_init[k],'3C286')
-    print(['<br/>'.join(mapping3C48_init[k]),
-                             '<br/>'.join(bfweights3C48),
-                             '<br/>'.join(mapping3C286_init[k]),
-                             '<br/>'.join(bfweights3C286)])
+    #print(['<br/>'.join(mapping3C48_init[k]),
+    #                         '<br/>'.join(bfweights3C48),
+    #                         '<br/>'.join(mapping3C286_init[k]),
+    #                         '<br/>'.join(bfweights3C286)])
     df_polcal.loc[str(k)] = ['<br/>'.join(mapping3C48_init[k]),
                              '<br/>'.join(bfweights3C48),
                              '<br/>'.join(mapping3C286_init[k]),
@@ -428,7 +428,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     if loadbutton.clicked:
 
         #load data at base resolution
-        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + "_dev",5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(2000//state_dict['base_n_t']),sub_offpulse_mean=True,fixchans=True)
+        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + "_dev",5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(2000//state_dict['base_n_t']),sub_offpulse_mean=True,fixchans=True,verbose=False)
         state_dict['base_I'] = I
         state_dict['base_Q'] = Q
         state_dict['base_U'] = U
@@ -465,7 +465,7 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
     tdelays_frac = tdelays/tsamp - tdelays_idx_low
     print("Trial DM: " + str(DM) + " pc/cc...",end='')#, DM delays (ms): " + str(tdelays) + "...",end='')
     nchans = len(freq_axis)
-    print(dyn_spec.shape)
+    #print(dyn_spec.shape)
     dyn_spec_DM = np.zeros(dyn_spec.shape)
 
     #shift each channel
@@ -604,7 +604,10 @@ def read_polcal(polcaldate,path=default_path):
 
 
 def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
-        polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display):
+        polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,makesolbutton,ParA_display,
+        edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
+        ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
+        phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider):
     
     """
     This function updates the polarization calibration screen
@@ -725,9 +728,9 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
         
         #run beam finder in the background
-        print("python " + repo_path + "/scripts/find_beams.py " + str('3C48') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
+        #print("python " + repo_path + "/scripts/find_beams.py " + str('3C48') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
         os.system("python " + repo_path + "/scripts/find_beams.py " + str('3C48') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
-        print("python " + repo_path + "/scripts/find_beams.py " + str('3C286') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
+        #print("python " + repo_path + "/scripts/find_beams.py " + str('3C286') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
         os.system("python " + repo_path + "/scripts/find_beams.py " + str('3C286') + " " + str(polcal_dict['polcal_findbeams_file']) + " > " + polcal.logfile + " 2>&1 &")
 
         
@@ -810,10 +813,80 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
             make_cal_filterbanks('3C48',polcal_dict['polcal_findbeams_file'],str(k)[4:],beam_dict_3C48[k]['bf_weights'],beam_dict_3C48[k]['beam'],beam_dict_3C48[k]['mjd'])
 
         #make 3C286 filterbanks
-        for k in beam_dict_3C48.keys():
+        for k in beam_dict_3C286.keys():
             make_cal_filterbanks('3C286',polcal_dict['polcal_findbeams_file'],str(k)[5:],beam_dict_3C286[k]['bf_weights'],beam_dict_3C286[k]['beam'],beam_dict_3C286[k]['mjd'])
 
 
+    #if make solution button pushed, make solution and plot
+    if (polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "":
+        plt.figure(figsize=(18,20))
+        plt.subplot(311)
+        plt.ylabel(r'$|g_{yy}|$')
+        plt.xticks([])
+
+        plt.subplot(312)
+        plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+        plt.xticks([])
+
+        plt.subplot(313)
+        plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+        plt.xlabel(r'Frequency (MHz)')
+
+        plt.subplots_adjust(hspace=0)
+    if polcal_dict['cal_name_3C48'] != "" and polcal_dict['polcal_findbeams_file'] != "":
+        #make abs gain solution
+        GY_fit,GY_fullres,freq_test = polcal.abs_gyy_solution(polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C48'],beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam'],
+                                                            edgefreq=edgefreq_slider.value,
+                                                            breakfreq=breakfreq_slider.value,
+                                                            sf_window_weights=sf_window_weight_cals.value,sf_order=sf_order_cals.value,peakheight=peakheight_slider.value,
+                                                            padwidth=peakwidth_slider.value,deg=polyfitorder_slider.value)
+        polcal_dict['GY'] = GY_fullres
+        polcal_dict['GY_fit'] = GY_fit
+        polcal_dict['cal_freq_axis'] = freq_test[0]
+        
+        #make gain ratio solution
+        ratio_fit,ratio_fullres,freq_test = polcal.gain_solution(polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C48'],beam_dict_3C48[polcal_dict['cal_name_3C48']]['beam'],
+                                                            edgefreq=ratio_edgefreq_slider.value,
+                                                            breakfreq=ratio_breakfreq_slider.value,
+                                                            sf_window_weights=ratio_sf_window_weight_cals.value,sf_order=ratio_sf_order_cals.value,peakheight=ratio_peakheight_slider.value,
+                                                            padwidth=ratio_peakwidth_slider.value,deg=ratio_polyfitorder_slider.value)
+        polcal_dict['ratio'] = ratio_fullres
+        polcal_dict['ratio_fit'] = ratio_fit
+        polcal_dict['cal_freq_axis'] = freq_test[0]
+
+        plt.subplot(311)
+        plt.plot(freq_test[0],GY_fullres)
+        plt.plot(freq_test[0],GY_fit)
+        plt.ylabel(r'$|g_{yy}|$')
+        plt.xticks([])
+        plt.axvline(edgefreq_slider.value,color='black',linewidth=3)
+        plt.axvline(breakfreq_slider.value,color='red',linewidth=3)
+        
+        plt.subplot(312)
+        plt.plot(freq_test[0],ratio_fullres)
+        plt.plot(freq_test[0],ratio_fit)
+        plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+        plt.xticks([])
+        plt.axvline(ratio_edgefreq_slider.value,color='black',linewidth=3)
+        plt.axvline(ratio_breakfreq_slider.value,color='red',linewidth=3)
+
+    if polcal_dict['cal_name_3C286'] != "" and polcal_dict['polcal_findbeams_file'] != "":
+
+        #make phase diff solution
+        phase_fit,phase_fullres,freq_test = polcal.phase_solution(polcal_dict['polcal_findbeams_file'],polcal_dict['cal_name_3C286'],beam_dict_3C286[polcal_dict['cal_name_3C286']]['beam'],
+                                                            sf_window_weights=phase_sf_window_weight_cals.value,sf_order=phase_sf_order_cals.value,peakheight=phase_peakheight_slider.value,
+                                                            padwidth=phase_peakwidth_slider.value,deg=phase_polyfitorder_slider.value)
+        polcal_dict['phase'] = phase_fullres
+        polcal_dict['phase_fit'] = phase_fit
+        polcal_dict['cal_freq_axis'] = freq_test[0]
+
+        plt.subplot(313)
+        plt.plot(freq_test[0],phase_fullres)
+        plt.plot(freq_test[0],phase_fit)
+
+    plt.show()
+
+        
 
     return beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 

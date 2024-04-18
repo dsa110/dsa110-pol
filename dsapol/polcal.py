@@ -8,6 +8,42 @@ from astropy.time import Time
 import time
 import os
 import json
+from scipy.interpolate import CubicSpline
+from scipy.signal import correlate
+from scipy.signal import savgol_filter as sf
+from scipy.signal import convolve
+from scipy.signal import fftconvolve
+from scipy.ndimage import convolve1d
+from scipy.signal import peak_widths
+from scipy.stats import chi
+from scipy.stats import norm
+from scipy.stats import kstest
+from scipy.optimize import curve_fit
+import numpy.ma as ma
+import csv
+from scipy.signal import find_peaks
+from scipy.signal import peak_widths
+import copy
+import numpy as np
+import numpy.ma as ma
+from sigpyproc import FilReader
+from sigpyproc.Filterbank import FilterbankBlock
+from sigpyproc.Header import Header
+from matplotlib import pyplot as plt
+import pylab
+import pickle
+import json
+from scipy.interpolate import interp1d
+from scipy.stats import chi2
+from scipy.stats import chi
+from scipy.signal import savgol_filter as sf
+from scipy.signal import convolve
+from scipy.ndimage import convolve1d
+from RMtools_1D.do_RMsynth_1D import run_rmsynth
+from RMtools_1D.do_RMclean_1D import run_rmclean
+from RMtools_1D.do_QUfit_1D_mnest import run_qufit
+from astropy.coordinates import EarthLocation
+import astropy.units as u
 """
 This file contains functions related to creating polarization calibration Jones matrix parameters. 
 This includes wrappers around Vikram's bash scripts for generating voltage files using the 
@@ -290,8 +326,6 @@ def make_cal_filterbanks(calname,caldate,calid,bfweights,ibeam,mjd,path=output_p
 
 
 
-### Functions to compute, filter, and combine solutions ###
-
 def get_best_beam(beam_dict):
     """
     Returns the obs id and beam closest to middle_beam (125 for DSA-64)
@@ -305,13 +339,210 @@ def get_best_beam(beam_dict):
     idx = np.argmin(np.abs(np.array(beams) - middle_beam))
     return names[idx],beams[idx]
 
-def get_calfil_files(calname,caldate,path=output_path):
+def get_calfil_files(calname,caldate,obsid,path=output_path):
     """
     This function returns the filterbank files available for a given calibrator and 
     observation date
     """
 
-    obs_files = glob.glob(path + calname + "_" + caldate + "/" + calname + "*0.fil")
+    obs_files = glob.glob(path + calname + "_" + caldate + "/" + obsid + "*.fil")
     obs_ids = [f[-len(calname)-3-10:-10] for f in obs_files]
 
     return obs_files,obs_ids
+
+### Functions to compute new solutions
+
+#predicted flux from Perley-Butler 2017
+coeffs_3C286 = [1.2481,-0.4507,-0.1798,0.0357]
+coeffs_3C48 = [ 1.3253, -0.7553, -0.1914, 0.0498]
+RA_3C48 = ((1 + 37/60 + 41.1/3600)*360/24)
+DEC_3C48 = (33 + 9/60 + 32/3600)
+RM_3C48 = -68 #Perley-Butler 2017
+p_3C48 = 0.005 #polarization fraction
+chi_3C48= 25*np.pi/180 #position angle
+def PB_flux(coeffs,nu_GHz):
+    logS = np.zeros(len(nu_GHz))
+    for i in range(len(coeffs)):
+        logS += coeffs[i]*(np.log10(nu_GHz)**(i))
+        
+    return 10**logS
+
+def clean_peaks(I_init,peakheight=2,padwidth=10):
+    """
+    This function cleans a spectrum for spurious peaks that will
+    be smoothed for a calibrator solution.
+    """
+
+    #normalize
+    I_new = copy.deepcopy(I_init)
+    I_norm = (I_new - np.nanmean(I_new))/np.nanstd(I_new)
+
+    #find peaks of specified height and width
+    pks = find_peaks(np.abs(np.pad(I_norm,pad_width=padwidth,mode='constant')),height=peakheight)[0]
+    pks = np.array(pks)-padwidth
+    wds = peak_widths(np.abs(np.pad(I_norm,pad_width=padwidth,mode='constant')),pks)[0]
+
+    #set each peak to the mean intensity 
+    for i in range(len(pks)):
+        pk = pks[i]
+        wd = int(np.ceil(wds[i])) + 1
+        if wd == 0: wd = 1
+
+        low = pk-wd
+        hi = pk+wd+1
+        if low < 0 :
+            low = 0
+        if hi >= len(I_new):
+            hi = len(I_new)-1
+        #print((low,hi))
+        I_new[low:hi] = np.mean(I_init)
+
+    return I_new
+
+def piecewise_polyfit(GY_fullres,freq_test_fullres,edgefreq=1418,breakfreq=1418,deg=5):
+    """
+    This function fits a piecewise polynomial to
+    a cleaned spectrum
+    """
+
+    #fit the lower part of the spectrum
+    edgeidx=np.argmin(np.abs(freq_test_fullres[0]-edgefreq))
+    popt = np.polyfit(freq_test_fullres[0][edgeidx:],GY_fullres[edgeidx:],deg)
+    GY_fit1 = np.zeros(len(GY_fullres))
+    for i in range(len(popt)):
+        GY_fit1 += popt[i]*(freq_test_fullres[0]**(len(popt)-i-1))
+
+    #fit the upper part of the spectrum
+    popt = np.polyfit(freq_test_fullres[0][:edgeidx],GY_fullres[:edgeidx],5)
+    GY_fit2 = np.zeros(len(GY_fullres))
+    for i in range(len(popt)):
+        GY_fit2 += popt[i]*(freq_test_fullres[0]**(len(popt)-i-1))
+
+    #stitch together
+    breakidx=np.argmin(np.abs(freq_test_fullres[0]-breakfreq))
+
+    GY_fit = np.zeros(len(GY_fit2))
+    GY_fit[breakidx:] = GY_fit1[breakidx:]
+    GY_fit[:breakidx] = GY_fit2[:breakidx]
+   
+    return GY_fit,GY_fit1,GY_fit2
+
+def abs_gyy_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,p=p_3C48,chi=chi_3C48,RM=RM_3C48,RA=RA_3C48,DEC=DEC_3C48,path=output_path,edgefreq=1418,breakfreq=1418,sf_window_weights=255,sf_order=5,peakheight=2,padwidth=10,deg=5):
+    """
+    This function uses the 3C48 calibrator observation given to compute the absolute gain in the y feed.
+    """
+
+    #read data
+    gain_dir = path + '3C48_' + caldate + '/' 
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(gain_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=n_t_down,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
+
+    #PA calibration
+    Ical,Qcal,Ucal,Vcal,ParA = dsapol.calibrate_angle(Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,ibeam,RA,DEC)
+
+    #compute simulated I,Q,U and XX,YY (https://science.nrao.edu/facilities/vla/docs/manuals/obsguide/modes/pol)
+    I_sim = PB_flux(coeffs_3C48,freq_test[0]*1e-3) #Jy
+    Q_sim = I_sim*(p*np.cos(chi)*np.cos(2*ParA) + p*np.sin(chi)*np.sin(2*ParA))
+    U_sim = I_sim*(-p*np.cos(chi)*np.sin(2*ParA) + p*np.sin(chi)*np.cos(2*ParA))
+    V_sim = np.zeros(I_sim.shape)
+
+    #apply the measured RM to predict what signal should look like
+    I_sim,Q_sim,U_sim,V_sim = dsapol.calibrate_RM(I_sim,Q_sim,U_sim,V_sim,-RM,0,freq_test,stokes=True)
+
+    #compute the expected X and Y feed voltages
+    XX_sim = 0.5*(I_sim + Q_sim)
+    YY_sim = 0.5*(I_sim - Q_sim)
+
+    #clean and eliminate spurious peaks
+    I_new = clean_peaks(Igainuc.mean(1),peakheight=peakheight,padwidth=padwidth) 
+    Q_new = clean_peaks(Qgainuc.mean(1),peakheight=peakheight,padwidth=padwidth) 
+
+    #compute the X and Y feed voltages
+    XX = 0.5*(I_new + Q_new)
+    YY = 0.5*(I_new - Q_new)
+    
+    #compare to the simulated voltages to get the gain
+    GX = np.sqrt(XX/XX_sim)
+    GY = np.sqrt(YY/YY_sim)
+
+    GX = ma.masked_invalid(GX, copy=True)
+    GY = ma.masked_invalid(GY, copy=True)
+
+    #interpolate to high resolution
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = dsapol.get_stokes_2D(gain_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
+    idx = np.isfinite(GX)
+    f_GX= interp1d(freq_test[0][idx],GX[idx],kind="linear",fill_value="extrapolate")
+    GX_fullres = f_GX(freq_test_fullres[0])
+
+    idx = np.isfinite(GY)
+    f_GY= interp1d(freq_test[0][idx],GY[idx],kind="linear",fill_value="extrapolate")
+    GY_fullres = f_GY(freq_test_fullres[0])
+
+    #piecewise cubic spline fit
+    GY_fit,GY_fit1,GY_fit2 = piecewise_polyfit(GY_fullres,freq_test_fullres,edgefreq=edgefreq,breakfreq=breakfreq,deg=deg) 
+
+    #savgol filter
+    GY_fit = sf(GY_fit,sf_window_weights,sf_order)
+
+    return GY_fit, GY_fullres,freq_test_fullres
+
+
+def gain_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=output_path,edgefreq=1360,breakfreq=1360,sf_window_weights=255,sf_order=5,peakheight=3,padwidth=10,deg=5):
+    """
+    This function uses the 3C48 calibrator observation given to compute the ratio of gains in x and y feeds.
+    """
+    
+    #read data
+    gain_dir = path + '3C48_' + caldate + '/'
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(gain_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=n_f,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
+
+    #gain calibration solution
+    ratio_2,ratio_params_2,ratio_sf_2 = dsapol.gaincal_full(gain_dir,'3C48',[obsid[-3:]],n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix="_dev",average=True,plot=False,show=False,sfwindow=-1,clean=True,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down)
+
+    
+    #interpolate to high resolution
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = dsapol.get_stokes_2D(gain_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
+    idx = np.isfinite(ratio_2)
+    f_ratio = interp1d(freq_test[0][idx],ratio_2[idx],kind="linear",fill_value="extrapolate")
+    ratio_fullres = f_ratio(freq_test_fullres[0])
+
+    #piecewise fit
+    ratio_fit,ratio_fit1,ratio_fit2 = piecewise_polyfit(ratio_fullres,freq_test_fullres,edgefreq=edgefreq,breakfreq=breakfreq,deg=deg)
+
+    #savgol filter
+    ratio_fit = sf(ratio_fit,sf_window_weights,sf_order)
+
+    return ratio_fit, ratio_fullres, freq_test_fullres
+
+
+
+def phase_solution(caldate,obsid,ibeam,n_t=1,n_f=1,nsamps=5,n_t_down=32,path=output_path,sf_window_weights=255,sf_order=5,peakheight=3,padwidth=10,deg=5):
+    """
+    This function uses the 3C286 calibrator observation given to compute the phase difference in x and y feeds.
+    """
+
+    #read data
+    phase_dir = path + '3C286_' + caldate + '/'
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(phase_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=n_f,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
+
+    #gain calibration solution
+    phase_2,phase_params_2,phase_sf_2 = dsapol.phasecal_full(phase_dir,'3C286',[obsid[-3:]],n_t=n_t,n_f=n_f,nsamps=nsamps,deg=deg,suffix="_dev",average=True,plot=False,show=False,sfwindow=-1,clean=True,padwidth=padwidth,peakheight=peakheight,n_t_down=n_t_down)
+
+
+    #interpolate to high resolution
+    (Igainuc,Qgainuc,Ugainuc,Vgainuc,fobj,timeaxis,freq_test_fullres,wav_test,badchans) = dsapol.get_stokes_2D(phase_dir,obsid + "_dev",nsamps,n_t=n_t,n_f=1,n_off=int(12000//n_t),sub_offpulse_mean=False,verbose=False)
+    idx = np.isfinite(phase_2)
+    f_phase = interp1d(freq_test[0][idx],phase_2[idx],kind="linear",fill_value="extrapolate")
+    phase_fullres = f_phase(freq_test_fullres[0])
+
+    # fit
+    phase_fit = np.zeros(len(phase_2))
+    for i in range(len(phase_params_2)):
+        phase_fit += phase_params_2[i]*(freq_test_fullres[0]**(len(phase_params_2)-i-1))
+
+    #savgol filter
+    phase_fit = sf(phase_fit,sf_window_weights,sf_order)
+
+    return phase_fit, phase_fullres, freq_test_fullres
+
+### functions to merge with previous cal solution
+
