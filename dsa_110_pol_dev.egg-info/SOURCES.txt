@@ -28,6 +28,7 @@ dsapol/polbeamform.py
 dsapol/polcal.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
 interface/PARSEC_Interface-InteractiveMercury.ipynb
+interface/last_cal_metadata.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
 offline_beamforming/beamforming_logfile.txt
 offline_beamforming/move_cal_voltages.bash

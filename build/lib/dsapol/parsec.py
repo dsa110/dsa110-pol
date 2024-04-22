@@ -292,6 +292,7 @@ General Layout:
     correct screen (4) all widgets will be defined in the notebook above the plotting cell
 """
 
+
 state_dict = dict()
 state_dict['current_state'] = 0
 state_map = {'load':0,
@@ -438,6 +439,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_wav_test'] = wav_test
         state_dict['badchans'] = badchans
 
+
+
         state_dict['current_state'] += 1
 
     #if filbutton is clicked, run the offline beamformer to make fil files
@@ -533,7 +536,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DM_input_dis
     (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
     #display dynamic spectrum
-    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,18))
+    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(8,8))
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
@@ -545,7 +548,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DM_input_dis
     a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     a0.set_xticks([])
-    a0.legend(loc="upper right")
+    a0.legend(loc="upper right",fontsize=16)
     
     a1.imshow(state_dict['I'][:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
             extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
@@ -614,9 +617,10 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     This function updates the polarization calibration screen
     whenever the cal file is selected
     """
-
-    #update polcal parameters in state dict
-    state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = read_polcal(polcaldate_menu.value)
+    
+    if polcaldate_menu.value != "":
+        #update polcal parameters in state dict
+        state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = read_polcal(polcaldate_menu.value)
     state_dict['polcalfile'] = polcaldate_menu.value
 
     #look for new calibrator files
@@ -656,7 +660,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     else:
         polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
 
-    if polcalbutton.clicked:
+    if polcalbutton.clicked and (state_dict['polcalfile'] != ""):
 
         #calibrate at native resolution
         state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True)
@@ -801,8 +805,24 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
 
     #if make solution button pushed, make solution and plot
-    if (polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "":
+    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
         plt.figure(figsize=(18,20))
+        
+        plt.subplot(311)
+        plt.ylabel(r'$|g_{yy}|$')
+        plt.xticks([])
+
+        plt.subplot(312)
+        plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+        plt.xticks([])
+
+        plt.subplot(313)
+        plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+        plt.xlabel(r'Frequency (MHz)')
+
+        plt.subplots_adjust(hspace=0)
+    
+    if (polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "":
         
         #get previous cal solution
         last_caldate,last_calobs1,last_calobs2,last_calnum = polcal.get_last_calmeta()
@@ -921,7 +941,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         lw=1
         if (phase_polyfitflag.value) and (phase_sfflag.value): lw = 3
         plt.plot(freq_test[0],phase_fit_sf,label='Mean Fit SF Soln',lw=lw)#,color=c[0].get_color(),linestyle='--',lw=lw)
-    plt.show()
+    #plt.show()
 
 
     #if save button clicked, write to file
@@ -950,24 +970,26 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         print(polcal_dict['new_cal_file'])
         
     #if using current cal solution, display
-    fig=plt.figure(figsize=(18,14))
-    plt.subplot(312)
-    plt.title(state_dict['polcalfile'])
-    plt.xticks([])
-    plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
-    plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gxx'])/np.abs(state_dict['gyy']))
+    #fig=plt.figure(figsize=(18,14))
+    if polcaldate_menu.value != "":
+        plt.subplot(312)
+        #plt.xticks([])
+        #plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+        plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gxx'])/np.abs(state_dict['gyy']),color='magenta',linewidth=4)
 
-    plt.subplot(313)
-    plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
-    plt.plot(state_dict['cal_freq_axis'],np.angle(state_dict['gxx'])-np.angle(state_dict['gyy']))
-    plt.xlabel("Frequency (MHz)")
+        plt.subplot(313)
+        #plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+        plt.plot(state_dict['cal_freq_axis'],np.angle(state_dict['gxx'])-np.angle(state_dict['gyy']),color='magenta',linewidth=4)
+        #plt.xlabel("Frequency (MHz)")
 
-    plt.subplot(311)
-    plt.xticks([])
-    plt.ylabel(r'$|g_{yy}|$')
-    plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']))
-    plt.subplots_adjust(hspace=0)
-    plt.show()
+        plt.subplot(311)
+        plt.title(state_dict['polcalfile'])
+        #plt.xticks([])
+        #plt.ylabel(r'$|g_{yy}|$')
+        plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']),color='magenta',linewidth=4)
+    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
+        plt.subplots_adjust(hspace=0)
+        plt.show()
 
 
     return beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
@@ -1109,7 +1131,7 @@ def filter_screen(n_t_slider,logn_f_slider,logwindow_slider,logibox_slider,buff_
     a1.set_xlabel("Time (ms)")
     a1.set_ylabel("Frequency (MHz)")
     plt.subplots_adjust(hspace=0)
-    plt.show(fig)
+    plt.show()
 
     if nextcompbutton.clicked:
 
