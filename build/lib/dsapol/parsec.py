@@ -1,6 +1,7 @@
 from dsapol import dsapol
 from dsapol import polbeamform
 from dsapol import polcal
+#from dsapol import widget
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import correlate
@@ -292,7 +293,7 @@ General Layout:
     correct screen (4) all widgets will be defined in the notebook above the plotting cell
 """
 
-
+# default values for state and polcal dicts and dataframe tables
 state_dict = dict()
 state_dict['current_state'] = 0
 state_map = {'load':0,
@@ -305,6 +306,8 @@ state_map = {'load':0,
              }
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
+state_dict['rel_n_t'] = 1
+state_dict['rel_n_f'] = 2**5
 df = pd.DataFrame(
     {
         r'${\rm buff}_{L}$': [np.nan],
@@ -375,6 +378,126 @@ df_beams = pd.DataFrame(
         )
 
 
+#List of initial widget values updated whenever screen loads
+frbpath = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
+def get_frbfiles(path=frbpath):
+    frbfiles = glob.glob(path + '2*_*')
+    return [frbfiles[i][frbfiles[i].index('us/2')+3:] for i in range(len(frbfiles))]
+
+frbfiles = get_frbfiles()
+ids = frbfiles[0][:frbfiles[0].index('_')]
+RA = FRB_RA[FRB_IDS.index(ids)]
+DEC = FRB_DEC[FRB_IDS.index(ids)]
+ibeam = int(FRB_BEAM[FRB_IDS.index(ids)])
+mjd = FRB_mjd[FRB_IDS.index(ids)]
+DMinit = FRB_DM[FRB_IDS.index(ids)]
+polcalfiles_findbeams = polcal.get_beamfinding_files()
+polcaldates = []
+for k in polcal_dict.keys():
+    if 'polcal' not in str(k):
+        polcaldates.append(str(k))
+polcalfiles_bf = polcal.get_avail_caldates()
+polcalfiles_findbeams = polcal.get_beamfinding_files()
+
+obs_files_3C48,obs_ids_3C48 = polcal.get_calfil_files('3C48',polcalfiles_findbeams[0],'3C48*0')
+obs_files_3C286,obs_ids_3C286 = polcal.get_calfil_files('3C286',polcalfiles_findbeams[0],'3C286*0')
+
+polcalfiles = glob.glob(default_path + 'POLCAL_PARAMETERS_*csv')
+polcalfiles = [polcalfiles[i][polcalfiles[i].index('POLCAL'):] for i in range(len(polcalfiles))]
+
+wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##################
+         'frbfiles_menu':frbfiles[0],
+         'base_n_t_slider':1,
+         'base_logn_f_slider':0,
+         'logibox_slider_init':0,
+         'buff_L_slider_init':1,
+         'buff_R_slider_init':1,
+         'RA_display':RA,
+         'DEC_display':DEC,
+         'ibeam_display':ibeam,
+         'mjd_display':mjd,
+         'DM_init_display':DMinit,
+         'showlog':True,
+
+         'n_t_slider':1, ############### (1) Dedispersion ##################
+         'logn_f_slider':5,
+         'logwindow_slider_init':5,
+         'ddm_num':0,
+         'DM_input_display':DMinit,
+         'DM_new_display':DMinit,
+
+         'polcaldate_create_menu':"", ############### (3) Calibration ##################
+         'polcaldate_bf_menu':"",
+         'polcaldate_findbeams_menu':polcalfiles_findbeams[0],
+         'obsid3C48_menu':"",
+         'obsid3C286_menu':"",
+         'ParA_display':np.nan,
+         'peakheight_slider':2,
+         'peakwidth_slider':10,
+         'sfflag':False,
+         'sf_window_weight_cals':255,
+         'sf_order_cals':5,
+         'polyfitflag':False,
+         'polyfitorder_slider':5,
+         'edgefreq_slider':1370,
+         'breakfreq_slider':1370,
+         'ratio_peakheight_slider':3,
+         'ratio_peakwidth_slider':10,
+         'ratio_sfflag':False,
+         'ratio_sf_window_weight_cals':257,
+         'ratio_sf_order_cals':5,
+         'ratio_polyfitflag':False,
+         'ratio_polyfitorder_slider':5,
+         'ratio_edgefreq_slider':1360,
+         'ratio_breakfreq_slider':1360,
+         'phase_peakheight_slider':3,
+         'phase_peakwidth_slider':10,
+         'phase_sfflag':False,
+         'phase_sf_window_weight_cals':255,
+         'phase_sf_order_cals':5,
+         'phase_polyfitflag':False,
+         'phase_polyfitorder_slider':5,
+         'polcaldate_menu':"",
+         'showlogcal':False,
+
+         'ncomps_num':1, ############### (4) Filter Weights ##################
+         'comprange_slider':[0,1],                  
+         'avger_w_slider':1,
+         'sf_window_weights_slider':3,
+         'logibox_slider':0,
+         'logwindow_slider':5,
+         'buff_L_slider':1,
+         'buff_R_slider':1,
+         'n_t_slider_filt':1,
+         'logn_f_slider_filt':5,
+         }
+
+def update_wdict(objects,labels,param='value'):
+    """
+    This function takes a list of widget objects and a list of their names as strings and updates the wdict with their curent values
+    """
+
+    assert(len(objects)==len(labels))
+    for i in range(len(objects)):
+        if param == 'value':
+            wdict[labels[i]] = objects[i].value
+        elif param == 'data':
+            wdict[labels[i]] = objects[i].data
+    if 'DM_init_display' in labels:
+        wdict['DM_input_display'] = wdict['DM_init_display']
+        wdict['DM_new_display'] = wdict['DM_init_display'] + wdict['ddm_num']
+    if 'DM_input_display' in labels: 
+        wdict['DM_input_display'] = wdict['DM_init_display']
+        objects[labels.index('DM_input_display')].data = wdict['DM_init_display']
+    if 'DM_new_display' in labels:
+        wdict['DM_new_display'] = wdict['DM_input_display'] + wdict['ddm_num']
+        objects[labels.index('DM_new_display')].data = wdict['DM_input_display'] + wdict['ddm_num']
+    
+    return
+
+        
+
+
 #Exception to quietly exit cell so that we can short circuit output cells
 class StopExecution(Exception):
     def _render_traceback_(self):
@@ -385,13 +508,8 @@ class StopExecution(Exception):
 """
 Load data state
 """
-frbpath = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
-def get_frbfiles(path=frbpath):
-    frbfiles = glob.glob(path + '2*_*')
-    return [frbfiles[i][frbfiles[i].index('us/2')+3:] for i in range(len(frbfiles))]
 
-
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider,buff_R_slider,RA_display,DEC_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -405,7 +523,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
     state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
-    state_dict['buff'] = [buff_L_slider.value,buff_R_slider.value]
+    state_dict['buff'] = [buff_L_slider_init.value,buff_R_slider_init.value]
     state_dict['width_native'] = 2**logibox_slider.value
     state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
 
@@ -414,6 +532,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     DEC_display.data = state_dict['DEC']
     ibeam_display.data = state_dict['ibeam']
     mjd_display.data = state_dict['mjd']
+    DM_init_display.data = state_dict['DM0']
 
     #see if filterbanks exist
     state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
@@ -448,6 +567,13 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'])
         print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
+    #update widget dict
+    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init],
+                    ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init"],
+                    param='value')
+    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display],
+                    ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display"],
+                    param='data')
     return
     
 """
@@ -485,10 +611,12 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
 
         dyn_spec_DM[k,:] = arrlow*(1-tdelays_frac[k]) + arrhi*(tdelays_frac[k])
     print("Done!")
+
     return dyn_spec_DM
 
 
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DM_input_display,DM_new_display,DMdonebutton):
+
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton):
     """
     This function updates the dedispersion screen when resolution
     or dm step are changed
@@ -505,7 +633,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DM_input_dis
     state_dict['DM'] = DM_new_display.data
 
     #update time, freq resolution
-    state_dict['window'] = 2**logwindow_slider.value
+    state_dict['window'] = 2**logwindow_slider_init.value
     state_dict['rel_n_t'] = n_t_slider.value
     state_dict['rel_n_f'] = (2**logn_f_slider.value)
     state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
@@ -570,6 +698,15 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DM_input_dis
 
 
         state_dict['current_state'] += 1
+    #update widget dict
+    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num],
+                ["n_t_slider","logn_f_slider","logwindow_slider_init","ddm_num"],
+                param='value')
+    
+    update_wdict([DM_input_display,DM_new_display],
+                ["DM_input_display","DM_new_display"],
+                param='data')
+
     return
 
 
@@ -650,7 +787,8 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
     #update find beam data
     polcal_dict['polcal_findbeams_file'] = polcaldate_findbeams_menu.value 
-    
+    obs_files_3C48,obs_ids_3C48 = polcal.get_calfil_files('3C48',polcaldate_findbeams_menu.value,'3C48*0')
+    obs_files_3C286,obs_ids_3C286 = polcal.get_calfil_files('3C286',polcaldate_findbeams_menu.value,'3C286*0')
 
     #update polcal dict with calibrator files that have voltages, bf weights available
     if polcaldate_bf_menu.value != "":
@@ -760,6 +898,25 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     else:
         polcal_dict['cal_beam_3C286'] = np.nan
 
+
+    #update widget dict
+    update_wdict([polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
+                edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
+                ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,
+                ratio_peakwidth_slider,ratio_polyfitorder_slider,phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,
+                phase_peakwidth_slider,phase_polyfitorder_slider,sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag],
+                ["polcaldate_menu","polcaldate_create_menu","polcaldate_bf_menu","polcaldate_findbeams_menu","obsid3C48_menu","obsid3C286_menu",
+                "edgefreq_slider","breakfreq_slider","sf_window_weight_cals","sf_order_cals","peakheight_slider","peakwidth_slider","polyfitorder_slider",
+                "ratio_edgefreq_slider","ratio_breakfreq_slider","ratio_sf_window_weight_cals","ratio_sf_order_cals","ratio_peakheight_slider",
+                "ratio_peakwidth_slider","ratio_polyfitorder_slider","phase_sf_window_weight_cals","phase_sf_order_cals","phase_peakheight_slider",
+                "phase_peakwidth_slider","phase_polyfitorder_slider","sfflag","polyfitflag","ratio_sfflag","ratio_polyfitflag","phase_sfflag","phase_polyfitflag"],
+                param='value')
+    update_wdict([ParA_display],
+                ["ParA_display"],
+                param='data')
+
+   
+
     #plot
     plt.figure(figsize=(20,9))
     plt.subplot(121)
@@ -790,6 +947,16 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
     plt.subplots_adjust(wspace=0)
     plt.show()
+
+    return beam_dict_3C48,beam_dict_3C286
+
+
+def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
+        polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display,
+        edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
+        ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
+        phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider,savecalsolnbutton,
+                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,beam_dict_3C48,beam_dict_3C286):
 
 
     #if make filt button pushed, make filterbanks for pol cals
@@ -992,7 +1159,23 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         plt.show()
 
 
-    return beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
+
+    #update widget dict
+    update_wdict([polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
+                edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
+                ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,
+                ratio_peakwidth_slider,ratio_polyfitorder_slider,phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,
+                phase_peakwidth_slider,phase_polyfitorder_slider,sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag],
+                ["polcaldate_menu","polcaldate_create_menu","polcaldate_bf_menu","polcaldate_findbeams_menu","obsid3C48_menu","obsid3C286_menu",
+                "edgefreq_slider","breakfreq_slider","sf_window_weight_cals","sf_order_cals","peakheight_slider","peakwidth_slider","polyfitorder_slider",
+                "ratio_edgefreq_slider","ratio_breakfreq_slider","ratio_sf_window_weight_cals","ratio_sf_order_cals","ratio_peakheight_slider",
+                "ratio_peakwidth_slider","ratio_polyfitorder_slider","phase_sf_window_weight_cals","phase_sf_order_cals","phase_peakheight_slider",
+                "phase_peakwidth_slider","phase_polyfitorder_slider","sfflag","polyfitflag","ratio_sfflag","ratio_polyfitflag","phase_sfflag","phase_polyfitflag"],
+                param='value')
+    update_wdict([ParA_display],
+                ["ParA_display"],
+                param='data')
+    return #beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 
 
 """
@@ -1013,15 +1196,15 @@ def get_SNR(I_tcal,I_w_t_filtcal,timestart,timestop):
     return sig0/noise    
         
 
-def filter_screen(n_t_slider,logn_f_slider,logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider):
-
+def filter_screen(n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider):
+    
     #first check if resolution was changed
     state_dict['window'] = 2**logwindow_slider.value
-    if (n_t_slider.value != state_dict['rel_n_t']) or (2**logn_f_slider.value != state_dict['rel_n_f']): 
-        state_dict['rel_n_t'] = n_t_slider.value
-        state_dict['rel_n_f'] = (2**logn_f_slider.value)
-        state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
-        state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
+    if (n_t_slider_filt.value != state_dict['rel_n_t']) or (2**logn_f_slider_filt.value != state_dict['rel_n_f']): 
+        state_dict['rel_n_t'] = n_t_slider_filt.value
+        state_dict['rel_n_f'] = (2**logn_f_slider_filt.value)
+        state_dict['n_t'] = n_t_slider_filt.value*state_dict['base_n_t']
+        state_dict['n_f'] = (2**logn_f_slider_filt.value)*state_dict['base_n_f']
         state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(2**state_dict['rel_n_f']),(2**state_dict['rel_n_f'])).mean(1)]*4
         state_dict['I'] = dsapol.avg_time(state_dict['base_I'],state_dict['rel_n_t'])
         state_dict['I'] = dsapol.avg_freq(state_dict['I'],state_dict['rel_n_f'])
@@ -1179,5 +1362,12 @@ def filter_screen(n_t_slider,logn_f_slider,logwindow_slider,logibox_slider,buff_
 
         #done with components, move to RM synth
         state_dict['current_state'] += 1
+
+    #update widget dict
+    update_wdict([n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
+                nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider],
+                ["n_t_slider_filt","logn_f_slider_filt","logwindow_slider","logibox_slider","buff_L_slider","buff_R_slider","ncomps_num","comprange_slider",
+                "nextcompbutton","donecompbutton","avger_w_slider","sf_window_weights_slider"],
+                param='value')
 
     return
