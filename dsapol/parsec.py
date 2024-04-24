@@ -556,6 +556,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['fobj'] = fobj
         state_dict['base_freq_test'] = freq_test
         state_dict['base_wav_test'] = wav_test
+        state_dict['base_time_axis'] = np.arange(I.shape[1])*32.7*state_dict['base_n_t']
         state_dict['badchans'] = badchans
 
 
@@ -592,7 +593,7 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
     tdelays_idx_hi = np.array(np.ceil(tdelays/tsamp),dtype=int)
     tdelays_idx_low = np.array(np.floor(tdelays/tsamp),dtype=int)
     tdelays_frac = tdelays/tsamp - tdelays_idx_low
-    print("Trial DM: " + str(DM) + " pc/cc...",end='')#, DM delays (ms): " + str(tdelays) + "...",end='')
+    #print("Trial DM: " + str(DM) + " pc/cc...",end='')#, DM delays (ms): " + str(tdelays) + "...",end='')
     nchans = len(freq_axis)
     #print(dyn_spec.shape)
     dyn_spec_DM = np.zeros(dyn_spec.shape)
@@ -610,7 +611,7 @@ def dedisperse(dyn_spec,DM,tsamp,freq_axis):
             arrhi =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_hi[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_hi[k]]/nchans
 
         dyn_spec_DM[k,:] = arrlow*(1-tdelays_frac[k]) + arrhi*(tdelays_frac[k])
-    print("Done!")
+    #print("Done!")
 
     return dyn_spec_DM
 
@@ -664,7 +665,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
     #display dynamic spectrum
-    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(8,8))
+    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
@@ -973,7 +974,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
 
     #if make solution button pushed, make solution and plot
     if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
-        plt.figure(figsize=(18,20))
+        fig = plt.figure(figsize=(18,12))
         
         plt.subplot(311)
         plt.ylabel(r'$|g_{yy}|$')
@@ -1061,7 +1062,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         plt.xticks([])
         plt.axvline(edgefreq_slider.value,color='black',linewidth=3)
         plt.axvline(breakfreq_slider.value,color='red',linewidth=3)
-        plt.legend(loc='upper left',fontsize=20,frameon=True,ncol=2)
+        plt.legend(loc='upper left',fontsize=20,frameon=True,ncol=3)
         
         plt.subplot(312)
         plt.plot(freq_test[0],ratio_fullres_i,label='New Soln')
@@ -1156,7 +1157,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']),color='magenta',linewidth=4)
     if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
         plt.subplots_adjust(hspace=0)
-        plt.show()
+        plt.close()
 
 
 
@@ -1175,6 +1176,10 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
     update_wdict([ParA_display],
                 ["ParA_display"],
                 param='data')
+    
+    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
+        return fig
+    
     return #beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 
 
@@ -1196,16 +1201,19 @@ def get_SNR(I_tcal,I_w_t_filtcal,timestart,timestop):
     return sig0/noise    
         
 
-def filter_screen(n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider):
+def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider):
     
+
+
     #first check if resolution was changed
     state_dict['window'] = 2**logwindow_slider.value
+    """
     if (n_t_slider_filt.value != state_dict['rel_n_t']) or (2**logn_f_slider_filt.value != state_dict['rel_n_f']): 
         state_dict['rel_n_t'] = n_t_slider_filt.value
         state_dict['rel_n_f'] = (2**logn_f_slider_filt.value)
         state_dict['n_t'] = n_t_slider_filt.value*state_dict['base_n_t']
         state_dict['n_f'] = (2**logn_f_slider_filt.value)*state_dict['base_n_f']
-        state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(2**state_dict['rel_n_f']),(2**state_dict['rel_n_f'])).mean(1)]*4
+        state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(state_dict['rel_n_f']),(state_dict['rel_n_f'])).mean(1)]*4
         state_dict['I'] = dsapol.avg_time(state_dict['base_I'],state_dict['rel_n_t'])
         state_dict['I'] = dsapol.avg_freq(state_dict['I'],state_dict['rel_n_f'])
         state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],state_dict['rel_n_t'])
@@ -1223,7 +1231,7 @@ def filter_screen(n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_sl
         state_dict['Ucal'] = dsapol.avg_freq(state_dict['Ucal'],state_dict['rel_n_f'])
         state_dict['Vcal'] = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
         state_dict['Vcal'] = dsapol.avg_freq(state_dict['Vcal'],state_dict['rel_n_f'])
-    
+    """
 
     #mask the current and previous component
     state_dict['n_comps'] = int(ncomps_num.value)
@@ -1289,7 +1297,7 @@ def filter_screen(n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_sl
 
     
     #display masked dynamic spectrum
-    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,18))
+    fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             I_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='I')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
@@ -1364,10 +1372,12 @@ def filter_screen(n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_sl
         state_dict['current_state'] += 1
 
     #update widget dict
-    update_wdict([n_t_slider_filt,logn_f_slider_filt,logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
-                nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider],
-                ["n_t_slider_filt","logn_f_slider_filt","logwindow_slider","logibox_slider","buff_L_slider","buff_R_slider","ncomps_num","comprange_slider",
-                "nextcompbutton","donecompbutton","avger_w_slider","sf_window_weights_slider"],
+    update_wdict([logwindow_slider,logibox_slider,
+                buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
+                avger_w_slider,sf_window_weights_slider],
+                ["logwindow_slider","logibox_slider",
+                "buff_L_slider","buff_R_slider","ncomps_num","comprange_slider",
+                "avger_w_slider","sf_window_weights_slider"],
                 param='value')
 
     return

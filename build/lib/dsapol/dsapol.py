@@ -870,7 +870,7 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
 
     timeaxisb = (((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())[0]
     #timeaxisb = np.linspace(0,I_t.shape[0],len(I_t))
-    print(len(timeaxisb),len(I_t))
+    #print(len(timeaxisb),len(I_t))
 
 
     #Interpolate to original sample rate
@@ -887,9 +887,9 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
     V_t_weight = fV(timeaxis)#/np.sum(fV(timeaxis))
 
     #savgol filter
-    if sf_window_weights <= 3:
-        print("No SF Filter")
-    else:
+    #if sf_window_weights <= 3:
+    #print("No SF Filter")
+    if sf_window_weights > 3:
         I_t_weight = sf(I_t_weight,sf_window_weights,3)
         Q_t_weight = sf(Q_t_weight,sf_window_weights,3)
         U_t_weight = sf(U_t_weight,sf_window_weights,3)

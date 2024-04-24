@@ -374,7 +374,6 @@ def clean_peaks(I_init,peakheight=2,padwidth=10):
     This function cleans a spectrum for spurious peaks that will
     be smoothed for a calibrator solution.
     """
-
     #normalize
     I_new = copy.deepcopy(I_init)
     I_norm = (I_new - np.nanmean(I_new))/np.nanstd(I_new)
@@ -398,7 +397,6 @@ def clean_peaks(I_init,peakheight=2,padwidth=10):
             hi = len(I_new)-1
         #print((low,hi))
         I_new[low:hi] = np.mean(I_init)
-
     return I_new
 
 def piecewise_polyfit(GY_fullres,freq_test_fullres,edgefreq=1418,breakfreq=1418,deg=5):
