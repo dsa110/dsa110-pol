@@ -100,16 +100,16 @@ FRB_z = []
 FRB_w = []
 FRB_BEAM = []
 FRB_IDS = []
-def update_FRB_params(fname="DSA110-FRBs.csv",path=default_path):
+def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
     """
     This function updates the global FRB parameters from the provided file. File is a copy
     of the 'tablecsv' tab in the DSA110 FRB spreadsheet.
     """
-    with open(path + fname,"r") as csvfile:
+    with open(repo_path + 'data/' + fname,"r") as csvfile:
         reader = csv.reader(csvfile,delimiter=',')
         for row in reader:
             #print(row)
-            if row[0] != "\ufeffname":
+            if row[0] != "name" and row[0] != "": #\ufeff
                 FRBs.append(row[0])
             
                 if row[1] != "":
