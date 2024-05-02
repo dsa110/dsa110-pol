@@ -20,7 +20,7 @@ import pickle as pkl
 from numpy.ma import masked_array as ma
 from scipy.stats import kstest
 from scipy.optimize import curve_fit
-
+from syshealth.status_mon import get_rm
 
 from scipy.signal import find_peaks
 from scipy.signal import peak_widths
@@ -391,6 +391,7 @@ DEC = FRB_DEC[FRB_IDS.index(ids)]
 ibeam = int(FRB_BEAM[FRB_IDS.index(ids)])
 mjd = FRB_mjd[FRB_IDS.index(ids)]
 DMinit = FRB_DM[FRB_IDS.index(ids)]
+RM_gal_init,RM_galerr_init = get_rm(radec=(RA,DEC),filename=repo_path + "/data/faraday2020v2.hdf5")
 polcalfiles_findbeams = polcal.get_beamfinding_files()
 polcaldates = []
 for k in polcal_dict.keys():
@@ -470,7 +471,21 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'buff_R_slider':1,
          'n_t_slider_filt':1,
          'logn_f_slider_filt':5,
-         }
+
+        'useRMTools':True, ################ (5) RM Synthesis ################
+        'maxRM_num_tools':1e6,
+        'dRM_tools':200,
+        'useRMsynth':True,
+        'nRM_num':int(2e6),
+        'minRM_num':-1e6,
+        'maxRM_num':1e6,
+        'useRM2D':True,
+        'nRM_num_zoom':5000,
+        'RM_window_zoom':1000,
+        'dRM_tools_zoom':0.4,
+        'RM_gal_display':np.around(RM_gal_init,2),
+        'RM_galerr_display':np.around(RM_galerr_init,2),
+}
 
 def update_wdict(objects,labels,param='value'):
     """
@@ -492,7 +507,6 @@ def update_wdict(objects,labels,param='value'):
     if 'DM_new_display' in labels:
         wdict['DM_new_display'] = wdict['DM_input_display'] + wdict['ddm_num']
         objects[labels.index('DM_new_display')].data = wdict['DM_input_display'] + wdict['ddm_num']
-    
     return
 
         
@@ -1381,3 +1395,34 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                 param='value')
 
     return
+
+
+
+
+
+"""
+RM Synthesis State
+"""
+
+def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
+                 maxRM_num,polcalbutton,useRM2D,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,polcalbutton_zoom,RM_gal_display,RM_galerr_display):
+
+    #update RM displays
+    state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(RA,DEC),filename=repo_path + "/data/faraday2020v2.hdf5")
+    state_dict['RM_gal'] = np.around(state_dict['RM_gal'],2)
+    state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],2)
+    RM_gal_display.data = state_dict['RM_gal']
+    RM_galerr_display.data = state_dict['RM_galerr']
+
+    #update widget dict
+    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D],
+                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D'],param='value')
+    
+    update_wdict([RM_gal_display,RM_galerr_display],['RM_gal_display','RM_galerr_display'],param='data')
+        
+    
+    return
+
+
+
+
