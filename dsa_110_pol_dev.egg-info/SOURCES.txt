@@ -14,6 +14,7 @@ setup.py
 .ipynb_checkpoints/Mark_RM_Testing-checkpoint.ipynb
 .ipynb_checkpoints/dsapol_unit_testing-checkpoint.ipynb
 data/DSA110-FRBs-PARSEC_TABLE.csv
+data/faraday2020v2.hdf5
 dist/dsa_110_pol_dev-1.0.0-py3.6.egg
 dist/dsa_110_pol_dev-1.0.0-py3.8.egg
 dist/dsa_110_pol_dev-1.0.0-py3.9.egg
@@ -22,6 +23,7 @@ dsa_110_pol_dev.egg-info/SOURCES.txt
 dsa_110_pol_dev.egg-info/dependency_links.txt
 dsa_110_pol_dev.egg-info/requires.txt
 dsa_110_pol_dev.egg-info/top_level.txt
+dsapol/RMcal.py
 dsapol/dsapol.py
 dsapol/parsec.py
 dsapol/polbeamform.py
