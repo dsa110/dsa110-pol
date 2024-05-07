@@ -1245,6 +1245,12 @@ def get_SNR(I_tcal,I_w_t_filtcal,timestart,timestop):
 def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider):
     
 
+    if nextcompbutton.clicked:
+
+        #increment the component and reset bounds
+        if state_dict['current_comp'] < state_dict['n_comps']-1:
+            state_dict['current_comp'] += 1
+        else: print('Done with components')
 
     #first check if resolution was changed
     state_dict['window'] = 2**logwindow_slider.value
@@ -1365,12 +1371,6 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     plt.subplots_adjust(hspace=0)
     plt.show()
 
-    if nextcompbutton.clicked:
-
-        #increment the component and reset bounds
-        if state_dict['current_comp'] < state_dict['n_comps']-1:
-            state_dict['current_comp'] += 1
-        else: print('Done with components')
 
 
     if donecompbutton.clicked:
@@ -1466,7 +1466,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         plt.figure(figsize=(12,6))
         if state_dict['n_comps'] > 1:                
             #loop through each component
-            for i in range(len(state_dict['n_comps'])):
+            for i in range(state_dict['n_comps']):
                 #mask other components and get spectra
                 Ip = copy.deepcopy(Ip_full)
                 Qp = copy.deepcopy(Qp_full)
@@ -1486,10 +1486,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 if useRMTools.value: #STAGE 1: RM-TOOLS
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
-                    state_dict['comps'][i]['RM_tools'],state_dict['comps'][i]['RM_tools_snrs'],state_dict['comps'][i]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                
+                    RM,RMerr,state_dict['comps'][i]['RM_tools_snrs'],state_dict['comps'][i]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict['comps'][i]['RM_tools'] = [RM,RMerr]
                 #elif useRMsynth.value: #STAGE 2: 1D RM synthesis
-                plt.plot(state_dict['comps'][i]['RM_tools'],state_dict['comps'][i]['RM_tools_snrs'])
+                plt.plot(state_dict['comps'][i]['trial_RM_tools'],state_dict['comps'][i]['RM_tools_snrs'])
 
 
         #RM-TOOLS for the full burst
