@@ -115,7 +115,7 @@ def get_RM_tools(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,freq_test,n_t,m
     """
 
     #set masked channels to np.nan
-    print("getting errors for each stokes param...")
+    #print("getting errors for each stokes param...")
     Ierr = np.std(Ical[:,:n_off],axis=1)
     try:
         Ierr[Ierr.mask] = np.nan
@@ -137,7 +137,7 @@ def get_RM_tools(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,freq_test,n_t,m
     except AttributeError:
         print("not a masked array")
 
-    print("getting nan masked data...")
+    #print("getting nan masked data...")
     try:
         I_fcal_rmtools = I_fcal.data
         I_fcal_rmtools[I_fcal.mask] = np.nan
@@ -156,16 +156,35 @@ def get_RM_tools(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,freq_test,n_t,m
     except AttributeError:
         U_fcal_rmtools = U_fcal
 
-    print("starting RM-tools...")
+    #print("starting RM-tools...")
     #run RM-tools
     out=run_rmsynth([freq_test[0]*1e6,I_fcal_rmtools,Q_fcal_rmtools,U_fcal_rmtools,Ierr,Qerr,Uerr],phiMax_radm2=maxRM_num_tools,dPhi_radm2=dRM_tools)
 
-    print("starting RM clean...")
+    #print("starting RM clean...")
     #run RM-clean
     out=run_rmclean(out[0],out[1],2)
     RM = float(out[0]["phiPeakPIchan_rm2"])
     RMerr = float(out[0]["dPhiPeakPIchan_rm2"])
     trial_RM = list(np.array(out[1]["phiArr_radm2"],dtype=float))
     RMsnrs = list(np.array(np.abs(out[1]["cleanFDF"]),dtype=float))
-    print("Done")
+    #print("Done")
     return RM,RMerr,RMsnrs,trial_RM
+
+#function to run 1D RM synthesis
+def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000):
+    """
+    This function uses the manual 1D RM synthesis module to run RM synthesis
+    """
+
+    #make RM axis
+    trial_RM = np.linspace(minRM_num,maxRM_num,int(nRM_num))
+    trial_phi = [0]
+
+    #run RM synthesis
+    RM1,phi1,RMsnrs1,RMerr1 = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True)
+
+    return RM1,RMerr1,RMsnrs1,trial_RM
+    
+    
+
+

@@ -306,6 +306,7 @@ state_map = {'load':0,
              }
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
+state_dict['n_comps'] = 1
 state_dict['rel_n_t'] = 1
 state_dict['rel_n_f'] = 2**5
 df = pd.DataFrame(
@@ -495,8 +496,26 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'RM_gal_display':np.around(RM_gal_init,2),
         'RM_galerr_display':np.around(RM_galerr_init,2),
         'RM_ion_display':np.around(RM_ion_init,2),
-        'RM_ionerr_display':np.around(RM_ionerr_init,2)
+        'RM_ionerr_display':np.around(RM_ionerr_init,2),
+        'rmcomp_menu':'All',
+        'rmcomp_menu_choices':['All','']
 }
+
+state_dict['RMcalibrated'] = dict()
+state_dict['RMcalibrated']['RMsnrs1'] = np.nan*np.ones(int(wdict['nRM_num']))
+state_dict['RMcalibrated']['RM_tools_snrs'] = np.nan*np.ones(int(2*wdict['maxRM_num']/wdict['dRM_tools']))
+state_dict['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+state_dict['RMcalibrated']['RM_tools_snrszoom'] = np.nan*np.ones(int(2*wdict['RM_window_zoom']/wdict['dRM_tools_zoom']))
+state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+state_dict['RMcalibrated']["RM2"] = [np.nan,np.nan]
+state_dict["RMcalibrated"]["RMerrfit"] = np.nan
+state_dict["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['maxRM_num'],int(wdict['nRM_num']))
+state_dict["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
+state_dict["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
+state_dict["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
+
+
+
 
 def update_wdict(objects,labels,param='value'):
     """
@@ -518,6 +537,11 @@ def update_wdict(objects,labels,param='value'):
     if 'DM_new_display' in labels:
         wdict['DM_new_display'] = wdict['DM_input_display'] + wdict['ddm_num']
         objects[labels.index('DM_new_display')].data = wdict['DM_input_display'] + wdict['ddm_num']
+    if 'rmcomp_menu' in labels:
+        if state_dict['n_comps'] > 1:
+            wdict['rmcomp_menu_choices'] = [str(i) for i in range(state_dict['n_comps'])] + ['All','']
+        else:
+            wdict['rmcomp_menu_choices'] = ['All','']
     return
 
         
@@ -1327,6 +1351,22 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                                 padded=True,norm=False)
     
 
+
+    #initialize RM dict
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated'] = dict()
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1'] = np.nan*np.ones(int(wdict['nRM_num']))
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrs'] = np.nan*np.ones(int(2*wdict['maxRM_num']/wdict['dRM_tools']))
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrszoom'] = np.nan*np.ones(int(2*wdict['RM_window_zoom']/wdict['dRM_tools_zoom']))
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM2"] = [np.nan,np.nan]
+    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["RMerrfit"] = np.nan
+    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['maxRM_num'],int(wdict['nRM_num']))
+    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
+    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
+    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
+
+
     #compute S/N and display
     state_dict['comps'][state_dict['current_comp']]['S/N'] = get_SNR(I_tcal,state_dict['comps'][state_dict['current_comp']]['weights'],
                                                                     state_dict['comps'][state_dict['current_comp']]['timestart'],
@@ -1432,9 +1472,13 @@ RM Synthesis State
 """
 
 def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
-                 maxRM_num,polcalbutton,useRM2D,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,
-                 polcalbutton_zoom,RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display,
-                 getRMgal_button,getRMion_button):
+                 maxRM_num,getRMbutton,useRM2D,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,
+                 getRMbutton_zoom,RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display,
+                 getRMgal_button,getRMion_button,rmcomp_menu):
+    
+    #update component options
+    update_wdict([rmcomp_menu],['rmcomp_menu'],
+                param='value')
 
     #update RM displays
     if getRMgal_button.clicked:
@@ -1454,7 +1498,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
 
     #if run button is clicked, run RM synthesis for all individual subcomponents and full burst
-    if polcalbutton.clicked:
+    if getRMbutton.clicked:
 
         
         #make dynamic spectra w/ high frequency resolution
@@ -1463,7 +1507,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         Up_full = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
         Vp_full = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
 
-        plt.figure(figsize=(12,6))
+        #plt.figure(figsize=(12,6))
         if state_dict['n_comps'] > 1:                
             #loop through each component
             for i in range(state_dict['n_comps']):
@@ -1486,31 +1530,51 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 if useRMTools.value: #STAGE 1: RM-TOOLS
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
-                    RM,RMerr,state_dict['comps'][i]['RM_tools_snrs'],state_dict['comps'][i]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                    state_dict['comps'][i]['RM_tools'] = [RM,RMerr]
+                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
                 #elif useRMsynth.value: #STAGE 2: 1D RM synthesis
-                plt.plot(state_dict['comps'][i]['trial_RM_tools'],state_dict['comps'][i]['RM_tools_snrs'])
+                #plt.plot(state_dict['comps'][i]['trial_RM_tools'],state_dict['comps'][i]['RM_tools_snrs'])
 
+
+                #STAGE 2: 1D RM synthesis
+                if useRMsynth.value:
+                    n_off = int(NOFFDEF/state_dict['n_t'])
+
+                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
+                    state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
+
+                
 
         #RM-TOOLS for the full burst
-        print(type(Ip_full))
-        print(Ip_full.mask)
-        print(Ip_full.data)
         
         If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
         
-        RM,RMerr,state_dict['RM_tools_snrs'],state_dict['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,
-                                                                                                    state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-        state_dict['RM_tools'] = [RM,RMerr]
+        RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+        state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
 
-        plt.plot(state_dict['trial_RM_tools'],state_dict['RM_tools_snrs'])
-        plt.xlabel(r'RM ($rad/m^2$)')
-        plt.ylabel(r'F($\phi$)')            
-        plt.show()
+        #1D RM synthesis
+        RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
+        state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+
+
+        #plt.plot(state_dict['trial_RM_tools'],state_dict['RM_tools_snrs'])
+        #plt.xlabel(r'RM ($rad/m^2$)')
+        #plt.ylabel(r'F($\phi$)')            
+        #plt.show()
+
+
+    #plot
+
+    if rmcomp_menu.value == 'All':
+        dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['RMcalibrated']['RMsnrs1'],state_dict['RMcalibrated']['RM_tools_snrs']],[state_dict['RMcalibrated']['RMsnrs1zoom'],state_dict['RMcalibrated']['RM_tools_snrszoom'],state_dict['RMcalibrated']['RMsnrs2']],state_dict['RMcalibrated']["RM2"][0],state_dict["RMcalibrated"]["RMerrfit"],state_dict["RMcalibrated"]["trial_RM1"],state_dict["RMcalibrated"]["trial_RM2"],state_dict["RMcalibrated"]["trial_RM_tools"],state_dict["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='All Components')
+    
+    elif rmcomp_menu.value != '':
+        i= int(rmcomp_menu.value)
+        dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value)
 
     #update widget dict
-    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D],
-                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D'],param='value')
+    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D,rmcomp_menu],
+                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D','rmcomp_menu'],param='value')
     
     update_wdict([RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display],['RM_gal_display','RM_galerr_display','RM_ion_display','RM_ionerr_display'],param='data')
         
