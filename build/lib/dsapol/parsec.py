@@ -156,132 +156,6 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
     return
 update_FRB_params()
 
-"""
-Standard helper functions
-"""
-#New significance estimate
-def L_sigma(Q,U,timestart,timestop,plot=False,weighted=False,I_w_t_filt=None):
-
-
-    L0_t = np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)
-    
-    if weighted:
-        L0_t_w = L0_t*I_w_t_filt
-        L_trial_binned = convolve(L0_t,I_w_t_filt)
-        sigbin = np.argmax(L_trial_binned)
-        noise = np.std(np.concatenate([L_trial_binned[:sigbin],L_trial_binned[sigbin+1:]]))
-        #print("weighted: " + str(noise))
-
-    else:
-        L_trial_cut1 = L0_t[timestart%(timestop-timestart):]
-        L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
-        L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
-        sigbin = np.argmax(L_trial_binned)
-        noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
-        #print("not weighted: " + str(noise))
-    return noise
-
-
-def L_pdf(x,df,width,abs_max=10,numpoints=10000,plot=False):
-    
-    delta = np.linspace(-abs_max,abs_max,2*numpoints)[1] - np.linspace(-abs_max,abs_max,2*numpoints)[0]
-    y1 = chi.pdf(np.linspace(-abs_max,abs_max,2*numpoints),df=2)*delta
-    y2 = copy.deepcopy(y1)
-    if plot:
-        plt.figure(figsize=(12,6))
-        x1=chi.rvs(df=2,size=100000)
-        h,b,p = plt.hist(x1,np.linspace(0,abs_max,int(numpoints/100)))
-        plt.plot(np.linspace(-abs_max,abs_max,2*numpoints),np.max(h)*y2/np.max(y2))
-
-    for i in range(width-1):
-        y2 = convolve(y2,y1,mode="same")
-        if plot:
-            x1+=chi.rvs(df=2,size=100000)
-            h,b,p = plt.hist(x1,np.linspace(0,abs_max,int(numpoints/100)))
-            plt.plot(np.linspace(-abs_max,abs_max,2*numpoints),y2)#np.max(h)*y2/delta/np.max(y2/delta))
-
-    fint = interp1d(np.linspace(-abs_max,abs_max,2*numpoints),y2/delta,fill_value="extrapolate")
-    #print(x)
-    if plot:
-        plt.plot(x,np.max(h)*fint(x)/np.max(fint(x)),color="red",linewidth=2)
-        plt.xlim(0,abs_max)
-        plt.show()
-    return fint(x)
-#pdf = L_pdf_weighted(np.linspace(0,m,npoint),m,hhfh,weights=I_w_t_filtnopad,abs_max=m,numpoints=npoint,plot=True)
-
-def L_pdf_weighted(x,df,width,weights,abs_max=10,numpoints=10000,plot=False):
-    
-    
-    
-    axis = np.linspace(-abs_max,abs_max,2*numpoints)
-    
-    delta = axis[1] - axis[0]
-    y1 = np.concatenate([np.zeros(numpoints),chi.pdf(axis[numpoints:]/np.abs(weights[0]),df=2)])/np.abs(weights[0])
-    y2 = copy.deepcopy(y1)
-    if plot:
-        plt.figure(figsize=(12,6))
-        #x1=chi.rvs(df=2,size=100000)*weights[0]
-        #h,b,p = plt.hist(x1,np.linspace(0,0.005,int(numpoints/100)))
-        plt.plot(axis,y2/np.max(y2))
-
-        #print((0,weights[0]))
-    count = 1
-    for i in range(1,width):
-        #print(i)
-        
-        if np.abs(weights[i]) > 1e-6:
-            #print((i,np.abs(weights[i])))
-            #print("axis " + str((np.max(axis),np.min(axis))))
-            #print(weights[i])
-            #print(y2/weights[i])
-            #print(weights[i])
-            #print((axis[numpoints:]/np.abs(weights[i]))[(axis[numpoints:]/np.abs(weights[i]))>0])
-            y3=np.concatenate([np.zeros(numpoints),chi.pdf(axis[numpoints:]/np.abs(weights[i]),df=2)])/np.abs(weights[i])
-            y2 = delta*convolve(y2,y3,mode="same")
-            if plot:
-                #x1+=chi.rvs(df=2,size=100000)*np.abs(weights[i])
-                #h,b,p = plt.hist(x1,np.linspace(0,0.005,int(numpoints/100)))
-                plt.plot(axis,y3/np.max(y3))#np.max(h)*y2/np.max(y2))
-                #plt.plot(axis,y2)
-            count += 1
-        #else: 
-        #    print("Skipping: " + str((i,weights[i])))
-        if np.any(np.abs(y2) > 1.7976931348623157e+308):
-            print("OVERFLOW")
-            
-        print(y2)
-    fint = interp1d(axis,y2/delta,fill_value="extrapolate")
-    #plt.figure()
-    #plt.plot(x,fint(x),color="red",linewidth=2)
-    #plt.show()
-    #if plot:
-     #   plt.plot(x,np.max(h)*fint(x)/np.max(fint(x)),color="red",linewidth=2)
-      #  plt.xlim(0,abs_max)
-    #plt.ylim(0,10)
-    plt.xlim(-0.001,0.005)
-    plt.show()
-    
-    #print("Total count :  " + str(count) + "/" + str(len(weights)))
-    return fint(x)
-
-    
-def L_pvalue(dat,x,df,width,abs_max=10,numpoints=10000,sigma=1):
-    pdf = L_pdf(x,df,width,abs_max=abs_max,numpoints=numpoints)
-    
-    idxdat = np.argmin(np.abs(x-dat*sigma))
-    
-    pvalue = np.sum(pdf[idxdat:])/np.sum(pdf) #probability that dat*sigma given this dist
-    return pvalue
-    
-def fit_parabola(x,a,b,c):
-    return -a*((x-c)**2) + b
-
-def gauss_scint(x,bw,amp,off):
-    return off + amp*np.exp(-np.log(2)*((x/bw)**2))
-
-
-def lorentz_scint(x,bw,amp,off):
-    return off + amp*(bw/(x**2 + (0.5*bw**2)))
 
 
 
@@ -1507,7 +1381,6 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         Up_full = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
         Vp_full = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
 
-        #plt.figure(figsize=(12,6))
         if state_dict['n_comps'] > 1:                
             #loop through each component
             for i in range(state_dict['n_comps']):
@@ -1532,38 +1405,99 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
                     RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
                     state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
-                #elif useRMsynth.value: #STAGE 2: 1D RM synthesis
-                #plt.plot(state_dict['comps'][i]['trial_RM_tools'],state_dict['comps'][i]['RM_tools_snrs'])
 
 
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
+                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
                     state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
 
-                
+                   
 
-        #RM-TOOLS for the full burst
-        
         If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
         
-        RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-        state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
+        #STAGE 1: RM-TOOLS (Full burst)
+        if useRMTools.value: 
+            RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+            state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
 
-        #1D RM synthesis
-        RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
-        state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+        #STAGE 2: 1D RM synthesis
+        if useRMsynth.value:
+            RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
+            state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+
+        
+    #if run button 2 is clicked, run RM synthesis for all individual subcomponents and full burst, zoom around initial estimate
+    if getRMbutton_zoom.clicked and (~np.isnan(state_dict["RMcalibrated"]["RM2"][0]) or ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]) or ~np.isnan(state_dict["RMcalibrated"]["RM_tools"][0])):
+        #get center RM
+        if ~np.isnan(state_dict["RMcalibrated"]["RM2"][0]): RMcenter = state_dict["RMcalibrated"]["RM2"][0]
+        elif ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]): RMcenter = state_dict["RMcalibrated"]["RM1"][0]
+        else: RMcenter = state_dict["RMcalibrated"]["RM_tools"][0]
+
+        #make dynamic spectra w/ high frequency resolution
+        Ip_full = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
+        Qp_full = dsapol.avg_time(state_dict['base_Qcal'],state_dict['rel_n_t'])
+        Up_full = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
+        Vp_full = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
+
+        if state_dict['n_comps'] > 1:
+        
+            #loop through each component
+            for i in range(state_dict['n_comps']):
+                #mask other components and get spectra
+                Ip = copy.deepcopy(Ip_full)
+                Qp = copy.deepcopy(Qp_full)
+                Up = copy.deepcopy(Up_full)
+                Vp = copy.deepcopy(Vp_full)
+                for k in range(state_dict['n_comps']):
+                    if i != k:
+                        mask = np.zeros(Ip.shape)
+                        mask[:,state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
+                        Ip = ma(Ip,mask)
+                        Qp = ma(Qp,mask)
+                        Up = ma(Up,mask)
+                        Vp = ma(Vp,mask)
+                If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['comps'][i]['buff'],weighted=True,n_t_weight=state_dict['comps'][i]['avger_w'],timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],sf_window_weights=state_dict['comps'][i]['sf_window_weights'],input_weights=state_dict['comps'][i]['weights'])
+
+                #STAGE 1: RM-TOOLS
+                if useRMTools.value: #STAGE 1: RM-TOOLS
+                    n_off = int(NOFFDEF/state_dict['n_t'])
+
+                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'] = [RM,RMerr]
 
 
-        #plt.plot(state_dict['trial_RM_tools'],state_dict['RM_tools_snrs'])
-        #plt.xlabel(r'RM ($rad/m^2$)')
-        #plt.ylabel(r'F($\phi$)')            
-        #plt.show()
+                #STAGE 2: 1D RM synthesis
+                if useRMsynth.value:
+                    n_off = int(NOFFDEF/state_dict['n_t'])
+
+                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
+                    state_dict['comps'][i]['RMcalibrated']["RM1zoom"] = [RM,RMerr]
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
+                    if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
+
+        If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+
+        #STAGE 1: RM-TOOLS (Full burst)
+        if useRMTools.value:
+            RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+            state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
+
+        #STAGE 2: 1D RM synthesis
+        if useRMsynth.value:
+            RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
+            state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+            state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
+            if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+    elif getRMbutton_zoom.clicked:
+        print("Run Initial RM synthesis first")
 
 
-    #plot
+
+
+    #1D plots
 
     if rmcomp_menu.value == 'All':
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['RMcalibrated']['RMsnrs1'],state_dict['RMcalibrated']['RM_tools_snrs']],[state_dict['RMcalibrated']['RMsnrs1zoom'],state_dict['RMcalibrated']['RM_tools_snrszoom'],state_dict['RMcalibrated']['RMsnrs2']],state_dict['RMcalibrated']["RM2"][0],state_dict["RMcalibrated"]["RMerrfit"],state_dict["RMcalibrated"]["trial_RM1"],state_dict["RMcalibrated"]["trial_RM2"],state_dict["RMcalibrated"]["trial_RM_tools"],state_dict["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='All Components')

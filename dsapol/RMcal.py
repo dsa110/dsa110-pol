@@ -170,8 +170,78 @@ def get_RM_tools(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,freq_test,n_t,m
     #print("Done")
     return RM,RMerr,RMsnrs,trial_RM
 
+
+#helper functions for parabolic fits
+#New significance estimate
+def L_sigma(Q,U,timestart,timestop,plot=False,weighted=False,I_w_t_filt=None):
+
+
+    L0_t = np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)
+
+    if weighted:
+        L0_t_w = L0_t*I_w_t_filt
+        L_trial_binned = convolve(L0_t,I_w_t_filt)
+        sigbin = np.argmax(L_trial_binned)
+        noise = np.std(np.concatenate([L_trial_binned[:sigbin],L_trial_binned[sigbin+1:]]))
+        #print("weighted: " + str(noise))
+
+    else:
+        L_trial_cut1 = L0_t[timestart%(timestop-timestart):]
+        L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
+        L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
+        sigbin = np.argmax(L_trial_binned)
+        noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
+        #print("not weighted: " + str(noise))
+    return noise
+
+def L_pdf(x,df,width,abs_max=10,numpoints=10000,plot=False):
+
+    delta = np.linspace(-abs_max,abs_max,2*numpoints)[1] - np.linspace(-abs_max,abs_max,2*numpoints)[0]
+    y1 = chi.pdf(np.linspace(-abs_max,abs_max,2*numpoints),df=2)*delta
+    y2 = copy.deepcopy(y1)
+    if plot:
+        plt.figure(figsize=(12,6))
+        x1=chi.rvs(df=2,size=100000)
+        h,b,p = plt.hist(x1,np.linspace(0,abs_max,int(numpoints/100)))
+        plt.plot(np.linspace(-abs_max,abs_max,2*numpoints),np.max(h)*y2/np.max(y2))
+
+    for i in range(width-1):
+        y2 = convolve(y2,y1,mode="same")
+        if plot:
+            x1+=chi.rvs(df=2,size=100000)
+            h,b,p = plt.hist(x1,np.linspace(0,abs_max,int(numpoints/100)))
+            plt.plot(np.linspace(-abs_max,abs_max,2*numpoints),y2)#np.max(h)*y2/delta/np.max(y2/delta))
+
+    fint = interp1d(np.linspace(-abs_max,abs_max,2*numpoints),y2/delta,fill_value="extrapolate")
+    #print(x)
+    if plot:
+        plt.plot(x,np.max(h)*fint(x)/np.max(fint(x)),color="red",linewidth=2)
+        plt.xlim(0,abs_max)
+        plt.show()
+    return fint(x)
+
+def L_pvalue(dat,x,df,width,abs_max=10,numpoints=10000,sigma=1):
+    pdf = L_pdf(x,df,width,abs_max=abs_max,numpoints=numpoints)
+
+    idxdat = np.argmin(np.abs(x-dat*sigma))
+
+    pvalue = np.sum(pdf[idxdat:])/np.sum(pdf) #probability that dat*sigma given this dist
+    return pvalue
+
+def fit_parabola(x,a,b,c):
+    return -a*((x-c)**2) + b
+
+def gauss_scint(x,bw,amp,off):
+    return off + amp*np.exp(-np.log(2)*((x/bw)**2))
+
+
+def lorentz_scint(x,bw,amp,off):
+    return off + amp*(bw/(x**2 + (0.5*bw**2)))
+
+
+
 #function to run 1D RM synthesis
-def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000):
+def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,weights=None):
     """
     This function uses the manual 1D RM synthesis module to run RM synthesis
     """
@@ -182,6 +252,19 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,nRM_num=int(2e6),minRM_num=-
 
     #run RM synthesis
     RM1,phi1,RMsnrs1,RMerr1 = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True)
+
+    #if set, use better fit of FDF for error
+    if fit:
+        assert(weights is not None)
+        
+        poptpar,pcovpar = curve_fit(fit_parabola,trial_RM[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window],
+                RMsnrs1[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window],
+                p0=[1,1,RM1],sigma=1/RMsnrs1[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window])
+        RM1 = poptpar[2]
+        
+        FWHMRM1zoom,tmp,tmp,tmp = peak_widths(RMsnrs1,[np.argmax(RMsnrs1)])
+        noisezoom = L_sigma(Qcal,Ucal,timestart,timestop,plot=False,weighted=True,I_w_t_filt=weights)
+        RMerr1 = FWHMRM1zoom*(trial_RM[1]-trial_RM[0])*noisezoom/(2*np.max(RMsnrs1))
 
     return RM1,RMerr1,RMsnrs1,trial_RM
     
