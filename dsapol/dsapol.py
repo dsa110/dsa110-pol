@@ -3685,7 +3685,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         timestart = 0
         timestop = I.shape[1]
     elif input_weights != []:
-        print("Using Custom Input Weights")
+        #print("Using Custom Input Weights")
         timestart = timestart_in 
         timestop = timestop_in
     else:
@@ -3779,14 +3779,14 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         U_binned = U_cut.reshape(len(U_cut)//(timestop-timestart),timestop-timestart).mean(1)
         Unoise = (np.std(np.concatenate([U_binned[:sigbin],U_binned[sigbin+1:]])))
         noise = Qnoise#np.sqrt((Q_binned[sigbin]*Qnoise)**2  + (U_binned[sigbin]*Unoise)**2)/sig0
-    print(noise)        
+    #print(noise)        
     snr0 = sig0/noise
 
     P_cut = P[:,timestart:timestop]
     wavall_cut = np.array([wav]*np.shape(P_cut)[1]).transpose()
     #if weighted:
     #    I_t_weights_cut = I_t_weights#I_t_weights[timestart:timestop]
-    print(P_cut.shape,wavall_cut.shape)
+    #print(P_cut.shape,wavall_cut.shape)
 
     #if full return full time vs RM matrix to estimate RM variation over the pulse width
     if full:
@@ -3840,7 +3840,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
     max_RM_idx = np.argmax(SNRs)
-    print(max_RM_idx)
+    #print(max_RM_idx)
 
     significance = ((np.max(SNRs)-snr0)/snr0)
 
@@ -5791,7 +5791,7 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
 
 #plotting functions
-def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title=""):
+def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title="",figsize=(38,28)):
     datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     #parse results
     RMsynth_snrs, RMtools_snrs = RMsnrs
@@ -5801,7 +5801,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         RMsynth_zoomsnrs, RMSNR_zoomsnrs = RMzoomsnrs
 
 
-    fig, axs = plt.subplots(2,1,figsize=(38,28), gridspec_kw={'height_ratios': [1, 1]})
+    fig, axs = plt.subplots(2,1,figsize=figsize, gridspec_kw={'height_ratios': [1, 1]})
 
     ax4= axs[0]# = plt.subplot2grid(shape=(2, 2), loc=(0, 0), colspan=2)
     ax5 =axs[1]#= plt.subplot2grid(shape=(2, 2), loc=(1, 0), colspan=2,rowspan=2)
@@ -6087,3 +6087,12 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
 
     return I_f,Q_f,U_f,L_f,V_f
 
+
+
+#compute the unbiased linear polarization
+def L_unbias(It,Qt,Ut,n_off,unbias_factor=1):
+
+    L_tcal_trm = np.sqrt(Qt**2 + Ut**2)
+    L_tcal_trm[L_tcal_trm**2 <= (unbias_factor*np.std(It[:n_off]))**2] = np.std(It[:n_off])
+    L_tcal_trm = np.sqrt(L_tcal_trm**2 - np.std(It[:n_off])**2)
+    return L_tcal_trm
