@@ -251,7 +251,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
     trial_phi = [0]
 
     #run RM synthesis
-    RM1,phi1,RMsnrs1,RMerr1 = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True)
+    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True,matrixmethod=False,multithread=True,maxProcesses=100,numbatch=10)
 
     #if set, use better fit of FDF for error
     if fit:
@@ -287,7 +287,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,
                                                                                         show=False,err=True,buff=buff,weighted=True,n_off=n_off,
                                                                                         timeaxis=timeaxis,fobj=fobj,full=True,
                                                                                         input_weights=weights[timestart:timestop],
-                                                                                        timestart_in=timestart,timestop_in=timestop)
+                                                                                        timestart_in=timestart,timestop_in=timestop,matrixmethod=True)
     #use error from the exponential fit
     RMerr2 = dsapol.RM_error_fit(np.max(RMsnrs2))
 
@@ -304,49 +304,48 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,
 
 
 #plot the 2D RM spectrum
-def plot_RM_2D(I_tcal_trm,Q_tcal_trm,U_tcal_trm,V_tcal_trm,n_off,n_t,timeaxis,timestart,timestop,RM,RMerr,trial_RM2,SNRs_full,show_uncalibrated=True,I_tcal=None,Q_tcal=None,U_tcal=None,V_tcal=None,rmbuff=500,cmapname='viridis',wind=5):
+def plot_RM_2D(I_tcal,Q_tcal,U_tcal,V_tcal,n_off,n_t,timeaxis,timestart,timestop,RM,RMerr,trial_RM2,SNRs_full,Qnoise,show_calibrated=True,RMcal=np.nan,RMcalerr=np.nan,I_tcal_trm=None,Q_tcal_trm=None,U_tcal_trm=None,V_tcal_trm=None,rmbuff=500,cmapname='viridis',wind=5):
     """
     This function plots the RM spectrum and polarization profile
     """
 
     #get unbiased linear polarization
-    if show_uncalibrated:
-        L_tcal = dsapol.L_unbias(I_tcal,Q_tcal,U_tcal,n_off)
-    L_tcal_trm = L_unbias(I_tcal_trm,Q_tcal_trm,U_tcal_trm,n_off)
-    Qnoise = np.std(Q_tcal_trm.mean(0)[:n_off])
+    if show_calibrated:
+        L_tcal_trm = dsapol.L_unbias(I_tcal_trm,Q_tcal_trm,U_tcal_trm,n_off)    
+    L_tcal = dsapol.L_unbias(I_tcal,Q_tcal,U_tcal,n_off)
+    
+    #Qnoise = np.std(Q_tcal.mean(0)[:n_off])
 
     #circular polarization
-    C_tcal_trm = V_tcal_trm
+    C_tcal = V_tcal
 
     #make plot
-    tshifted = (timeaxis - np.argmax(I_tcal_trm)*(32.7)*n_t)/1000
-    tpeak = (np.argmax(I_tcal_trm)*(32.7)*n_t)/1000
+    tshifted = (timeaxis - np.argmax(I_tcal)*(32.7)*n_t)/1000
+    tpeak = (np.argmax(I_tcal)*(32.7)*n_t)/1000
 
     fig= plt.figure(figsize=(38,28))
     ax0 = plt.subplot2grid(shape=(9, 4), loc=(0, 0), colspan=4,rowspan=2)
     ax1 = plt.subplot2grid(shape=(9, 4), loc=(2, 0), colspan=4,rowspan=2,sharex=ax0)
     ax2 = plt.subplot2grid(shape=(9, 4), loc=(4, 0), colspan=4, rowspan=4)
 
-    ax0.errorbar(tshifted[timestart:timestop],trial_RM2[SNRs_full.argmax(axis=0)],yerr=RM_error_fit(SNRs_full.max(axis=0)/Qnoise),fmt='o',color="black",markersize=10,capsize=20,elinewidth=4,zorder=2,markeredgewidth=2)
+    ax0.errorbar(tshifted[timestart:timestop],trial_RM2[SNRs_full.argmax(axis=0)],yerr=dsapol.RM_error_fit(SNRs_full.max(axis=0)/Qnoise),fmt='o',color="black",markersize=10,capsize=20,elinewidth=4,zorder=2,markeredgewidth=2)
     ax0.scatter(tshifted[timestart:timestop],trial_RM2[SNRs_full.argmax(axis=0)],c=SNRs_full.max(axis=0),marker='o',s=300,linewidth=2,zorder=3,vmin=np.nanpercentile(SNRs_full,75),vmax=np.nanmax(SNRs_full),cmap=cmapname,edgecolors='black',linewidths=2)
 
     ax0.set_xlim(((timestart - np.argmax(I_tcal_trm))*32.7*n_t)/1000-wind,((timestop - np.argmax(I_tcal_trm))*32.7*n_t)/1000 +wind)
-    ax0.set_xlim(((timestart -np.argmax(I_tcal_trm))*32.7*n_t)/1000,((timestop - np.argmax(I_tcal_trm))*32.7*n_t)/1000)
+    #ax0.set_xlim(((timestart -np.argmax(I_tcal_trm))*32.7*n_t)/1000,((timestop - np.argmax(I_tcal_trm))*32.7*n_t)/1000)
     ax0.set_ylabel(r'RM ($rad/m^2$)')
     ax0.set_ylim(np.min(trial_RM2)-10,np.max(trial_RM2)+10)
-    ax0.set_ylim(RM2-rmbuff,RM2+rmbuff)
+    ax0.set_ylim(RM-rmbuff,RM+rmbuff)
 
-    ax1.step(tshifted,I_tcal_trm,label=r'I',color="black",linewidth=3,where='post')
-    if show_uncalibrated:
+    ax1.step(tshifted,I_tcal,label=r'I',color="black",linewidth=3,where='post')
+    if show_calibrated:
         ax1.step(tshifted,L_tcal_trm,label=r'L (RM calibrated)',color="blue",linewidth=2.5,where='post')
-        ax1.step(tshifted,L_tcal,linestyle='--',label=r'L (RM uncalibrated)',color="blue",linewidth=2.5,where='post')
-    else:
-        ax1.step(tshifted,L_tcal_trm,label=r'L',color="blue",linewidth=2.5,where='post')
-    ax1.step(tshifted,C_tcal_trm,label=r'V',color="orange",linewidth=2,where='post')
+    ax1.step(tshifted,L_tcal,linestyle='--',label=r'L (RM uncalibrated)',color="blue",linewidth=2.5,where='post')
+    ax1.step(tshifted,C_tcal,label=r'V',color="orange",linewidth=2,where='post')
 
     ax1.legend(loc="upper right",fontsize=50,frameon=True,framealpha=1)
     ax1.set_ylabel(r'S/N')
-    ax1.set_xlim(((timestart -np.argmax(I_tcal_trm))*32.7*n_t)/1000,((timestop -np.argmax(I_tcal_trm))*32.7*n_t)/1000)
+    ax1.set_xlim(((timestart -np.argmax(I_tcal))*32.7*n_t)/1000 - wind,((timestop -np.argmax(I_tcal))*32.7*n_t)/1000 + wind)
     ax2.set_xlabel(r'Time ($m s$)')
     ax2.set_ylabel(r'RM ($rad/m^2$)')
 
@@ -354,7 +353,10 @@ def plot_RM_2D(I_tcal_trm,Q_tcal_trm,U_tcal_trm,V_tcal_trm,n_off,n_t,timeaxis,ti
     ax2.imshow(SNRs_full[::-1,:],aspect="auto",interpolation="nearest",vmin=np.nanpercentile(SNRs_full,75),vmax=np.nanmax(SNRs_full),cmap=cmapname,
           extent=(((timestart -np.argmax(I_tcal_trm))*32.7*n_t)/1000,((timestop -np.argmax(I_tcal_trm))*32.7*n_t)/1000,
                  np.min(trial_RM2),np.max(trial_RM2)))
-    ax0.axhline(RM2,color="red",label=r'${{\rm RM}}={a}\pm{b}$ rad/m$^2$'.format(a=np.around(RM2,2),b=np.around(RMerr_fit,2)),linewidth=3,zorder=1)
+    ax2.set_xlim(((timestart -np.argmax(I_tcal))*32.7*n_t)/1000 - wind,((timestop -np.argmax(I_tcal))*32.7*n_t)/1000 + wind)
+    ax0.axhline(RM,color="red",label=r'${{\rm RM}}_{{\rm peak}}={a}\pm{b}$ rad/m$^2$'.format(a=np.around(RM,2),b=np.around(RMerr,2)),linewidth=3,zorder=1)
+    if show_calibrated:
+        ax0.axhline(RMcal,color="magenta",label=r'${{\rm RM}}_{{\rm cal}}={a}\pm{b}$ rad/m$^2$'.format(a=np.around(RMcal,2),b=np.around(RMcalerr,2)),linewidth=3,zorder=1)
     ax0.legend(loc="upper right",fontsize=50,frameon=True,framealpha=1)
 
     fig.tight_layout()

@@ -41,6 +41,7 @@ from astropy.coordinates import EarthLocation
 import astropy.units as u
 
 import matplotlib.ticker as ticker
+from concurrent.futures import ProcessPoolExecutor, as_completed, wait
 
 #3C48 and 3C286 polynomial fit parameters from Perley-Butler 2013
 coeffs_3C286 = [1.2481,-0.4507,-0.1798,0.0357]
@@ -456,7 +457,7 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     wav_arr = []
     for i in range(4):
         freq_arr.append(freq[i].reshape(-1,n_f).mean(1))
-        wav_arr.append(list(c/(np.array(freq_arr[i])*(1e6))))
+        wav_arr.append(c/(np.array(freq_arr[i])*(1e6)))
 
     
     return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr,bad_chans)
@@ -3500,12 +3501,13 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
 
 #Estimate RM by maximizing SNR over given trial RM; wav is wavelength array
-def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True): 
+def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0): 
+    if multithread: assert(len(trial_RM)%(maxProcesses*numbatch) == 0)
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
 
-    #Calculate polarization
+    #Calculate polarization        
     P = Q + 1j*U
     
     if plot:
@@ -3523,14 +3525,56 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
     #SNR matrix
     SNRs = np.zeros((len(trial_RM),len(trial_phi)))
     
-    for i in range(len(trial_RM)):
+    #matrix implementation
+    if matrixmethod:
+        RMmesh,wavmesh = np.meshgrid(trial_RM,wav) 
+         
         for j in range(len(trial_phi)):
-            RM_i = trial_RM[i]
-            phi_j = trial_phi[j]
+       
+            cterm = np.matrix(np.cos(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            sterm = np.matrix(np.sin(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            SNRs[:,j] = np.array(np.abs(np.matrix(Q)*cterm + np.matrix(U)*sterm + 1j*(np.matrix(Q)*sterm - np.matrix(U)*cterm)))[0,:]
+    
+    else:
 
-            P_trial = P*np.exp(-1j*((2*RM_i*(((wav)**2) - np.mean((wav)**2))) + phi_j))
 
-            SNRs[i,j] = np.abs(np.mean(P_trial))
+        if multithread:
+
+
+
+            for j in range(numbatch):
+
+                #create executor
+                executor = ProcessPoolExecutor(maxProcesses)
+
+                task_list = []
+                trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
+                for i in range(maxProcesses*j,maxProcesses*(j+1)):
+                    trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
+
+                    #start thread
+                    task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                            False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
+                                            False,False,1,1,i))
+
+                #wait for tasks to complete
+                #wait(task_list)
+
+                for future in as_completed(task_list):
+                    tmp,tmp,SNRs_i,tmp,i = future.result()
+                    SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+
+                executor.shutdown(wait=True)
+   
+        else:
+            for i in range(len(trial_RM)):
+                for j in range(len(trial_phi)):
+                    RM_i = trial_RM[i]
+                    phi_j = trial_phi[j]
+
+                    P_trial = P*np.exp(-1j*((2*RM_i*(((wav)**2) - np.mean((wav)**2))) + phi_j))
+
+                    SNRs[i,j] = np.abs(np.mean(P_trial))
     
 
     if plot:
@@ -3547,7 +3591,7 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
         plt.close(f)
         
        
-        if len(trial_RM) > 1 and len(trial_phi) >1:
+        if len(trial_RM) > 1 and len(trial_phi) >1 and (not matrixmethod):
             f=plt.figure(figsize=(12,6))
             plt.imshow(SNRs,aspect='auto')
             plt.colorbar()
@@ -3637,7 +3681,7 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
     else:
         RM_err = None
 
-    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RM_err)
+    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RM_err,mt_offset)
 
 def SNR_fit(RM,popt):
     fit = 0
@@ -3674,7 +3718,7 @@ def faraday_error(Q_f,U_f,freq_test,RM,phi=0):
     return method1HWHM
 
 #Specific Faraday calibration to get SNR spectrum in range around peak
-def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1):
+def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False):
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
@@ -3791,6 +3835,34 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
     #if full return full time vs RM matrix to estimate RM variation over the pulse width
     if full:
         SNRs_full = np.zeros((len(trial_RM),timestop-timestart))
+
+    #matrix method
+    if matrixmethod:
+        RMmesh,wavmesh = np.meshgrid(trial_RM,wav)
+
+        for j in range(len(trial_phi)):
+
+            cterm = np.matrix(np.cos(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            sterm = np.matrix(np.sin(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            
+            sig_all = np.zeros(len(trial_RM))
+            for tidx in range(len(I_t_weights)):
+                
+                
+                Q_cut = np.matrix(np.real(P_cut[:,tidx]))
+                U_cut = np.matrix(np.imag(P_cut[:,tidx]))
+                L_cut = np.array(np.abs(Q_cut*cterm + U_cut*sterm + 1j*(Q_cut*sterm - U_cut*cterm)))[0,:]
+                
+                if full:
+                    SNRs_full[:,tidx] = L_cut#np.array(np.abs(Q_cut*cterm + U_cut*sterm + 1j*(Q_cut*sterm - U_cut*cterm)))[0,:]/len(wavall_cut)
+                
+                if weighted:
+                    sig += L_cut*I_t_weights[tidx]
+                else:
+                    sig += L_cut
+            SNRs[:,j] = sig_all/noise
+
+
     for i in range(len(trial_RM)):
         for j in range(len(trial_phi)):
             RM_i = trial_RM[i]

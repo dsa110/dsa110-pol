@@ -183,6 +183,7 @@ state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
 state_dict['rel_n_t'] = 1
 state_dict['rel_n_f'] = 2**5
+
 df = pd.DataFrame(
     {
         r'${\rm buff}_{L}$': [np.nan],
@@ -373,8 +374,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'RM_ionerr_display':np.around(RM_ionerr_init,2),
         'rmcomp_menu':'All',
         'rmcomp_menu_choices':['All',''],
-        'rmcal_menu':'',
-        'rmcal_menu_choices':['']
+        'rmcal_menu':'No RM Calibration',
+        'rmcal_menu_choices':['No RM Calibration'],
+        'RMdisplay':np.nan,
+        'RMerrdisplay':np.nan
 }
 
 
@@ -404,25 +407,52 @@ RMcaldict = {
                 'Error':np.nan}}
             }
 
+RMdf = pd.DataFrame(
+    {
+        'RM-Tools': [np.nan],
+        'RM-Tools Error': [np.nan],
+        '1D-Synth': [np.nan],
+        '1D-Synth Error': [np.nan],
+        '2D-Synth':[np.nan],
+        '2D-Synth Error': [np.nan]
+    },
+        index=['All']
+    )
+
+
 def make_rmcal_menu_choices():
-    choices = ['']
+    choices = ["No RM Calibration"]
     for k in RMcaldict.keys():
         for j in RMcaldict[k].keys():
             if j in ['coarse','zoom']:
                 for l in RMcaldict[k][j].keys():
                     if ~np.isnan(RMcaldict[k][j][l]['RM']):
-                        choice = str(k) + ' ' + '[' + str(j) + '] ' + str(l) + ': ' + str(np.around(RMcaldict[k][j][l]['RM'],2)) + r'$\pm$' + str(np.around(RMcaldict[k][j][l]['Error'],2)) + r'rad/m$^2$'
+                        choice = str(k) + ' ' + '[' + str(j) + '] ' + str(l) + ': ' + str(np.around(RMcaldict[k][j][l]['RM'],2)) + r'+-' + str(np.around(RMcaldict[k][j][l]['Error'],2)) + r'rad/m^2'
                         choices.append(choice)
                     else: continue
             
             
             else:
                 if ~np.isnan(RMcaldict[k][j]['RM']):
-                    choice = str(k) + ' ' + str(j) + ': ' + str(np.around(RMcaldict[k][j]['RM'],2)) + r'$\pm$' + str(np.around(RMcaldict[k][j]['Error'],2)) + r'rad/m$^2$'
+                    choice = str(k) + ' ' + str(j) + ': ' + str(np.around(RMcaldict[k][j]['RM'],2)) + r'+-' + str(np.around(RMcaldict[k][j]['Error'],2)) + r'rad/m^2'
                     choices.append(choice)
                 else: continue
 
     return choices
+
+
+def RM_from_menu(choice):
+    if choice == "No RM Calibration":
+        return np.nan,np.nan
+    key1 = (choice[:8]).strip()
+    if '[' in choice:
+        key2 = (choice[choice.index('[')+1:choice.index(']')]).strip()
+        key3 = (choice[choice.index(']')+1:choice.index(':')]).strip()
+        return RMcaldict[key1][key2][key3]['RM'],RMcaldict[key1][key2][key3]['Error']
+    else:
+        key3 = (choice[9:choice.index(':')]).strip()
+        return RMcaldict[key1][key3]['RM'],RMcaldict[key1][key3]['Error']
+
 
 
 #RM dict
@@ -442,7 +472,9 @@ state_dict["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['
 state_dict["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
 state_dict["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
 state_dict["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
-
+state_dict['RMcalibrated']['RMcal'] = np.nan
+state_dict['RMcalibrated']['RMcalerr'] = np.nan
+state_dict['RMcalibrated']['RMcalstring'] = "No RM Calibration"
 
 
 
@@ -849,10 +881,24 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         state_dict['Ucal'] = dsapol.avg_freq(state_dict['Ucal'],state_dict['rel_n_f'])
         state_dict['Vcal'] = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
         state_dict['Vcal'] = dsapol.avg_freq(state_dict['Vcal'],state_dict['rel_n_f'])
+        
+        
+        #default case: not RM calibrated
+        state_dict['IcalRM'] = copy.deepcopy(state_dict['Ical'])
+        state_dict['QcalRM'] = copy.deepcopy(state_dict['Qcal'])
+        state_dict['UcalRM'] = copy.deepcopy(state_dict['Ucal'])
+        state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
+       
         print("done downsampling...",file=f)
         f.close()
         #get time series
         (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+
+        state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
+        state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
+        state_dict['U_tcalRM'] = copy.deepcopy(state_dict['U_tcal'])
+        state_dict['V_tcalRM'] = copy.deepcopy(state_dict['V_tcal'])
+
         state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
 
         #get timestart, timestop
@@ -1319,29 +1365,15 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     
 
 
-    #initialize RM dict
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated'] = dict()
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1'] = np.nan*np.ones(int(wdict['nRM_num']))
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrs'] = np.nan*np.ones(int(2*wdict['maxRM_num']/wdict['dRM_tools']))
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrszoom'] = np.nan*np.ones(int(2*wdict['RM_window_zoom']/wdict['dRM_tools_zoom']))
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
-    state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM2"] = [np.nan,np.nan]
-    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["RMerrfit"] = np.nan
-    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['maxRM_num'],int(wdict['nRM_num']))
-    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
-    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
-    state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
-
-
     #compute S/N and display
     state_dict['comps'][state_dict['current_comp']]['S/N'] = get_SNR(I_tcal,state_dict['comps'][state_dict['current_comp']]['weights'],
                                                                     state_dict['comps'][state_dict['current_comp']]['timestart'],
                                                                     state_dict['comps'][state_dict['current_comp']]['timestop'])
     
     
-  
-    df.loc[str(state_dict['current_comp'])] = [state_dict['comps'][state_dict['current_comp']]['buff'][0],
+    #update tables  
+    if state_dict['n_comps'] > 1:
+        df.loc[str(state_dict['current_comp'])] = [state_dict['comps'][state_dict['current_comp']]['buff'][0],
                                                    state_dict['comps'][state_dict['current_comp']]['buff'][1],
                                                    state_dict['comps'][state_dict['current_comp']]['avger_w'],
                                                    state_dict['comps'][state_dict['current_comp']]['sf_window_weights'],
@@ -1349,7 +1381,45 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                    state_dict['comps'][state_dict['current_comp']]['right_lim'],
                                                    state_dict['comps'][state_dict['current_comp']]['S/N']]
 
-    
+        RMdf.loc[str(state_dict['current_comp'])] = [np.nan]*6
+
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated'] = dict()
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1'] = np.nan*np.ones(int(wdict['nRM_num']))
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrs'] = np.nan*np.ones(int(2*wdict['maxRM_num']/wdict['dRM_tools']))
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrszoom'] = np.nan*np.ones(int(2*wdict['RM_window_zoom']/wdict['dRM_tools_zoom']))
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM2"] = [np.nan,np.nan,np.nan,np.nan]
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM1"] = [np.nan,np.nan]
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM1zoom"] = [np.nan,np.nan]
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM_tools"] = [np.nan,np.nan]
+        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM_toolszoom"] = [np.nan,np.nan]
+        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["RMerrfit"] = np.nan
+        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['maxRM_num'],int(wdict['nRM_num']))
+        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
+        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
+        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
+
+        df.loc["All"] = [np.nan,
+                                                   np.nan,
+                                                   np.nan,
+                                                   np.nan,
+                                                   np.nan,
+                                                   np.nan,
+                                                   np.nan]
+    else:
+        df.loc["All"] = [state_dict['comps'][state_dict['current_comp']]['buff'][0],
+                                                   state_dict['comps'][state_dict['current_comp']]['buff'][1],
+                                                   state_dict['comps'][state_dict['current_comp']]['avger_w'],
+                                                   state_dict['comps'][state_dict['current_comp']]['sf_window_weights'],
+                                                   state_dict['comps'][state_dict['current_comp']]['left_lim'],
+                                                   state_dict['comps'][state_dict['current_comp']]['right_lim'],
+                                                   state_dict['comps'][state_dict['current_comp']]['S/N']]
+
+
+
+
+
     #display masked dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
@@ -1377,6 +1447,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     a1.set_ylabel("Frequency (MHz)")
     plt.subplots_adjust(hspace=0)
     plt.show()
+
 
 
 
@@ -1499,6 +1570,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
                     state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
 
+                    #update table
+                    RMdf.loc[str(i), 'RM-Tools'] = RM
+                    RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
+
 
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
@@ -1507,6 +1582,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
                     state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
 
+                    #update table
+                    RMdf.loc[str(i), '1D-Synth'] = RM
+                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
                    
 
         If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
@@ -1516,12 +1594,20 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
             state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
 
+
+            #update table
+            RMdf.loc['All', 'RM-Tools'] = RM
+            RMdf.loc['All', 'RM-Tools Error'] = RMerr
+        
         #STAGE 2: 1D RM synthesis
         if useRMsynth.value:
             RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
             state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
 
-        
+            #update table
+            RMdf.loc['All', '1D-Synth'] = RM
+            RMdf.loc['All', '1D-Synth Error'] = RMerr
+
     #if run button 2 is clicked, run RM synthesis for all individual subcomponents and full burst, zoom around initial estimate
     if getRMbutton_zoom.clicked and (~np.isnan(state_dict["RMcalibrated"]["RM2"][0]) or ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]) or ~np.isnan(state_dict["RMcalibrated"]["RM_tools"][0])):
         #get center RM
@@ -1560,7 +1646,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
                     RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
                     state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'] = [RM,RMerr]
-
+                    
+                    #update table
+                    RMdf.loc[str(i), 'RM-Tools'] = RM
+                    RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
 
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
@@ -1571,7 +1660,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
                     if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
 
-    
+                    #update table
+                    RMdf.loc[str(i), '1D-Synth'] = RM
+                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
+
                 #STAGE 3: 2D RM synthesis
                 if useRM2D.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
@@ -1581,6 +1673,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                     state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
 
+                    #update table
+                    RMdf.loc[str(i), '2D-Synth'] = RM2
+                    RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
+
         If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
 
         #STAGE 1: RM-TOOLS (Full burst)
@@ -1588,12 +1684,21 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
             state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
 
+            #update table
+            RMdf.loc['All', 'RM-Tools'] = RM
+            RMdf.loc['All', 'RM-Tools Error'] = RMerr
+
         #STAGE 2: 1D RM synthesis
         if useRMsynth.value:
             RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
             state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
             state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
             if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+
+            #update table
+            RMdf.loc['All', '1D-Synth'] = RM
+            RMdf.loc['All', '1D-Synth Error'] = RMerr
+
 
         #STAGE 3: 2D RM synthesis
         if useRM2D.value:
@@ -1603,6 +1708,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
             state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
             state_dict['RMcalibrated']['RMerrfit'] = RMerr2
+
+            #update table
+            RMdf.loc['All', '2D-Synth'] = RM2
+            RMdf.loc['All', '2D-Synth Error'] = RMerr2
 
     elif getRMbutton_zoom.clicked:
         print("Run Initial RM synthesis first")
@@ -1626,17 +1735,73 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
     update_wdict([RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display],['RM_gal_display','RM_galerr_display','RM_ion_display','RM_ionerr_display'],param='data')
         
     
+    
+    
     return
 
 
 
-def RM_screen_plot(rmcal_menu,RMcalibratebutton):
-
+def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
+    
     #update rm cal menu
     update_wdict([rmcal_menu],['rmcal_menu'],param='value')
-
+    
     #if RMcalibrate is clicked, calibrate to peak RM
-    #if RMcalibratebutton.clicked:
+    if RMcalibratebutton.clicked and (rmcal_menu.value != "") and (rmcal_menu.value != "No RM Calibration"):
+        
+        #convert menu option to RM value in dict
+        RM,err = RM_from_menu(rmcal_menu.value)
+        RMdisplay.data,RMerrdisplay.data = np.around(RM),np.around(err)
+    
+        #add to state dict
+        state_dict['RMcalibrated']['RMcal'] = RM
+        state_dict['RMcalibrated']['RMcalerr'] = err
+        state_dict['RMcalibrated']['RMcalstring']= rmcal_menu.value
+    
+        #rm calibrate
+        state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'] = dsapol.calibrate_RM(state_dict['Ical'],
+                                                                                                        state_dict['Qcal'],
+                                                                                                        state_dict['Ucal'],
+                                                                                                        state_dict['Vcal'],
+                                                                                                        RM,0,state_dict['freq_test'],
+                                                                                                        stokes=True) #total derotation
+
+        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+
+
+
+    elif RMcalibratebutton.clicked and (rmcal_menu.value == "No RM Calibration"):
+
+        #Don't calibrate
+
+        state_dict['IcalRM'] = copy.deepcopy(state_dict['Ical'])
+        state_dict['QcalRM'] = copy.deepcopy(state_dict['Qcal'])
+        state_dict['UcalRM'] = copy.deepcopy(state_dict['Ucal'])
+        state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
+            
+        state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
+        state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
+        state_dict['U_tcalRM'] = copy.deepcopy(state_dict['U_tcal'])
+        state_dict['V_tcalRM'] = copy.deepcopy(state_dict['V_tcal'])
+        
+        state_dict['RMcalibrated']['RMcal'] = np.nan
+        state_dict['RMcalibrated']['RMcalerr'] = np.nan
+        state_dict['RMcalibrated']['RMcalstring'] = "No RM Calibration"
+
+        RMdisplay.data,RMerrdisplay.data = np.nan,np.nan
+
+    #plot RM spectrum
+    if ~np.isnan(state_dict['RMcalibrated']['RM2'][0]):
+
+        show_calibrated = ~np.isnan(state_dict['RMcalibrated']['RMcal'])
+
+        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+
+        RMcal.plot_RM_2D(state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],int(NOFFDEF/state_dict['n_t']),state_dict['n_t'],state_dict['time_axis'],state_dict['timestart'],state_dict['timestop'],state_dict['RMcalibrated']['RM2'][0],state_dict['RMcalibrated']['RM2'][1],state_dict['RMcalibrated']['trial_RM2'],state_dict['RMcalibrated']['SNRs_full'],Qnoise=np.std(state_dict['Qcal'].mean(0)[:int(NOFFDEF/state_dict['n_t'])]),show_calibrated=show_calibrated,RMcal=state_dict['RMcalibrated']['RMcal'],RMcalerr=state_dict['RMcalibrated']['RMcalerr'],I_tcal_trm=state_dict['I_tcalRM'],Q_tcal_trm=state_dict['Q_tcalRM'],U_tcal_trm=state_dict['U_tcalRM'],V_tcal_trm=state_dict['V_tcalRM'],wind=state_dict['window']*32.7*state_dict['n_t']*1e-3)#,rmbuff=500,cmapname='viridis',wind=5)
+
+    update_wdict([rmcal_menu],['rmcal_menu'],param='value')
+    update_wdict([RMdisplay,RMerrdisplay],['RMdisplay','RMerrdisplay'],param='data')
+    
     return
 
 
