@@ -3319,7 +3319,7 @@ def get_calmatrix_from_ratio_phasediff(ratio,phase_diff,gyy_mag=1,gyy_phase=0):#
     return [gxx,gyy]
 
 #Takes data products for target and returns calibrated Stokes parameters
-def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True):
+def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3718,7 +3718,7 @@ def faraday_error(Q_f,U_f,freq_test,RM,phi=0):
     return method1HWHM
 
 #Specific Faraday calibration to get SNR spectrum in range around peak
-def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False):
+def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0):
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
@@ -3741,7 +3741,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         if input_weights!=[]:
             I_t_weights = input_weights
         else:
-            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=None,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
         I_t_weights_2D = np.array([I_t_weights]*I.shape[0])
 
 
@@ -3771,41 +3771,6 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             plt.plot(noise)
             plt.show()
 
-        """
-        L0_t_w = L0_t*I_t_weights
-        sig0 = np.sum(L0_t_w[timestart:timestop])
-        L_trial_binned = (convolve(L0_t,I_t_weights))#,mode="same"))
-        sigbin = np.argmax(L_trial_binned)
-        #noise = np.std(np.concatenate([L_trial_binned[:sigbin],L_trial_binned[sigbin+1:]]))
-        Q_binned = (convolve(Q.mean(0),I_t_weights))#,mode="same"))
-        #print(np.std(np.concatenate([L_trial_binned[:sigbin][np.abs(L_trial_binned[:sigbin]) > eps],L_trial_binned[sigbin+1:][np.abs(L_trial_binned[sigbin+1:]) > eps]])))
-        Qnoise = np.std(np.concatenate([Q_binned[:sigbin][np.abs(Q_binned[:sigbin]) > eps],Q_binned[sigbin+1:][np.abs(Q_binned[sigbin+1:]) > eps]]))
-        
-        
-        U_binned = (convolve(U.mean(0),I_t_weights))#,mode="same"))
-        #print(np.std(np.concatenate([L_trial_binned[:sigbin][np.abs(L_trial_binned[:sigbin]) > eps],L_trial_binned[sigbin+1:][np.abs(L_trial_binned[sigbin+1:]) > eps]])))
-        Unoise = np.std(np.concatenate([U_binned[:sigbin][np.abs(U_binned[:sigbin]) > eps],U_binned[sigbin+1:][np.abs(U_binned[sigbin+1:]) > eps]]))
-        
-        #don't have a good estimate of Q and U, and noise is within 1%, so just use Q noise
-        noise = Qnoise#np.sqrt((U_binned[sigbin]*Unoise)**2 + (Q_binned[sigbin]*Qnoise)**2)/np.sqrt((sig0**2))
-        print((Qnoise,Unoise)) 
-        
-        plt.figure(figsize=(12,6))
-        plt.plot(L_trial_binned)
-        plt.plot(Q_binned)
-        plt.plot(U_binned)
-        plt.axvline(sigbin)
-        plt.axhline(noise)
-        plt.axhline(-noise)
-        #plt.plot(I_t_weights)
-        #plt.xlim(timestart-10,timestop+10)
-        #plt.plot(sigbin)
-        plt.show()
-        plt.figure(figsize=(12,6))
-        plt.plot(Q.mean(0))
-        plt.plot(L0_t)
-        plt.show()
-        """
     else:
         
         sig0 = np.mean(np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)[timestart:timestop])
@@ -3857,58 +3822,93 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                     SNRs_full[:,tidx] = L_cut#np.array(np.abs(Q_cut*cterm + U_cut*sterm + 1j*(Q_cut*sterm - U_cut*cterm)))[0,:]/len(wavall_cut)
                 
                 if weighted:
-                    sig += L_cut*I_t_weights[tidx]
+                    sig_all[tidx] += L_cut*I_t_weights[tidx]
                 else:
-                    sig += L_cut
+                    sig_all[tidx] += L_cut
             SNRs[:,j] = sig_all/noise
 
+    else:
 
-    for i in range(len(trial_RM)):
-        for j in range(len(trial_phi)):
-            RM_i = trial_RM[i]
-            phi_j = trial_phi[j]
-
-            P_trial = P_cut*np.exp(-1j*((2*RM_i*(((wavall_cut)**2) - np.mean(wav**2))) + phi_j))
-            Q_trial_t = np.mean(np.real(P_trial),axis=0)
-            U_trial_t = np.mean(np.imag(P_trial),axis=0)
-            #print(timestop-timestart)
-            #L_trial = np.sqrt(np.real(P_trial)**2 + np.imag(P_trial)**2)
-            #L_trial_t = np.mean(L_trial,axis=0)
-
-            L_trial_t = np.sqrt(Q_trial_t**2 + U_trial_t**2)
-            if full:
-                SNRs_full[i,:] = L_trial_t
-
-            #sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
-            if weighted:
-                sig = np.sum(L_trial_t*I_t_weights)
-            else:
-                sig = np.mean(L_trial_t)
+        if multithread:
 
 
-            """
-            L_trial_offp = np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])
-            L_trial_offp = L_trial_offp[:len(L_trial_offp) - (len(L_trial_offp)%(timestop-timestart))]
-            print(L_trial_offp.reshape(len(L_trial_offp)//(timestop-timestart),timestop-timestart))
-            L_trial_binned_offp = np.mean(L_trial_offp.reshape(len(L_trial_offp)//(timestop-timestart),timestop-timestart))
-            #print(L_trial_offp)
-            #print(L_trial_binned_offp)
-            #binned_off_pulse =  #dsapol.avg_time(np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])[:4096],timestop-timestart)
-            noise = np.sqrt(np.mean(L_trial_binned_offp**2))
-            print(noise)
-            #print(sig,noise)
 
-            if i == 0:
-                L_trial_cut1 = L_trial_t[timestart%(timestop-timestart):]
-                L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
+            for j in range(numbatch):
 
-                L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
-                sigbin = np.argmax(L_trial_binned)
-                noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
-            else:
-                noise = noise
-            """
-            SNRs[i,j] = sig/noise#np.abs(np.sum(P_trial))
+                #create executor
+                with ProcessPoolExecutor(maxProcesses) as executor:
+
+                    task_list = []
+                    trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
+                    for i in range(maxProcesses*j,maxProcesses*(j+1)):
+                        trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
+
+                        #start thread
+                        task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                                                                                                t_samp,False,datadir,calstr,label,n_f,n_t,False,
+                                                                                                False,buff,weighted,n_t_weight,timeaxis,
+                                                                                                sf_window_weights,n_off,full,input_weights,
+                                                                                                timestart_in,timestop_in,False,False,1,1,i))
+                        
+                        
+                    """
+
+                    if full:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                                    width_native,t_samp,False,datadir,calstr,label,n_f,n_t,
+                                                    show,False,buff,weighted,n_t_weight,timeaxis,fobj,sf_window_weights,
+                                                    n_off,full,input_weights,timestart_in,timestop_in,False,False,
+                                                    1,1,i)
+                        SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                    else:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                                    width_native,t_samp,False,datadir,calstr,label,n_f,n_t,
+                                                    show,False,buff,weighted,n_t_weight,timeaxis,fobj,sf_window_weights,
+                                                    n_off,full,input_weights,timestart_in,timestop_in,False,False,
+                                                    1,1,i)
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                    """ 
+                
+                    
+
+                    #wait for tasks to complete
+                    #wait(task_list)
+                    for future in as_completed(task_list):
+                    
+                        if full:
+                            tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
+                            SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                            SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                        else:
+                            tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
+                            SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+
+                #executor.shutdown(wait=True)
+        else:
+            for i in range(len(trial_RM)):
+                for j in range(len(trial_phi)):
+                    RM_i = trial_RM[i]
+                    phi_j = trial_phi[j]
+
+                    P_trial = P_cut*np.exp(-1j*((2*RM_i*(((wavall_cut)**2) - np.mean(wav**2))) + phi_j))
+                    Q_trial_t = np.mean(np.real(P_trial),axis=0)
+                    U_trial_t = np.mean(np.imag(P_trial),axis=0)
+                    #print(timestop-timestart)
+                    #L_trial = np.sqrt(np.real(P_trial)**2 + np.imag(P_trial)**2)
+                    #L_trial_t = np.mean(L_trial,axis=0)
+
+                    L_trial_t = np.sqrt(Q_trial_t**2 + U_trial_t**2)
+                    if full:
+                        SNRs_full[i,:] = L_trial_t
+
+                    #sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
+                    if weighted:
+                        sig = np.sum(L_trial_t*I_t_weights)
+                    else:
+                        sig = np.mean(L_trial_t)
+
+                    SNRs[i,j] = sig/noise#np.abs(np.sum(P_trial))
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
     max_RM_idx = np.argmax(SNRs)
@@ -3960,13 +3960,14 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 plt.show()
     else:
         RMerr = None
-
+        upper = None
+        lower = None
     if full:
         #for full time-dependent analysis, get RM vs time
         peak_RMs = trial_RM[np.argmax(SNRs_full,axis=1)]
-        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,SNRs_full,peak_RMs)
+        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,SNRs_full,peak_RMs,mt_offset)
     else:
-        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise)
+        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,mt_offset)
 
 #Calculate Error for SNR method
 def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):

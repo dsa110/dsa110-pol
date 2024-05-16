@@ -251,7 +251,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
     trial_phi = [0]
 
     #run RM synthesis
-    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True,matrixmethod=False,multithread=True,maxProcesses=100,numbatch=10)
+    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True,matrixmethod=False,multithread=True,maxProcesses=1000,numbatch=10)
 
     #if set, use better fit of FDF for error
     if fit:
@@ -282,12 +282,13 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,
 
 
     #run RM synthesis
-    RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,QUnoise,SNRs_full,peak_RMs = dsapol.faradaycal_SNR(Ical,Qcal,Ucal,Vcal,freq_test,trial_RM,trial_phi,
+    RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,QUnoise,SNRs_full,peak_RMs,tmp = dsapol.faradaycal_SNR(Ical,Qcal,Ucal,Vcal,freq_test,trial_RM,trial_phi,
                                                                                         width_native,fobj.header.tsamp,plot=False,n_f=n_f,n_t=n_t,
                                                                                         show=False,err=True,buff=buff,weighted=True,n_off=n_off,
-                                                                                        timeaxis=timeaxis,fobj=fobj,full=True,
+                                                                                        timeaxis=timeaxis,full=True,
                                                                                         input_weights=weights[timestart:timestop],
-                                                                                        timestart_in=timestart,timestop_in=timestop,matrixmethod=True)
+                                                                                        timestart_in=timestart,timestop_in=timestop,matrixmethod=False,
+                                                                                        multithread=True,maxProcesses=100,numbatch=10)
     #use error from the exponential fit
     RMerr2 = dsapol.RM_error_fit(np.max(RMsnrs2))
 
