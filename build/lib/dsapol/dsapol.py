@@ -3319,7 +3319,7 @@ def get_calmatrix_from_ratio_phasediff(ratio,phase_diff,gyy_mag=1,gyy_phase=0):#
     return [gxx,gyy]
 
 #Takes data products for target and returns calibrated Stokes parameters
-def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False):
+def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False,maxProcesses=100,idx=np.nan):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3346,14 +3346,45 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
         gxx_cal = gxx
         gyy_cal = gyy
         print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+
+
+    if multithread:
+        I_true = np.zeros(I_obs.shape)
+        Q_true = np.zeros(Q_obs.shape)
+        U_true = np.zeros(U_obs.shape)
+        V_true = np.zeros(V_obs.shape)
+
+        executor = ProcessPoolExecutor(maxProcesses)
+        chunk_size = I_obs.shape[1]//maxProcesses
+        task_list = []
+        for i in range(maxProcesses):
+
+            I_obs_i = I_obs[:,i*chunk_size:(i+1)*chunk_size]
+            Q_obs_i = Q_obs[:,i*chunk_size:(i+1)*chunk_size]
+            U_obs_i = U_obs[:,i*chunk_size:(i+1)*chunk_size]
+            V_obs_i = V_obs[:,i*chunk_size:(i+1)*chunk_size]
+
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
+
+        for future in as_completed(task_list):
+            I_true_i,Q_true_i,U_true_i,V_true_i,i = future.result()
+            I_true[:,i*chunk_size:(i+1)*chunk_size] = I_true_i
+            Q_true[:,i*chunk_size:(i+1)*chunk_size] = Q_true_i
+            U_true[:,i*chunk_size:(i+1)*chunk_size] = U_true_i
+            V_true[:,i*chunk_size:(i+1)*chunk_size] = V_true_i
+
+        executor.shutdown(wait=True)
+
+    else:
+
+        I_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) + (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
+        Q_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) - (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
     
-    I_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) + (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
-    Q_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) - (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
-    
-    xy_obs = U_obs + 1j*V_obs
-    xy_cal = xy_obs / (gxx_cal*np.conj(gyy_cal))#* np.exp(-1j * (np.angle(gxx_cal)-np.angle(gyy_cal)))
-    U_true, V_true = xy_cal.real, xy_cal.imag
-    
+        xy_obs = U_obs + 1j*V_obs
+        xy_cal = xy_obs / (gxx_cal*np.conj(gyy_cal))#* np.exp(-1j * (np.angle(gxx_cal)-np.angle(gyy_cal)))
+        U_true, V_true = xy_cal.real, xy_cal.imag
+    if ~np.isnan(idx):
+        return (I_true,Q_true,U_true,V_true,idx)
     return (I_true,Q_true,U_true,V_true)
 
 
