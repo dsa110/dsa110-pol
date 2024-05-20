@@ -3549,7 +3549,7 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
 #Estimate RM by maximizing SNR over given trial RM; wav is wavelength array
 def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0): 
-    if multithread: assert(len(trial_RM)%(maxProcesses*numbatch) == 0)
+    if multithread: assert(numbatch*maxProcesses <= len(trial_RM)) #assert(len(trial_RM)%(maxProcesses*numbatch) == 0)
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
@@ -3604,14 +3604,28 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
                                             False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
                                             False,False,1,1,i))
 
+                if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
+                    trial_RM_i = trial_RM[numbatch*maxProcesses:]
+
+                    task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                            False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
+                                            False,False,1,1,maxProcesses*numbatch))
+
+
                 #wait for tasks to complete
                 #wait(task_list)
 
                 for future in as_completed(task_list):
                     tmp,tmp,SNRs_i,tmp,i = future.result()
-                    SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+
+                    if i == maxProcesses*numbatch:
+                        SNRs[numbatch*maxProcesses:,0] = SNRs_i
+                    else:
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
 
                 executor.shutdown(wait=True)
+            
+
    
         else:
             for i in range(len(trial_RM)):
@@ -3766,6 +3780,7 @@ def faraday_error(Q_f,U_f,freq_test,RM,phi=0):
 
 #Specific Faraday calibration to get SNR spectrum in range around peak
 def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0):
+    if multithread: assert(numbatch*maxProcesses <= len(trial_RM))
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
@@ -3898,6 +3913,16 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                                                                                                 timestart_in,timestop_in,False,False,1,1,i))
                         
                         
+                    if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
+                        trial_RM_i = trial_RM[numbatch*maxProcesses:]
+
+
+                        task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                                                                                                t_samp,False,datadir,calstr,label,n_f,n_t,False,
+                                                                                                False,buff,weighted,n_t_weight,timeaxis,
+                                                                                                sf_window_weights,n_off,full,input_weights,
+                                                                                                timestart_in,timestop_in,False,False,1,1,numbatch*maxProcesses))
+
                     """
 
                     if full:
@@ -3925,10 +3950,20 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                     
                         if full:
                             tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
-                            SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
-                            SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                            
+                            if i == numbatch*maxProcesses:
+                                SNRs_full[numbatch*maxProcesses:,:] = SNRs_full_i
+                            else:
+                                SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                      
                         else:
                             tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
+                            
+                        
+                        
+                        if i == numbatch*maxProcesses:
+                            SNRs[numbatch*maxProcesses:,0] = SNRs_i
+                        else:
                             SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
 
                 #executor.shutdown(wait=True)
