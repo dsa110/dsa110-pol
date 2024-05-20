@@ -184,6 +184,7 @@ state_dict['n_comps'] = 1
 state_dict['rel_n_t'] = 1
 state_dict['rel_n_f'] = 2**5
 
+
 df = pd.DataFrame(
     {
         r'${\rm buff}_{L}$': [np.nan],
@@ -377,7 +378,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'rmcal_menu':'No RM Calibration',
         'rmcal_menu_choices':['No RM Calibration'],
         'RMdisplay':np.nan,
-        'RMerrdisplay':np.nan
+        'RMerrdisplay':np.nan,
+
+        'showghostPA':True,
+        'limit_slider':[-1,1],
 }
 
 
@@ -1771,6 +1775,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
 
     elif RMcalibratebutton.clicked and (rmcal_menu.value == "No RM Calibration"):
 
+        
         #Don't calibrate
 
         state_dict['IcalRM'] = copy.deepcopy(state_dict['Ical'])
@@ -1804,3 +1809,191 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
     return
 
 
+
+
+
+
+
+def polanalysis_screen(showghostPA,limit_slider):
+
+    #check if RM calibrated
+    if state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration":
+        I_use = copy.deepcopy(state_dict['IcalRM'])
+        Q_use = copy.deepcopy(state_dict['QcalRM'])
+        U_use = copy.deepcopy(state_dict['UcalRM'])
+        V_use = copy.deepcopy(state_dict['VcalRM'])
+
+        I_tuse = state_dict['I_tcalRM']
+        Q_tuse = state_dict['Q_tcalRM']
+        U_tuse = state_dict['U_tcalRM']
+        V_tuse = state_dict['V_tcalRM']
+
+    elif "Ical" in state_dict.keys():
+        I_use = copy.deepcopy(state_dict['Ical'])
+        Q_use = copy.deepcopy(state_dict['Qcal'])
+        U_use = copy.deepcopy(state_dict['Ucal'])
+        V_use = copy.deepcopy(state_dict['Vcal'])
+
+        I_tuse = state_dict['I_tcal']
+        Q_tuse = state_dict['Q_tcal']
+        U_tuse = state_dict['U_tcal']
+        V_tuse = state_dict['V_tcal']
+
+    elif 'I' in state_dict.keys(): 
+        I_use = copy.deepcopy(state_dict['I'])
+        Q_use = copy.deepcopy(state_dict['Q'])
+        U_use = copy.deepcopy(state_dict['U'])
+        V_use = copy.deepcopy(state_dict['V'])
+
+        I_tuse = state_dict['I_t']
+        Q_tuse = state_dict['Q_t']
+        U_tuse = state_dict['U_t']
+        V_tuse = state_dict['V_t']
+    else:
+        raise KeyError
+
+
+    #get intL and intR from slider
+    left_lim,right_lim = limit_slider.value
+    n_off = int(NOFFDEF/state_dict['n_t'])
+    state_dict['intL'] = int(np.argmax(I_tuse) + left_lim)
+    state_dict['intR'] = int(np.argmax(I_tuse) + right_lim)
+    
+    
+    #compute PA
+    sigflag = state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration"
+    weighted = 'weights' in state_dict.keys()
+    if not weighted:
+        weights_use = np.nan*np.ones(len(I_tuse))
+    else:
+        weights_use = state_dict['weights']
+    state_dict['PA_f'],state_dict['PA_t'],state_dict['PA_f_errs'],state_dict['PA_t_errs'],state_dict['avg_PA'],state_dict['PA_err'] = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=state_dict['fobj'])
+
+
+
+    #compute frequency spectrum
+    (I_fuse,Q_fuse,U_fuse,V_fuse) = dsapol.get_stokes_vs_freq(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_f'],state_dict['n_t'],
+                                                state_dict['freq_test'],n_off=n_off,plot=False,normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=state_dict['fobj'])
+    state_dict['I_f'],state_dict['Q_f'],state_dict['U_f'],state_dict['V_f'] = (I_fuse,Q_fuse,U_fuse,V_fuse)
+    
+
+    #compute pol fractions
+    [(pol_f,pol_t,avg,sigma_frac,snr_frac),
+            (L_f,L_t,avg_L,sigma_L,snr_L),
+            (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
+            (C_f,C_t,avg_C,sigma_C,snr_C),snr] = dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),
+                                                                    plot=False,normalize=True,buff=state_dict['buff'],full=False,weighted=weighted,input_weights=weights_use,
+                                                                    fobj=state_dict['fobj'],intL=state_dict['intL'],intR=state_dict['intR'])
+
+    unbias_factor = 1
+
+    L_t = L_t*I_tuse
+    L_f = L_f*I_fuse
+
+    C_t = C_t*I_tuse
+    C_f = C_f*I_fuse
+
+    C_t_unbiased = C_t_unbiased*I_tuse
+    C_f_unbiased = C_f_unbiased*I_fuse
+
+
+    L_t = np.sqrt(Q_tuse**2 + U_tuse**2)
+    L_t[L_t**2 <= (unbias_factor*np.std(I_tuse[:n_off]))**2] = np.std(I_tuse[:n_off])
+    L_t = np.sqrt(L_t**2 - np.std(I_tuse[:n_off])**2)
+    L_f = np.sqrt(Q_fuse**2 + U_fuse**2)
+    L_f[L_f**2 <= (unbias_factor*np.std(I_tuse[:n_off]))**2] = np.std(I_tuse[:n_off])
+    L_f = np.sqrt(L_f**2 - np.std(I_tuse[:n_off])**2)
+
+
+    C_t = V_tuse
+    C_f = V_fuse
+
+
+    #plot
+    """
+    if 'weights' not in state_dict.keys():
+        I_f,Q_f,U_f,L_f,V_f = dsapol.pol_summary_plot(I_use,Q_use,U_use,V_use,state_dict['ids'],state_dict['nickname'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+            state_dict['n_t'],state_dict['n_f'],
+            state_dict['freq_test'],state_dict['time_axis'],state_dict['fobj'],n_off=int(NOFFDEF/state_dict['n_t']),buff=state_dict['buff'],weighted=False,show=True,
+            wind=state_dict['window'],suffix="parsec",
+            plot_weights=False,timestart=state_dict['timestart'],timestop=state_dict['timestop'],short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,
+            SNRCUT=3,ghostPA=True,showspectrum=True,figsize=(18,12))
+    else:
+        I_f,Q_f,U_f,L_f,V_f = dsapol.pol_summary_plot(I_use,Q_use,U_use,V_use,state_dict['ids'],state_dict['nickname'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+            state_dict['n_t'],state_dict['n_f'],
+            state_dict['freq_test'],state_dict['time_axis'],state_dict['fobj'],n_off=int(NOFFDEF/state_dict['n_t']),buff=state_dict['buff'],weighted=True,show=True,
+            input_weights=state_dict['weights'],intL=state_dict['intL'],intR=state_dict['intR'],multipeaks=state_dict['n_comps']>1,wind=state_dict['window'],suffix="parsec",
+            plot_weights=False,timestart=state_dict['timestart'],timestop=state_dict['timestop'],short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,
+            SNRCUT=3,ghostPA=True,showspectrum=True,figsize=(18,12))
+
+
+    """
+    #fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
+    fig= plt.figure(figsize=(18,12))
+    ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
+    ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+    ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
+    ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
+    ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
+    
+    SNRCUT = 3
+    if showghostPA.value:
+        ax0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                (180/np.pi)*state_dict['PA_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+        ax6.errorbar((180/np.pi)*state_dict['PA_f'],state_dict['freq_test'][0],xerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+
+    ax0.errorbar(state_dict['time_axis'][state_dict['intL']:state_dict['intR']][L_t[state_dict['intL']:state_dict['intR']]>=SNRCUT],(180/np.pi)*state_dict['PA_t'][state_dict['intL']:state_dict['intR']][L_t[state_dict['intL']:state_dict['intR']]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['intL']:state_dict['intR']][L_t[state_dict['intL']:state_dict['intR']]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+    ax6.errorbar((180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],state_dict['freq_test'][0][L_f >=SNRCUT],xerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+
+    ax0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax6.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    if sigflag:
+        ax0.set_ylabel(r'PPA ($^\circ$)')
+        ax6.set_xlabel(r'PPA ($^\circ$)')
+    else:
+        ax0.set_ylabel(r'PA ($^\circ$)')
+        ax6.set_xlabel(r'PA ($^\circ$)')
+    ax0.set_ylim(-1.4*95,1.1*95)
+    ax6.set_xlim(-1.4*95,1.1*95)
+    ax0.set_xticks([])
+    ax6.set_yticks([])
+
+
+    ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3)
+    ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            L_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='L',color="blue",linewidth=2.5)
+    ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            V_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',color="orange",linewidth=2)
+
+    ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax1.set_xticks([])
+    ax1.legend(loc="upper right",fontsize=16)
+
+    ax3.step(I_fuse,state_dict['freq_test'][0],color="black",linewidth=3)
+    ax3.step(L_f,state_dict['freq_test'][0],color="blue",linewidth=2.5)
+    ax3.step(C_f,state_dict['freq_test'][0],color="orange",linewidth=2)
+    ax3.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax3.set_xlabel(r'S/N') 
+    ax3.set_yticks([])
+    
+    
+    
+    ax2.imshow(I_use[:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
+            extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+                32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3,
+                np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0])])
+    ax2.set_xlabel("Time (ms)")
+    ax2.set_ylabel("Frequency (MHz)")
+    plt.subplots_adjust(hspace=0)
+    plt.subplots_adjust(wspace=0)
+    plt.show(fig)
+
+    update_wdict([showghostPA,limit_slider],['showghostPA','limit_slider'],param='value')
+
+    return

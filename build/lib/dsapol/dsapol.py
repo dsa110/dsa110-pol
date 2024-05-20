@@ -743,7 +743,7 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
         timeaxist = timeaxist[:,timeaxist.shape[1]%n_t_weight:]
     
     timeaxisb = (((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())[0]
-    print(len(timeaxisb),len(I_t))
+    #print(len(timeaxisb),len(I_t))
     #print(timeaxist)
     #print(timeaxisb)
     #print(((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())
@@ -1346,7 +1346,7 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
     return (peak, timestart, timestop)
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
-def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1):
+def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1,intL=None,intR=None):
     """
     This function calculates and plots the polarization fraction averaged over both time and 
     frequency, the total an polarized signal-to-noise, and the average polarization fraction within the peak.
@@ -1519,6 +1519,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     #avg_frac = (np.mean(pol_t[timestart:timestop][pol_t[timestart:timestop]<1]))
     #avg_frac = (np.mean(pol_t[timestart:timestop]))
     
+
     if weighted:
         if input_weights == []:
             I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
@@ -1528,13 +1529,14 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
             I_t_weights_unpadded = np.trim_zeros(input_weights)
 
 
-        if multipeaks:
+        if multipeaks and (intL == None or intR == None):
             pks,props = find_peaks(I_t_weights,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
             intL = intL[0]
             intR = intR[-1]
-        else:
+        elif (intL == None or intR == None):
             FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+        
         intL = int(intL)
         intR = int(intR)
 
@@ -1594,30 +1596,49 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         I_binned = convolve(I_t,I_t_weights_unpadded)
         noise = np.std(np.concatenate([I_binned[:sigbin-(timestop-timestart)*2],I_binned[sigbin+(timestop-timestart)*2:]]))
         snr = sig0/noise
-        print((sig0,noise,snr))
+        #print((sig0,noise,snr))
 
         T_trial_binned = convolve(pol_t*I_t,I_t_weights_unpadded)
         sig0 = T_trial_binned[sigbin]
         Q_binned = convolve(Q_t,I_t_weights_unpadded)
         noise = np.std(np.concatenate([Q_binned[:sigbin-(timestop-timestart)*2],Q_binned[sigbin+(timestop-timestart)*2:]]))
         snr_frac = sig0/noise
-        print((sig0,noise,snr_frac))
+        #print((sig0,noise,snr_frac))
 
         L_trial_binned = convolve(L_t*I_t,I_t_weights_unpadded)
         sig0 = L_trial_binned[sigbin]
         snr_L = sig0/noise
-        print((sig0,noise,snr_L))
+        #print((sig0,noise,snr_L))
 
         C_trial_binned = np.convolve(np.abs(C_t)*I_t,I_t_weights_unpadded)
         sig0 = C_trial_binned[sigbin]
         V_binned = convolve(V_t,I_t_weights_unpadded)
         noise = np.std(np.concatenate([V_binned[:sigbin-(timestop-timestart)*2],V_binned[sigbin+(timestop-timestart)*2:]]))
         snr_C = sig0/noise
-        print((sig0,noise,snr_C))
+        #print((sig0,noise,snr_C))
 
         
 
     else:
+        if input_weights == []:
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+            I_t_weights_unpadded = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
+        else:
+            I_t_weights = input_weights
+            I_t_weights_unpadded = np.trim_zeros(input_weights)
+
+
+        if multipeaks and (intL == None or intR == None):
+            pks,props = find_peaks(I_t,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        elif (intL == None or intR == None):
+            FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
+        
+        intL = int(intL)
+        intR = int(intR)
+
         #average,error
         off_pulse_I = np.nanstd(I_t[:n_off])
         off_pulse_Q = np.nanstd(Q_t[:n_off])
@@ -1654,24 +1675,24 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
         snr = sig0/noise
 
-        sig0 = np.nanmean(pol_t*I_t[timestart:timestop])
-        pol_t_cut1 = pol_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((pol_t*I_t)[timestart:timestop])
+        pol_t_cut1 = (pol_t*I_t)[timestart%(timestop-timestart):]
         pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
         pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(pol_t_binned)
         noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
         snr_frac = sig0/noise
 
-        sig0 = np.nanmean(L_t*I_t[timestart:timestop])
-        L_t_cut1 = L_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((L_t*I_t)[timestart:timestop])
+        L_t_cut1 = (L_t*I_t)[timestart%(timestop-timestart):]
         L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
         L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(L_t_binned)
         noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
         snr_L = sig0/noise
 
-        sig0 = np.nanmean(np.abs(C_t)*I_t[timestart:timestop])
-        C_t_cut1 = np.abs(C_t)*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((np.abs(C_t)*I_t)[timestart:timestop])
+        C_t_cut1 = (np.abs(C_t)*I_t)[timestart%(timestop-timestart):]
         C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
         C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(C_t_binned)
@@ -1951,24 +1972,24 @@ def get_pol_fraction_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=Fal
         noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
         snr = sig0/noise
 
-        sig0 = np.nanmean(pol_t*I_t[timestart:timestop])
-        pol_t_cut1 = pol_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((pol_t*I_t)[timestart:timestop])
+        pol_t_cut1 = (pol_t*I_t)[timestart%(timestop-timestart):]
         pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
         pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(pol_t_binned)
         noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
         snr_frac = sig0/noise
 
-        sig0 = np.nanmean(L_t*I_t[timestart:timestop])
-        L_t_cut1 = L_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((L_t*I_t)[timestart:timestop])
+        L_t_cut1 = (L_t*I_t)[timestart%(timestop-timestart):]
         L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
         L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(L_t_binned)
         noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
         snr_L = sig0/noise
 
-        sig0 = np.nanmean(np.abs(C_t)*I_t[timestart:timestop])
-        C_t_cut1 = np.abs(C_t)*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((np.abs(C_t)*I_t)[timestart:timestop])
+        C_t_cut1 = (np.abs(C_t)*I_t)[timestart%(timestop-timestart):]
         C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
         C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(C_t_binned)
@@ -2164,10 +2185,8 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
             intR = intR[-1]
         else:
             FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
-        print("here: " + str((intL,intR)))
         intL = int(intL)
         intR = int(intR)
-        print("here: " + str((intL,intR)))
 
         #average,error
         PA_t_cut1 = PA_t[intL:intR]
@@ -2186,10 +2205,8 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
             intR = intR[-1]
         else:
             FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
-        print("here: " + str((intL,intR)))
         intL = int(intL)
         intR = int(intR)
-        print("here: " + str((intL,intR)))
 
         #avg_PA = np.mean(PA_t[timestart:timestop][PA_t[timestart:timestop]<1])
         avg_PA = np.nanmean(PA_t[intL:intR])
@@ -2865,7 +2882,7 @@ def absgaincal(gain_dir,source_name,obs_name,n_t,n_f,nsamps,deg,ibeam,suffix="_d
 
     #polyfit
     popt = np.polyfit(freq_test_fullres[0],GY_fullres,deg=deg)
-    print(len(popt))
+    #print(len(popt))
     GY_fit = np.zeros(len(GY_fullres))
     for i in range(len(popt)):
         GY_fit += popt[i] * (freq_test_fullres[0]**(deg - i))
@@ -6020,7 +6037,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True,figsize=(42,36)):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
@@ -6090,14 +6107,15 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     tpeak = (np.argmax(I_t)*(t_samp*1e6)*n_t)/1000
     
     if showspectrum:
-        fig= plt.figure(figsize=(42,36))
+        fig= plt.figure(figsize=figsize)
         ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
         ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
         ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
         ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
         ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
     else:
-        fig= plt.figure(figsize=(24,36))
+        smallfigsize = (figsize[0]//2,figsize[1])
+        fig= plt.figure(figsize=smallfigsize)
         ax0 = plt.subplot2grid(shape=(8, 4), loc=(0, 0), colspan=4)
         ax1 = plt.subplot2grid(shape=(8, 4), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
         ax2 = plt.subplot2grid(shape=(8, 4), loc=(3, 0), colspan=4, rowspan=4)
