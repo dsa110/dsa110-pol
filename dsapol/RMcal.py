@@ -251,7 +251,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
     trial_phi = [0]
 
     #run RM synthesis
-    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True,matrixmethod=False,multithread=True,maxProcesses=1000,numbatch=10)
+    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=100,err=True,matrixmethod=False,multithread=True,maxProcesses=100,numbatch=10)
 
     #if set, use better fit of FDF for error
     if fit:

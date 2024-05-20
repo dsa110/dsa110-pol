@@ -169,7 +169,7 @@ General Layout:
 
 # default values for state and polcal dicts and dataframe tables
 state_dict = dict()
-state_dict['current_state'] = 0
+##state_dict['current_state'] = 0
 state_map = {'load':0,
              'dedisp':1,
              'polcal':2,
@@ -620,7 +620,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
 
 
-        state_dict['current_state'] += 1
+        #state_dict['current_state'] += 1
 
     #if filbutton is clicked, run the offline beamformer to make fil files
     if filbutton.clicked:
@@ -757,7 +757,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
         
 
 
-        state_dict['current_state'] += 1
+        #state_dict['current_state'] += 1
     #update widget dict
     update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num],
                 ["n_t_slider","logn_f_slider","logwindow_slider_init","ddm_num"],
@@ -904,7 +904,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         #get timestart, timestop
         (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
-        state_dict['current_state'] += 1
+        #state_dict['current_state'] += 1
 
     #if copy button clicked, copy voltages from T3
     if polcopybutton.clicked:
@@ -1051,7 +1051,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
 
 
     #if make solution button pushed, make solution and plot
-    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
+    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile'] != "":
         fig = plt.figure(figsize=(18,12))
         
         plt.subplot(311)
@@ -1233,10 +1233,9 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         #plt.xticks([])
         #plt.ylabel(r'$|g_{yy}|$')
         plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']),color='magenta',linewidth=4)
-    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
+    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile'] != "":
         plt.subplots_adjust(hspace=0)
-        plt.close()
-
+        plt.show()
 
 
     #update widget dict
@@ -1255,7 +1254,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
                 ["ParA_display"],
                 param='data')
     
-    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile']:
+    if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile'] != "":
         return fig
     
     return #beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
@@ -1488,7 +1487,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                    state_dict['S/N']]
 
         #done with components, move to RM synth
-        state_dict['current_state'] += 1
+        #state_dict['current_state'] += 1
 
     #update widget dict
     update_wdict([logwindow_slider,logibox_slider,

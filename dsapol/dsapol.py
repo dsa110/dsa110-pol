@@ -3366,12 +3366,28 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
 
             task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
 
+        if I_obs.shape[1]%maxProcesses != 0:
+            i = maxProcesses
+            I_obs_i = I_obs[:,maxProcesses*chunk_size:]
+            Q_obs_i = Q_obs[:,maxProcesses*chunk_size:]
+            U_obs_i = U_obs[:,maxProcesses*chunk_size:]
+            V_obs_i = V_obs[:,maxProcesses*chunk_size:]
+
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
+
         for future in as_completed(task_list):
             I_true_i,Q_true_i,U_true_i,V_true_i,i = future.result()
-            I_true[:,i*chunk_size:(i+1)*chunk_size] = I_true_i
-            Q_true[:,i*chunk_size:(i+1)*chunk_size] = Q_true_i
-            U_true[:,i*chunk_size:(i+1)*chunk_size] = U_true_i
-            V_true[:,i*chunk_size:(i+1)*chunk_size] = V_true_i
+
+            if i == maxProcesses:
+                I_true[:,maxProcesses*chunk_size:] = I_true_i
+                Q_true[:,maxProcesses*chunk_size:] = Q_true_i
+                U_true[:,maxProcesses*chunk_size:] = U_true_i
+                V_true[:,maxProcesses*chunk_size:] = V_true_i
+            else:
+                I_true[:,i*chunk_size:(i+1)*chunk_size] = I_true_i
+                Q_true[:,i*chunk_size:(i+1)*chunk_size] = Q_true_i
+                U_true[:,i*chunk_size:(i+1)*chunk_size] = U_true_i
+                V_true[:,i*chunk_size:(i+1)*chunk_size] = V_true_i
 
         executor.shutdown(wait=True)
 
