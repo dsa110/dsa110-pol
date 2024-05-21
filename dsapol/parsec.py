@@ -56,7 +56,7 @@ create a web app, and will operate as a wrapper around dsapol.py.
 """
 Plotting parameters
 """
-fsize=35
+fsize=30#35
 fsize2=30
 plt.rcParams.update({
                     'font.size': fsize,
@@ -357,6 +357,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'buff_R_slider':1,
          'n_t_slider_filt':1,
          'logn_f_slider_filt':5,
+         'multipeaks':False,
+         'multipeaks_height_slider':0.5,
 
         'useRMTools':True, ################ (5) RM Synthesis ################
         'maxRM_num_tools':1e6,
@@ -381,7 +383,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'RMerrdisplay':np.nan,
 
         'showghostPA':True,
-        'limit_slider':[-1,1],
+        'intLbuffer_slider':0,
+        'intRbuffer_slider':0,
+        'polcomp_menu':'All',
+        'polcomp_menu_choices':['All']
 }
 
 
@@ -423,6 +428,25 @@ RMdf = pd.DataFrame(
         index=['All']
     )
 
+poldf = pd.DataFrame(
+        {
+            'S/N': [np.nan],
+            'T/I (%)': [np.nan],
+            'T/I Error (%)': [np.nan],
+            'T S/N': [np.nan],
+            'L/I (%)': [np.nan],
+            'L/I Error (%)': [np.nan],
+            'L S/N': [np.nan],
+            'V/I (%)': [np.nan],
+            'V/I Error (%)': [np.nan],
+            '|V|/I (%)': [np.nan],
+            '|V|/I Error (%)': [np.nan],
+            'V S/N': [np.nan],
+            'PA (deg)': [np.nan],
+            'PA Error (deg)': [np.nan]
+        },
+            index=['All']
+        )
 
 def make_rmcal_menu_choices():
     choices = ["No RM Calibration"]
@@ -545,6 +569,12 @@ def update_wdict(objects,labels,param='value'):
                     RMcaldict['2D-Synth']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM2'][1]
 
         wdict['rmcal_menu_choices'] = make_rmcal_menu_choices()
+    #update polcomps
+    if state_dict['n_comps'] > 1: 
+        wdict['polcomp_menu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
+    else:
+        wdict['polcomp_menu_choices'] = ['All']
+    
     return
 
         
@@ -1282,7 +1312,7 @@ def get_SNR(I_tcal,I_w_t_filtcal,timestart,timestop):
     return sig0/noise    
         
 
-def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider):
+def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider):
     
 
     if nextcompbutton.clicked:
@@ -1327,13 +1357,14 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     Qp = copy.deepcopy(state_dict['Qcal'])
     Up = copy.deepcopy(state_dict['Ucal'])
     Vp = copy.deepcopy(state_dict['Vcal'])
+    mask = np.zeros(state_dict['Ical'].shape)
     for k in range(state_dict['current_comp']):
-        mask = np.zeros(state_dict['Ical'].shape)
+        #mask = np.zeros(state_dict['Ical'].shape)
         mask[:,state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
-        Ip = ma(Ip,mask)
-        Qp = ma(Qp,mask)
-        Up = ma(Up,mask)
-        Vp = ma(Vp,mask)
+    Ip = ma(Ip,mask)
+    Qp = ma(Qp,mask)
+    Up = ma(Up,mask)
+    Vp = ma(Vp,mask)
     n_off=int(NOFFDEF//state_dict['n_t'])
 
     
@@ -1365,8 +1396,23 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                                                 n_t_weight=state_dict['comps'][state_dict['current_comp']]['avger_w'],
                                                                 sf_window_weights=state_dict['comps'][state_dict['current_comp']]['sf_window_weights'],
                                                                 padded=True,norm=False)
-    
 
+
+    if multipeaks.value:
+        height = np.max(state_dict['comps'][state_dict['current_comp']]['weights'])*multipeaks_height_slider.value
+        pks,props = find_peaks(state_dict['comps'][state_dict['current_comp']]['weights'],
+                                height=height)
+        FWHM,heights,intL,intR = peak_widths(state_dict['comps'][state_dict['current_comp']]['weights'],pks)
+        state_dict['comps'][state_dict['current_comp']]['intL'] = intL[0]
+        state_dict['comps'][state_dict['current_comp']]['intR'] = intR[-1]
+    else:
+        FWHM,heights,state_dict['comps'][state_dict['current_comp']]['intL'],state_dict['comps'][state_dict['current_comp']]['intR'] = peak_widths(state_dict['comps'][state_dict['current_comp']]['weights'],
+                                    [np.argmax(state_dict['comps'][state_dict['current_comp']]['weights'])])
+
+    state_dict['comps'][state_dict['current_comp']]['intL'] = int(state_dict['comps'][state_dict['current_comp']]['intL'])
+    state_dict['comps'][state_dict['current_comp']]['intR'] = int(state_dict['comps'][state_dict['current_comp']]['intR'])
+    state_dict['comps'][state_dict['current_comp']]['intLbuffer'] = 0
+    state_dict['comps'][state_dict['current_comp']]['intRbuffer'] = 0
 
     #compute S/N and display
     state_dict['comps'][state_dict['current_comp']]['S/N'] = get_SNR(I_tcal,state_dict['comps'][state_dict['current_comp']]['weights'],
@@ -1441,6 +1487,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     a0.legend(loc="upper right")
     a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['left_lim']]*1e-3,color='red')
     a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['right_lim']]*1e-3,color='red')
+    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['intL']]*1e-3,color='purple')
+    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['intR']]*1e-3,color='purple')
+    if multipeaks.value:
+        a0.axhline(height,color='purple',linestyle='--')
 
     a1.imshow(Ip[:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
             extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
@@ -1470,16 +1520,24 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         ts2 = []
         b1 = []
         b2 = []
+        l1 = []
+        l2 = []
         for i in state_dict['comps'].keys():
             ts1.append(state_dict['comps'][i]['timestart'])
             ts2.append(state_dict['comps'][i]['timestop'])
             b1.append(state_dict['comps'][i]['buff'][0])
             b2.append(state_dict['comps'][i]['buff'][1])
+            l1.append(state_dict['comps'][i]['intL'])
+            l2.append(state_dict['comps'][i]['intR'])
         first = np.argmin(ts1)
         last = np.argmax(ts2)
         state_dict['timestart'] = ts1[first]
         state_dict['timestop'] = ts2[last]
         state_dict['buff'] = [b1[first],b2[last]]
+        state_dict['intL'] = l1[first]
+        state_dict['intR'] = l2[last]
+        state_dict['intLbuffer'] = 0
+        state_dict['intRbuffer'] = 0
 
         #add to dataframe
         df.loc["All"] = [state_dict['buff'][0],
@@ -1496,10 +1554,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     #update widget dict
     update_wdict([logwindow_slider,logibox_slider,
                 buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
-                avger_w_slider,sf_window_weights_slider],
+                avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider],
                 ["logwindow_slider","logibox_slider",
                 "buff_L_slider","buff_R_slider","ncomps_num","comprange_slider",
-                "avger_w_slider","sf_window_weights_slider"],
+                "avger_w_slider","sf_window_weights_slider","multipeaks","multipeaks_height_slider"],
                 param='value')
 
     return
@@ -1803,9 +1861,8 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
 
         RMcal.plot_RM_2D(state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],int(NOFFDEF/state_dict['n_t']),state_dict['n_t'],state_dict['time_axis'],state_dict['timestart'],state_dict['timestop'],state_dict['RMcalibrated']['RM2'][0],state_dict['RMcalibrated']['RM2'][1],state_dict['RMcalibrated']['trial_RM2'],state_dict['RMcalibrated']['SNRs_full'],Qnoise=np.std(state_dict['Qcal'].mean(0)[:int(NOFFDEF/state_dict['n_t'])]),show_calibrated=show_calibrated,RMcal=state_dict['RMcalibrated']['RMcal'],RMcalerr=state_dict['RMcalibrated']['RMcalerr'],I_tcal_trm=state_dict['I_tcalRM'],Q_tcal_trm=state_dict['Q_tcalRM'],U_tcal_trm=state_dict['U_tcalRM'],V_tcal_trm=state_dict['V_tcalRM'],wind=state_dict['window']*32.7*state_dict['n_t']*1e-3)#,rmbuff=500,cmapname='viridis',wind=5)
 
-    update_wdict([rmcal_menu],['rmcal_menu'],param='value')
     update_wdict([RMdisplay,RMerrdisplay],['RMdisplay','RMerrdisplay'],param='data')
-    
+    update_wdict([rmcal_menu],['rmcal_menu'],param='value')    
     return
 
 
@@ -1814,7 +1871,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
 
 
 
-def polanalysis_screen(showghostPA,limit_slider):
+def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu):
 
     #check if RM calibrated
     if state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration":
@@ -1854,12 +1911,17 @@ def polanalysis_screen(showghostPA,limit_slider):
 
 
     #get intL and intR from slider
-    left_lim,right_lim = limit_slider.value
     n_off = int(NOFFDEF/state_dict['n_t'])
-    state_dict['intL'] = int(np.argmax(I_tuse) + left_lim)
-    state_dict['intR'] = int(np.argmax(I_tuse) + right_lim)
+    if 'intL' not in state_dict.keys():
+        FWHM,heights,intL,intR = peak_widths(I_tuse,[np.argmax(I_tuse)])
+        state_dict['intL'] = int(intL) #- intLbuffer_slider.value
+        state_dict['intR'] = int(intR) #+ intRbuffer_slider.value
+
+    if polcomp_menu.value == "All":
+        state_dict['intLbuffer'] = intLbuffer_slider.value
+        state_dict['intRbuffer'] = intRbuffer_slider.value
     
-    
+
     #compute PA
     sigflag = state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration"
     weighted = 'weights' in state_dict.keys()
@@ -1867,13 +1929,85 @@ def polanalysis_screen(showghostPA,limit_slider):
         weights_use = np.nan*np.ones(len(I_tuse))
     else:
         weights_use = state_dict['weights']
-    state_dict['PA_f'],state_dict['PA_t'],state_dict['PA_f_errs'],state_dict['PA_t_errs'],state_dict['avg_PA'],state_dict['PA_err'] = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=state_dict['fobj'])
+    if state_dict['n_comps'] > 1:
+        for i in range(state_dict['n_comps']):
+            
+            #get weights
+            weighted = 'weights' in state_dict['comps'][i].keys()
+            if not weighted:
+                weights_use = np.nan*np.ones(len(I_tuse))
+            else:
+                weights_use = state_dict['comps'][i]['weights']
+
+            #check if buffers are for this component
+            if polcomp_menu.value != "All" and int(polcomp_menu.value[-1]) == i:
+                state_dict['comps'][i]['intLbuffer'] = intLbuffer_slider.value
+                state_dict['comps'][i]['intRbuffer'] = intRbuffer_slider.value
+
+            #get PA for subcomponent
+            (PA_f,
+             PA_t,
+             PA_f_errs,
+             PA_t_errs,
+             state_dict['comps'][i]['avg_PA'],
+             state_dict['comps'][i]['PA_err']) = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,
+                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),
+                                                                    normalize=True,buff=state_dict['comps'][i]['buff'],weighted=weighted,input_weights=weights_use,
+                                                                    fobj=state_dict['fobj'],intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
+                                                                    intR=state_dict['comps'][i]['intR']+state_dict['comps'][i]['intRbuffer'])
+
+
+            #get pol fractions for subcomponent
+            [(pol_f,pol_t,avg,sigma_frac,snr_frac),
+            (L_f,L_t,avg_L,sigma_L,snr_L),
+            (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
+            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,
+                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
+                                                                    n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
+                                                                    buff=state_dict['comps'][i]['buff'],full=False,weighted=weighted,input_weights=weights_use,
+                                                                    fobj=state_dict['fobj'],intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
+                                                                    intR=state_dict['comps'][i]['intR']+state_dict['comps'][i]['intRbuffer'])
+
+            state_dict['comps'][i]['Tpol'] = avg
+            state_dict['comps'][i]['Tpol_err'] = sigma_frac
+            state_dict['comps'][i]['Tsnr'] = snr_frac
+            state_dict['comps'][i]['snr'] = snr
+            state_dict['comps'][i]['Lpol'] = avg_L
+            state_dict['comps'][i]['Lpol_err'] = sigma_L
+            state_dict['comps'][i]['Lsnr'] = snr_L
+            state_dict['comps'][i]['absVpol'] = avg_C_abs
+            state_dict['comps'][i]['absVpol_err'] = sigma_C_abs
+            state_dict['comps'][i]['Vpol'] = avg_C
+            state_dict['comps'][i]['Vpol_err'] = sigma_C
+            state_dict['comps'][i]['Vsnr'] = snr_C
+
+            #upate dataframe
+            poldf.loc['Component ' + str(i)] = [np.around(state_dict['comps'][i]['snr'],2),
+                        np.around(100*state_dict['comps'][i]['Tpol'],2),
+                        np.around(100*state_dict['comps'][i]['Tpol_err'],2),
+                        np.around(state_dict['comps'][i]['Tsnr'],2),
+                        np.around(100*state_dict['comps'][i]['Lpol'],2),
+                        np.around(100*state_dict['comps'][i]['Lpol_err'],2),
+                        np.around(state_dict['comps'][i]['Lsnr'],2),
+                        np.around(100*state_dict['comps'][i]['Vpol'],2),
+                        np.around(100*state_dict['comps'][i]['Vpol_err'],2),
+                        np.around(100*state_dict['comps'][i]['absVpol'],2),
+                        np.around(100*state_dict['comps'][i]['absVpol_err'],2),
+                        np.around(state_dict['comps'][i]['Vsnr'],2),
+                        np.around((180/np.pi)*state_dict['comps'][i]['avg_PA'],2),
+                        np.around((180/np.pi)*state_dict['comps'][i]['PA_err'],2)]
+        
+    
+    #compute PA for full burst
+    state_dict['PA_f'],state_dict['PA_t'],state_dict['PA_f_errs'],state_dict['PA_t_errs'],state_dict['avg_PA'],state_dict['PA_err'] = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=state_dict['fobj'],intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
 
 
 
     #compute frequency spectrum
-    (I_fuse,Q_fuse,U_fuse,V_fuse) = dsapol.get_stokes_vs_freq(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_f'],state_dict['n_t'],
-                                                state_dict['freq_test'],n_off=n_off,plot=False,normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=state_dict['fobj'])
+    (I_fuse,Q_fuse,U_fuse,V_fuse) = dsapol.get_stokes_vs_freq(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=n_off,plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,
+                                                        fobj=state_dict['fobj'])
     state_dict['I_f'],state_dict['Q_f'],state_dict['U_f'],state_dict['V_f'] = (I_fuse,Q_fuse,U_fuse,V_fuse)
     
 
@@ -1881,10 +2015,26 @@ def polanalysis_screen(showghostPA,limit_slider):
     [(pol_f,pol_t,avg,sigma_frac,snr_frac),
             (L_f,L_t,avg_L,sigma_L,snr_L),
             (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
-            (C_f,C_t,avg_C,sigma_C,snr_C),snr] = dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,
-                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),
-                                                                    plot=False,normalize=True,buff=state_dict['buff'],full=False,weighted=weighted,input_weights=weights_use,
-                                                                    fobj=state_dict['fobj'],intL=state_dict['intL'],intR=state_dict['intR'])
+            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
+                                                                    n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
+                                                                    buff=state_dict['buff'],full=False,weighted=weighted,input_weights=weights_use,
+                                                                    fobj=state_dict['fobj'],intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
+
+
+    #update state dict
+    state_dict['Tpol'] = avg
+    state_dict['Tpol_err'] = sigma_frac
+    state_dict['Tsnr'] = snr_frac
+    state_dict['snr'] = snr
+    state_dict['Lpol'] = avg_L
+    state_dict['Lpol_err'] = sigma_L
+    state_dict['Lsnr'] = snr_L
+    state_dict['absVpol'] = avg_C_abs
+    state_dict['absVpol_err'] = sigma_C_abs
+    state_dict['Vpol'] = avg_C
+    state_dict['Vpol_err'] = sigma_C
+    state_dict['Vsnr'] = snr_C
 
     unbias_factor = 1
 
@@ -1910,43 +2060,55 @@ def polanalysis_screen(showghostPA,limit_slider):
     C_f = V_fuse
 
 
-    #plot
-    """
-    if 'weights' not in state_dict.keys():
-        I_f,Q_f,U_f,L_f,V_f = dsapol.pol_summary_plot(I_use,Q_use,U_use,V_use,state_dict['ids'],state_dict['nickname'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
-            state_dict['n_t'],state_dict['n_f'],
-            state_dict['freq_test'],state_dict['time_axis'],state_dict['fobj'],n_off=int(NOFFDEF/state_dict['n_t']),buff=state_dict['buff'],weighted=False,show=True,
-            wind=state_dict['window'],suffix="parsec",
-            plot_weights=False,timestart=state_dict['timestart'],timestop=state_dict['timestop'],short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,
-            SNRCUT=3,ghostPA=True,showspectrum=True,figsize=(18,12))
-    else:
-        I_f,Q_f,U_f,L_f,V_f = dsapol.pol_summary_plot(I_use,Q_use,U_use,V_use,state_dict['ids'],state_dict['nickname'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
-            state_dict['n_t'],state_dict['n_f'],
-            state_dict['freq_test'],state_dict['time_axis'],state_dict['fobj'],n_off=int(NOFFDEF/state_dict['n_t']),buff=state_dict['buff'],weighted=True,show=True,
-            input_weights=state_dict['weights'],intL=state_dict['intL'],intR=state_dict['intR'],multipeaks=state_dict['n_comps']>1,wind=state_dict['window'],suffix="parsec",
-            plot_weights=False,timestart=state_dict['timestart'],timestop=state_dict['timestop'],short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,
-            SNRCUT=3,ghostPA=True,showspectrum=True,figsize=(18,12))
+
+    #upate dataframe
+    poldf.loc['All'] = [np.around(state_dict['snr'],2),
+                        np.around(100*state_dict['Tpol'],2),
+                        np.around(100*state_dict['Tpol_err'],2),
+                        np.around(state_dict['Tsnr'],2),
+                        np.around(100*state_dict['Lpol'],2),
+                        np.around(100*state_dict['Lpol_err'],2),
+                        np.around(state_dict['Lsnr'],2),
+                        np.around(100*state_dict['Vpol'],2),
+                        np.around(100*state_dict['Vpol_err'],2),
+                        np.around(100*state_dict['absVpol'],2),
+                        np.around(100*state_dict['absVpol_err'],2),
+                        np.around(state_dict['Vsnr'],2),
+                        np.around((180/np.pi)*state_dict['avg_PA'],2),
+                        np.around((180/np.pi)*state_dict['PA_err'],2)]
 
 
-    """
-    #fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
+    #plot --> we're creating 3 separate plots: full summary, time domain, frequency domain
+    intL=state_dict['intL']-state_dict['intLbuffer']
+    intR=state_dict['intR']+state_dict['intRbuffer']
+
+
+    #(Full Summary Plot)
     fig= plt.figure(figsize=(18,12))
-    ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
-    ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
-    ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
-    ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
-    ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
+    #ax0 = plt.subplot2grid(shape=(7, 7), loc=(0, 0), colspan=4)
+    #ax1 = plt.subplot2grid(shape=(7, 7), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+    #ax2 = plt.subplot2grid(shape=(7, 7), loc=(3, 0), colspan=4, rowspan=4)
+    #ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
+    #ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
     
+    ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
+    ax0_f = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,sharex=ax0)
+    ax1 = plt.subplot2grid(shape=(8, 8), loc=(2, 0), colspan=4,rowspan=2,sharex=ax0)
+    ax2 = plt.subplot2grid(shape=(8, 8), loc=(4, 0), colspan=4, rowspan=4)
+    ax3 = plt.subplot2grid(shape=(8, 8), loc=(4, 4), rowspan=4,colspan=2)
+    ax6 = plt.subplot2grid(shape=(8, 8), loc=(4,7), rowspan=4,colspan=1)
+    ax6_f = plt.subplot2grid(shape=(8, 8), loc=(4,6), rowspan=4,colspan=1)
+
     SNRCUT = 3
     if showghostPA.value:
         ax0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                 (180/np.pi)*state_dict['PA_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
                 yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
-                fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+                fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
         ax6.errorbar((180/np.pi)*state_dict['PA_f'],state_dict['freq_test'][0],xerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
 
-    ax0.errorbar(state_dict['time_axis'][state_dict['intL']:state_dict['intR']][L_t[state_dict['intL']:state_dict['intR']]>=SNRCUT],(180/np.pi)*state_dict['PA_t'][state_dict['intL']:state_dict['intR']][L_t[state_dict['intL']:state_dict['intR']]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['intL']:state_dict['intR']][L_t[state_dict['intL']:state_dict['intR']]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
-    ax6.errorbar((180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],state_dict['freq_test'][0][L_f >=SNRCUT],xerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+    ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT],(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+    ax6.errorbar((180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],state_dict['freq_test'][0][L_f >=SNRCUT],xerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=5,linewidth=2)
 
     ax0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
@@ -1962,7 +2124,6 @@ def polanalysis_screen(showghostPA,limit_slider):
     ax0.set_xticks([])
     ax6.set_yticks([])
 
-
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3)
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
@@ -1974,6 +2135,26 @@ def polanalysis_screen(showghostPA,limit_slider):
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     ax1.set_xticks([])
     ax1.legend(loc="upper right",fontsize=16)
+    ax1.set_ylabel(r'S/N')
+
+    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15)
+    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15)
+    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15)
+    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+            100*pol_t[intL:intR],label='T/I',color="green",linewidth=3)
+    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+            100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5)
+    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+            100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2)
+    
+    ax0_f.set_xticks([])
+    ax0_f.set_ylabel(r'%')
+    ax0_f.set_ylim(-120,120)
+    ax0_f.legend(loc="upper right",fontsize=16)
+
 
     ax3.step(I_fuse,state_dict['freq_test'][0],color="black",linewidth=3)
     ax3.step(L_f,state_dict['freq_test'][0],color="blue",linewidth=2.5)
@@ -1982,7 +2163,13 @@ def polanalysis_screen(showghostPA,limit_slider):
     ax3.set_xlabel(r'S/N') 
     ax3.set_yticks([])
     
-    
+    ax6_f.step(100*pol_f,state_dict['freq_test'][0],color="green",linewidth=3)
+    ax6_f.step(100*(L_f/I_fuse),state_dict['freq_test'][0],color="blue",linewidth=2.5)
+    ax6_f.step(100*(C_f/I_fuse),state_dict['freq_test'][0],color="orange",linewidth=2)
+    ax6_f.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax6_f.set_xlabel(r'%') 
+    ax6_f.set_xlim(-120,120)
+    ax6_f.set_yticks([])
     
     ax2.imshow(I_use[:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
             extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
@@ -1990,10 +2177,201 @@ def polanalysis_screen(showghostPA,limit_slider):
                 np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0])])
     ax2.set_xlabel("Time (ms)")
     ax2.set_ylabel("Frequency (MHz)")
+    
+
+    if polcomp_menu.value == "All":
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax2.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax2.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+    else:
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax2.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax2.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+
+    if state_dict['n_comps'] > 1:
+        for i in range(state_dict['n_comps']):
+            if polcomp_menu.value != "All" and polcomp_menu.value[-1] == str(i):
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+            else:
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+
     plt.subplots_adjust(hspace=0)
     plt.subplots_adjust(wspace=0)
-    plt.show(fig)
+    #plt.show(fig)
+    plt.close() 
 
-    update_wdict([showghostPA,limit_slider],['showghostPA','limit_slider'],param='value')
+    #(Time Domain)
+    fig_time= plt.figure(figsize=(18,12))
+    #ax0 = plt.subplot2grid(shape=(7, 7), loc=(0, 0), colspan=4)
+    #ax1 = plt.subplot2grid(shape=(7, 7), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+    #ax2 = plt.subplot2grid(shape=(7, 7), loc=(3, 0), colspan=4, rowspan=4)
+    #ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
+    #ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
 
-    return
+    ax0 = plt.subplot2grid(shape=(4, 4), loc=(0, 0), colspan=4)
+    ax0_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax0)
+    ax1 = plt.subplot2grid(shape=(4, 4), loc=(2, 0), colspan=4,rowspan=2)#,sharex=ax0)
+
+    SNRCUT = 3
+    if showghostPA.value:
+        ax0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                (180/np.pi)*state_dict['PA_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
+
+    ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT],(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+
+    ax0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    if sigflag:
+        ax0.set_ylabel(r'PPA ($^\circ$)')
+    else:
+        ax0.set_ylabel(r'PA ($^\circ$)')
+    ax0.set_ylim(-1.4*95,1.1*95)
+    ax0.set_xticks([])
+
+    ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3)
+    ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            L_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='L',color="blue",linewidth=2.5)
+    ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            V_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',color="orange",linewidth=2)
+
+    ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax1.legend(loc="upper right",fontsize=16)
+    ax1.set_ylabel(r'S/N')
+    ax1.set_xlabel("Time (ms)")
+
+    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15)
+    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15)
+    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15)
+    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+            100*pol_t[intL:intR],label='T/I',color="green",linewidth=3)
+    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+            100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5)
+    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+            100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2)
+    ax0_f.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax0_f.set_xticks([])
+    ax0_f.set_ylabel(r'%')
+    ax0_f.set_ylim(-120,120)
+    ax0_f.legend(loc="upper right",fontsize=16)
+
+    if polcomp_menu.value == "All":
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
+        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+    else:
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
+        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+
+
+    if state_dict['n_comps'] > 1:
+        for i in range(state_dict['n_comps']):
+            if polcomp_menu.value != "All" and polcomp_menu.value[-1] == str(i):
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+            else:
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+
+    plt.subplots_adjust(hspace=0)
+    plt.subplots_adjust(wspace=0)
+    #plt.show(fig)
+    plt.close()
+
+
+    #(Frequency Domain)
+    fig_freq= plt.figure(figsize=(18,12))
+    #ax0 = plt.subplot2grid(shape=(7, 7), loc=(0, 0), colspan=4)
+    #ax1 = plt.subplot2grid(shape=(7, 7), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+    #ax2 = plt.subplot2grid(shape=(7, 7), loc=(3, 0), colspan=4, rowspan=4)
+    #ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
+    #ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
+
+    ax6 = plt.subplot2grid(shape=(4, 4), loc=(0, 0), colspan=4)
+    ax6_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax6)
+    ax3 = plt.subplot2grid(shape=(4, 4), loc=(2, 0), colspan=4,rowspan=2)#,sharex=ax6)
+
+    SNRCUT = 3
+    if showghostPA.value:
+        ax6.errorbar(state_dict['freq_test'][0],(180/np.pi)*state_dict['PA_f'],yerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+
+    ax6.errorbar(state_dict['freq_test'][0][L_f >=SNRCUT], (180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],yerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=5,linewidth=2)
+
+    ax6.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    if sigflag:
+        ax6.set_ylabel(r'PPA ($^\circ$)')
+    else:
+        ax6.set_ylabel(r'PA ($^\circ$)')
+    ax6.set_ylim(-1.4*95,1.1*95)
+    ax6.set_xticks([])
+
+    ax3.step(state_dict['freq_test'][0],I_fuse,color="black",linewidth=3)
+    ax3.step(state_dict['freq_test'][0],L_f,color="blue",linewidth=2.5)
+    ax3.step(state_dict['freq_test'][0],C_f,color="orange",linewidth=2)
+    ax3.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax3.set_ylabel(r'S/N')
+    ax3.set_xlabel("Frequency (MHz)")
+
+    ax6_f.step(state_dict['freq_test'][0],100*pol_f,color="green",linewidth=3)
+    ax6_f.step(state_dict['freq_test'][0],100*(L_f/I_fuse),color="blue",linewidth=2.5)
+    ax6_f.step(state_dict['freq_test'][0],100*(C_f/I_fuse),color="orange",linewidth=2)
+    ax6_f.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax6_f.set_ylabel(r'%')
+    ax6_f.set_ylim(-120,120)
+    ax6_f.set_xticks([])
+
+    plt.subplots_adjust(hspace=0)
+    plt.subplots_adjust(wspace=0)
+    #plt.show(fig)
+    plt.close()
+
+    update_wdict([showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu],['showghostPA','intLbuffer_slider','intRbuffer_slider','polcomp_menu'],param='value')
+
+    return fig,fig_time,fig_freq
+

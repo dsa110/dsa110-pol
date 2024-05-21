@@ -2077,7 +2077,7 @@ def PA_err_fit_array(LSNR_arr,popt1=[ 0.2685898,  28.71010826],popt2=[0.93328853
     return np.array(PAerrs)
 
 
-def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1,errormethod='MC'):
+def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1,errormethod='MC',intL=None,intR=None):
     """
     This function calculates and plots the polarization angle averaged over both time and
     frequency, and the average polarization angle within the peak.
@@ -2178,12 +2178,12 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
             I_t_weights = input_weights
 
  
-        if multipeaks:
+        if multipeaks and (intL == None or intR == None):
             pks,props = find_peaks(I_t_weights,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
             intL = intL[0]
             intR = intR[-1]
-        else:
+        elif (intL == None or intR == None):
             FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
         intL = int(intL)
         intR = int(intR)
@@ -2198,12 +2198,12 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
         sigma_PA = np.sqrt(np.nansum((I_t_weights_pol_cut*(PA_t_errs[intL:intR]))**2))/np.nansum(I_t_weights_pol_cut)
 
     else:
-        if multipeaks:
+        if multipeaks and (intL == None or intR == None):
             pks,props = find_peaks(I_t,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t,pks)
             intL = intL[0]
             intR = intR[-1]
-        else:
+        elif (intL == None or intR == None):
             FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
         intL = int(intL)
         intR = int(intR)
