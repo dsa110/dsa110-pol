@@ -1,5 +1,6 @@
 README.md
 README.txt
+casa38dsapol_env.yml
 celery.sqlite
 celerybeat-schedule.bak
 celerybeat-schedule.dat
@@ -28,6 +29,7 @@ dsapol/dsapol.py
 dsapol/parsec.py
 dsapol/polbeamform.py
 dsapol/polcal.py
+dsapol/rmtablefuncs.py
 dsapol/widget.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
 interface/PARSEC_Interface-InteractiveMercury-V2.ipynb

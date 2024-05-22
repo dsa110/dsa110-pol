@@ -2,6 +2,7 @@ from dsapol import polbeamform
 from dsapol import polcal
 from dsapol import RMcal
 from dsapol import dsapol
+from dsapol import rmtablefuncs 
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import correlate
@@ -183,6 +184,41 @@ state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
 state_dict['rel_n_t'] = 1
 state_dict['rel_n_f'] = 2**5
+state_dict['Iflux'] = np.nan 
+state_dict['Iflux_err'] = np.nan
+state_dict['Qflux'] = np.nan
+state_dict['Qflux_err'] = np.nan
+state_dict['Uflux'] = np.nan
+state_dict['Uflux_err'] = np.nan 
+state_dict['Vflux'] = np.nan 
+state_dict['Vflux_err'] = np.nan
+state_dict['noise_chan'] = np.nan 
+state_dict['polint'] = np.nan 
+state_dict['polint_err'] = np.nan
+state_dict['Tpol'] = np.nan
+state_dict['Tpol_err'] = np.nan
+state_dict['Lpol'] = np.nan
+state_dict['Lpol_err'] = np.nan
+state_dict['Vpol'] = np.nan
+state_dict['Vpol_err'] = np.nan
+state_dict['absVpol'] = np.nan
+state_dict['absVpol_err'] = np.nan
+state_dict['avg_PA'] = np.nan
+state_dict['PA_err'] = np.nan
+state_dict['freq_test'] = [np.linspace(1311.25000003072,1498.75,6144)]*4
+state_dict['base_n_t'] = 1
+state_dict['base_n_f'] = 1 
+state_dict['ids'] = ""
+state_dict['nickname'] = ""
+state_dict['RA'] = 0
+state_dict['DEC'] = 0
+state_dict['ibeam'] =np.nan
+state_dict['DM0'] =np.nan 
+state_dict['datadir'] ="./"
+state_dict['buff'] = [0,0]
+state_dict['width_native'] = 1 
+state_dict['mjd'] = 0 
+
 
 
 df = pd.DataFrame(
@@ -359,6 +395,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'logn_f_slider_filt':5,
          'multipeaks':False,
          'multipeaks_height_slider':0.5,
+         'Iflux_display':np.nan,
+         'Qflux_display':np.nan,
+         'Uflux_display':np.nan,
+         'Vflux_display':np.nan,
 
         'useRMTools':True, ################ (5) RM Synthesis ################
         'maxRM_num_tools':1e6,
@@ -503,8 +543,14 @@ state_dict["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_z
 state_dict['RMcalibrated']['RMcal'] = np.nan
 state_dict['RMcalibrated']['RMcalerr'] = np.nan
 state_dict['RMcalibrated']['RMcalstring'] = "No RM Calibration"
+state_dict['RMcalibrated']['RMFWHM'] = np.nan
 
 
+#archive dict
+from rmtable import rmtable
+archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
+#archive_df.add_missing_columns()#rmtablefuncs.make_FRB_RMTable(state_dict)
+#archive_df = archive_df.to_pandas()
 
 def update_wdict(objects,labels,param='value'):
     """
@@ -651,7 +697,6 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_wav_test'] = wav_test
         state_dict['base_time_axis'] = np.arange(I.shape[1])*32.7*state_dict['base_n_t']
         state_dict['badchans'] = badchans
-
 
 
         #state_dict['current_state'] += 1
@@ -1312,7 +1357,7 @@ def get_SNR(I_tcal,I_w_t_filtcal,timestart,timestop):
     return sig0/noise    
         
 
-def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider):
+def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider,fluxestbutton, Iflux_display,Qflux_display,Uflux_display,Vflux_display):
     
 
     if nextcompbutton.clicked:
@@ -1551,6 +1596,42 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         #done with components, move to RM synth
         #state_dict['current_state'] += 1
 
+    if fluxestbutton.clicked:
+        #get the non-normalized IQUV so we can estimate total flux in Jy
+        if 'base_I_unnormalized' not in state_dict.keys():
+            (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + "_dev",5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=False,fixchans=True,verbose=False)
+            state_dict['base_I_unnormalized'] = I
+            state_dict['base_Q_unnormalized'] = Q
+            state_dict['base_U_unnormalized'] = U
+            state_dict['base_V_unnormalized'] = V
+      
+        #calibrate
+        state_dict['base_Ical_unnormalized'],state_dict['base_Qcal_unnormalized'],state_dict['base_Ucal_unnormalized'],state_dict['base_Vcal_unnormalized'] = dsapol.calibrate(state_dict['base_I_unnormalized'],state_dict['base_Q_unnormalized'],state_dict['base_U_unnormalized'],state_dict['base_V_unnormalized'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=128)
+        
+        #mean over frequency, take peak flux (i.e. not fluence)
+        maxidx = np.argmax(np.abs(np.nanmean(state_dict['base_Ical_unnormalized'],axis=0)[int(state_dict['intL']):int(state_dict['intR'])]))
+        state_dict['Iflux'] = np.abs(np.nanmean(state_dict['base_Ical_unnormalized'],axis=0)[maxidx]) #Jy
+        state_dict['Iflux_err'] = np.nanstd(state_dict['base_Ical_unnormalized'],axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
+        state_dict['Qflux'] = np.abs(np.nanmean(state_dict['base_Qcal_unnormalized'],axis=0)[maxidx]) #Jy
+        state_dict['Qflux_err'] = np.nanstd(state_dict['base_Qcal_unnormalized'],axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
+        state_dict['Uflux'] = np.abs(np.nanmean(state_dict['base_Ucal_unnormalized'],axis=0)[maxidx]) #Jy
+        state_dict['Uflux_err'] = np.nanstd(state_dict['base_Ucal_unnormalized'],axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
+        state_dict['Vflux'] = np.abs(np.nanmean(state_dict['base_Vcal_unnormalized'],axis=0)[maxidx]) #Jy
+        state_dict['Vflux_err'] = np.nanstd(state_dict['base_Vcal_unnormalized'],axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
+        state_dict['noise_chan'] = np.nanmedian(np.nanstd(state_dict['base_Ical_unnormalized'],axis=0)[int(state_dict['intL']):int(state_dict['intR'])])
+        
+        state_dict['polint'] = np.abs(np.sqrt(np.nanmean(state_dict['base_Qcal_unnormalized'])**2 +
+                                                        np.nanmean(state_dict['base_Ucal_unnormalized'])**2 + 
+                                                        np.nanmean(state_dict['base_Vcal_unnormalized'])**2),axis=0)[maxidx]
+        state_dict['polint_err'] = np.nanstd(np.sqrt(state_dict['base_Qcal_unnormalized']**2 + 
+                                                    state_dict['base_Ucal_unnormalized']**2 + 
+                                                    state_dict['base_Vcal_unnormalized']**2),axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
+
+        Iflux_display.data = np.around(state_dict['Iflux'],2)
+        Qflux_display.data = np.around(state_dict['Qflux'],2)
+        Uflux_display.data = np.around(state_dict['Uflux'],2)
+        Vflux_display.data = np.around(state_dict['Vflux'],2)
+
     #update widget dict
     update_wdict([logwindow_slider,logibox_slider,
                 buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
@@ -1560,6 +1641,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                 "avger_w_slider","sf_window_weights_slider","multipeaks","multipeaks_height_slider"],
                 param='value')
 
+    update_wdict([Iflux_display,Qflux_display,Uflux_display,Vflux_display],
+                 ['Iflux_display','Qflux_display','Uflux_display','Vflux_display'],
+                 param='data')
     return
 
 
@@ -1733,7 +1817,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['fobj'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
                     state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                     state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
-
+                    state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
                     #update table
                     RMdf.loc[str(i), '2D-Synth'] = RM2
                     RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
@@ -1769,11 +1853,12 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
             state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
             state_dict['RMcalibrated']['RMerrfit'] = RMerr2
+            state_dict['RMcalibrated']['RMFWHM'] = upp-low
 
             #update table
             RMdf.loc['All', '2D-Synth'] = RM2
             RMdf.loc['All', '2D-Synth Error'] = RMerr2
-
+            
     elif getRMbutton_zoom.clicked:
         print("Run Initial RM synthesis first")
 
@@ -2375,3 +2460,14 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
 
     return fig,fig_time,fig_freq
 
+
+def archive_screen():
+
+    """
+    screen for RM table and archiving data
+    """
+
+    
+    archive_df = rmtablefuncs.make_FRB_RMTable(state_dict)
+
+    return
