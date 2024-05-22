@@ -18,7 +18,7 @@ except (AttributeError, AssertionError):
 setup(name='dsa-110_pol-dev',
       version='1.0.0',
       description='DSA-110 Polarization Utilities',
-      packages=['dsapol'],
+      packages=['dsapol','dsapol96'],
       install_requires=[
           'numpy',
           'matplotlib',
