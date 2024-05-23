@@ -90,6 +90,11 @@ Repo path
 repo_path = "/media/ubuntu/ssd/sherman/code/dsa110-pol/"
 
 """
+Level 3 candidates path
+"""
+level3_path = "/dataz/dsa110/candidates/"
+
+"""
 Read FRB parameters
 """
 FRB_RA = []
@@ -1662,9 +1667,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['Vflux_err'] = np.nanstd(state_dict['base_Vcal_unnormalized'],axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
         state_dict['noise_chan'] = np.nanmedian(np.nanstd(state_dict['base_Ical_unnormalized'],axis=0)[int(state_dict['intL']):int(state_dict['intR'])])
         
-        state_dict['polint'] = np.abs(np.sqrt(np.nanmean(state_dict['base_Qcal_unnormalized'])**2 +
-                                                        np.nanmean(state_dict['base_Ucal_unnormalized'])**2 + 
-                                                        np.nanmean(state_dict['base_Vcal_unnormalized'])**2),axis=0)[maxidx]
+        state_dict['polint'] = np.abs(np.sqrt(np.nanmean(state_dict['base_Qcal_unnormalized'],axis=0)**2 +
+                                                        np.nanmean(state_dict['base_Ucal_unnormalized'],axis=0)**2 + 
+                                                        np.nanmean(state_dict['base_Vcal_unnormalized'],axis=0)**2))[maxidx]
         state_dict['polint_err'] = np.nanstd(np.sqrt(state_dict['base_Qcal_unnormalized']**2 + 
                                                     state_dict['base_Ucal_unnormalized']**2 + 
                                                     state_dict['base_Vcal_unnormalized']**2),axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
@@ -2521,7 +2526,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     return fig,fig_time,fig_freq
 
 
-def archive_screen():
+def archive_screen(savebutton):
 
     """
     screen for RM table and archiving data
@@ -2531,4 +2536,14 @@ def archive_screen():
     RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
     polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
 
+    #save tables and calibrated filterbanks to level 3 directory
+    if savebutton.clicked:
+        state_dict['Level3Dir'] = level3_path + state_dict['ids'] + "/Level3/"
+        RMtable_archive_df.write(state_dict['Level3Dir'] + state_dict['ids'] + "_RMTable.fits",overwrite=True) 
+        polspec_archive_df.write_FITS(state_dict['Level3Dir'] + state_dict['ids'] + "_PolSpectra.fits",overwrite=True) 
+        print("Saved RMtable and PolSpectra to h23:" + state_dict['Level3Dir'])
+        if 'base_Ical' in state_dict.keys():
+            dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),state_dict['fobj'],state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
+    
+            print("Saved Pol Calibrated Filterbanks to h23:" + state_dict['Level3Dir'])
     return

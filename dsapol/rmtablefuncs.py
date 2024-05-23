@@ -73,7 +73,7 @@ def make_FRB_RMTable(state_dict):
                'rm_width_err':[np.nan],
                'complex_flag':['N'],
                'complex_test':['None'],
-               'rm_method':['RM Synthesis—Pol. Int'],
+               'rm_method':['RM Synthesis-Pol. Int'],
                'ionosphere':['RMextract (NOT APPLIED)'],
                'Ncomp':[state_dict['n_comps']],
                'stokesI':[state_dict['Iflux']],
