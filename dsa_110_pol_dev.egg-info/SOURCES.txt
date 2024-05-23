@@ -26,7 +26,6 @@ dsa_110_pol_dev.egg-info/requires.txt
 dsa_110_pol_dev.egg-info/top_level.txt
 dsapol/RMcal.py
 dsapol/dsapol.py
-dsapol/dsapol96.py
 dsapol/parsec.py
 dsapol/polbeamform.py
 dsapol/polcal.py

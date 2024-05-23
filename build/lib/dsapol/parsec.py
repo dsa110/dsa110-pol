@@ -218,7 +218,47 @@ state_dict['datadir'] ="./"
 state_dict['buff'] = [0,0]
 state_dict['width_native'] = 1 
 state_dict['mjd'] = 0 
-
+state_dict['base_I'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+state_dict['base_Q'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+state_dict['base_U'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+state_dict['base_V'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+state_dict['fobj'] = None
+state_dict['base_freq_test'] = [np.nan*np.ones(6144)]*4
+state_dict['base_wav_test'] = [np.nan*np.ones(6144)]*4
+state_dict['base_time_axis'] = np.nan*np.ones(5120)
+state_dict['badchans'] = []
+state_dict['base_I_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_Q_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_U_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_V_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_Ical_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_Qcal_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_Ucal_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_Vcal_unnormalized'] = np.nan*np.ones((6144,5120))
+state_dict['base_Ical_unnormalized_errs'] = np.nan*np.ones((6144,5120))
+state_dict['base_Qcal_unnormalized_errs'] = np.nan*np.ones((6144,5120))
+state_dict['base_Ucal_unnormalized_errs'] = np.nan*np.ones((6144,5120))
+state_dict['base_Vcal_unnormalized_errs'] = np.nan*np.ones((6144,5120))
+state_dict['base_Ical_f_unnormalized'] = np.nan*np.ones(6144)
+state_dict['base_Qcal_f_unnormalized'] = np.nan*np.ones(6144)
+state_dict['base_Ucal_f_unnormalized'] = np.nan*np.ones(6144)
+state_dict['base_Vcal_f_unnormalized'] = np.nan*np.ones(6144)
+state_dict['base_Ical_f_unnormalized_errs'] = np.nan*np.ones(6144)
+state_dict['base_Qcal_f_unnormalized_errs'] = np.nan*np.ones(6144)
+state_dict['base_Ucal_f_unnormalized_errs'] = np.nan*np.ones(6144)
+state_dict['base_Vcal_f_unnormalized_errs'] = np.nan*np.ones(6144)        
+state_dict['Tpol'] = np.nan
+state_dict['Tpol_err'] = np.nan
+state_dict['Lpol'] = np.nan
+state_dict['Lpol_err'] = np.nan
+state_dict['Vpol'] = np.nan
+state_dict['Vpol_err'] = np.nan
+state_dict['absVpol'] = np.nan
+state_dict['absVpol_err'] = np.nan
+state_dict['snr'] = np.nan
+state_dict['Tsnr'] =np.nan
+state_dict['Lsnr']= np.nan
+state_dict['Vsnr'] = np.nan
 
 
 df = pd.DataFrame(
@@ -547,11 +587,8 @@ state_dict['RMcalibrated']['RMFWHM'] = np.nan
 
 
 #archive dict
-from rmtable import rmtable
-archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
-#archive_df.add_missing_columns()#rmtablefuncs.make_FRB_RMTable(state_dict)
-#archive_df = archive_df.to_pandas()
-
+RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
+polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
 def update_wdict(objects,labels,param='value'):
     """
     This function takes a list of widget objects and a list of their names as strings and updates the wdict with their curent values
@@ -1607,7 +1644,12 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
       
         #calibrate
         state_dict['base_Ical_unnormalized'],state_dict['base_Qcal_unnormalized'],state_dict['base_Ucal_unnormalized'],state_dict['base_Vcal_unnormalized'] = dsapol.calibrate(state_dict['base_I_unnormalized'],state_dict['base_Q_unnormalized'],state_dict['base_U_unnormalized'],state_dict['base_V_unnormalized'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=128)
-        
+
+        state_dict['base_Ical_unnormalized_errs'] = np.nanstd(state_dict['base_Ical_unnormalized'],axis=0)/state_dict['base_Ical_unnormalized'].shape[0]
+        state_dict['base_Qcal_unnormalized_errs'] = np.nanstd(state_dict['base_Qcal_unnormalized'],axis=0)/state_dict['base_Qcal_unnormalized'].shape[0]
+        state_dict['base_Ucal_unnormalized_errs'] = np.nanstd(state_dict['base_Ucal_unnormalized'],axis=0)/state_dict['base_Ucal_unnormalized'].shape[0]
+        state_dict['base_Vcal_unnormalized_errs'] = np.nanstd(state_dict['base_Vcal_unnormalized'],axis=0)/state_dict['base_Vcal_unnormalized'].shape[0]
+
         #mean over frequency, take peak flux (i.e. not fluence)
         maxidx = np.argmax(np.abs(np.nanmean(state_dict['base_Ical_unnormalized'],axis=0)[int(state_dict['intL']):int(state_dict['intR'])]))
         state_dict['Iflux'] = np.abs(np.nanmean(state_dict['base_Ical_unnormalized'],axis=0)[maxidx]) #Jy
@@ -1631,6 +1673,24 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         Qflux_display.data = np.around(state_dict['Qflux'],2)
         Uflux_display.data = np.around(state_dict['Uflux'],2)
         Vflux_display.data = np.around(state_dict['Vflux'],2)
+
+
+        #also get vs freq
+        (state_dict['base_Ical_f_unnormalized'],
+        state_dict['base_Qcal_f_unnormalized'],
+        state_dict['base_Ucal_f_unnormalized'],
+        state_dict['base_Vcal_f_unnormalized']) = dsapol.get_stokes_vs_freq(state_dict['base_Ical_unnormalized'],
+                                                                                state_dict['base_Q_unnormalized'],
+                                                                                state_dict['base_U_unnormalized'],
+                                                                                state_dict['base_V_unnormalized'],
+                                                                                state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],
+                                                                                state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),
+                                                                                plot=False,show=False,normalize=False,buff=state_dict['buff'],
+                                                                                weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+        state_dict['base_Ical_f_unnormalized_errs'] = np.nanstd(state_dict['base_Ical_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
+        state_dict['base_Qcal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Qcal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
+        state_dict['base_Ucal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Ucal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
+        state_dict['base_Vcal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Vcal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
 
     #update widget dict
     update_wdict([logwindow_slider,logibox_slider,
@@ -2468,6 +2528,7 @@ def archive_screen():
     """
 
     
-    archive_df = rmtablefuncs.make_FRB_RMTable(state_dict)
+    RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
+    polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
 
     return
