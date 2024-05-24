@@ -5,6 +5,8 @@ celery.sqlite
 celerybeat-schedule.bak
 celerybeat-schedule.dat
 celerybeat-schedule.dir
+cwdpath.txt
+directories.json
 environment.yml
 files.txt
 requirements.txt
@@ -34,6 +36,7 @@ dsapol/polcal.py
 dsapol/rmtablefuncs.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
 dsapol96/RMcal.py
+dsapol96/directories.json
 dsapol96/dsapol.py
 dsapol96/parsec.py
 dsapol96/polbeamform.py
@@ -42,6 +45,10 @@ dsapol96/rmtablefuncs.py
 dsapol96/widget.py
 interface/PARSEC_Interface-InteractiveMercury-V2.ipynb
 interface/PARSEC_Interface-InteractiveMercury.ipynb
+interface/celerybeat-schedule.bak
+interface/celerybeat-schedule.dat
+interface/celerybeat-schedule.dir
+interface/directories.json
 interface/last_cal_metadata.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V2-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb

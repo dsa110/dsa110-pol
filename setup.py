@@ -65,7 +65,9 @@ dirs = {"cwd":cwd,
         "polcal_voltages":"/media/ubuntu/ssd/sherman/polcal_voltages/",
         "data":"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/",
         "logs":cwd[:cwd.index("dsa110-pol")] + "dsapol_logfiles/",
-        "gen_bfweights":"/dataz/dsa110/operations/beamformer_weights/generated/"}
+        "gen_bfweights":"/dataz/dsa110/operations/beamformer_weights/generated/",
+        "dsastorageFRBDir":"user@dsa-storage.ovro.pvt:/home/user/data/candidates/candidates/",
+        "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/"}
 print(dirs)
 f = open(dirs["polcal"] + "directories.json","w")
 json.dump(dirs,f)

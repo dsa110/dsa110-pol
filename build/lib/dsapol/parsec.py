@@ -105,6 +105,13 @@ FRB data path
 """
 frbpath = dirs["data"] #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 
+
+"""
+dsastorage paths
+"""
+dsastorageFRBDir = dirs["dsastorageFRBDir"]
+dsastorageCALDir = dirs["dsastorageCALDir"]
+
 """
 Read FRB parameters
 """
@@ -2456,7 +2463,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     return fig,fig_time,fig_freq
 
 
-def archive_screen(savebutton):
+def archive_screen(savebutton,archivebutton):
 
     """
     screen for RM table and archiving data
@@ -2476,4 +2483,13 @@ def archive_screen(savebutton):
             dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),state_dict['fobj'],state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
     
             print("Saved Pol Calibrated Filterbanks to h23:" + state_dict['Level3Dir'])
+    
+    
+    #move T3 files to dsastorage
+    if archivebutton.clicked:
+        state_dict['dsastorageDir'] = dsastorageFRBDir + state_dict['ids'] + "/"
+        state_dict['Level3Dir'] = level3_path + state_dict['ids'] + "/Level3/"
+        os.system("scp " + state_dict['Level3Dir'] + "*fil " + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/ > " + rmtablefuncs.logfile)
+        os.system("scp " + state_dict['Level3Dir'] + "*fits " + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/ > " + rmtablefuncs.logfile)
+
     return
