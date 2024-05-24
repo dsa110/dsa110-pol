@@ -50,16 +50,29 @@ This includes wrappers around Vikram's bash scripts for generating voltage files
 most recent calibrator observations, forming beams when known, and smoothing/averaging the solution
 with previous solutions.
 """
+import json
+f = open("../directories.json","r")
+dirs = json.load(f)
+f.close()
 
-
-data_path = "/dataz/dsa110/T3/"
-voltage_copy_path = "/media/ubuntu/ssd/sherman/polcal_voltages/"
-logfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/polcal_logfile.txt"
-output_path = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
-bfweights_path = "/dataz/dsa110/operations/beamformer_weights/generated/"
-bfweights_output_path = "/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/"
-lastcalfile = "/media/ubuntu/ssd/sherman/code/dsa110-pol/interface/last_cal_metadata.txt"
-
+data_path = dirs["T3"]#"/dataz/dsa110/T3/"
+voltage_copy_path = dirs["polcal_voltages"] #"/media/ubuntu/ssd/sherman/polcal_voltages/"
+logfile = dirs["logs"] + "polcal_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/polcal_logfile.txt"
+output_path = dirs["data"]#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
+bfweights_path = dirs["gen_bfweights"] #"/dataz/dsa110/operations/beamformer_weights/generated/"
+bfweights_output_path = dirs["polcal"] + "pol_self_calibs_FORPAPER/" #"/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/"
+lastcalfile = dirs["cwd"] + "interface/last_cal_metadata.txt" #"/media/ubuntu/ssd/sherman/code/dsa110-pol/interface/last_cal_metadata.txt"
+default_path = dirs["polcal"] #"/media/ubuntu/ssd/sherman/code/"
+"""
+print(data_path)
+print(voltage_copy_path)
+print(logfile)
+print(output_path)
+print(bfweights_path)
+print(bfweights_output_path)
+print(lastcalfile)
+print(default_path)
+"""
 middle_beam = 125
 
 #### Functions for copying voltages from T3 to working dir for given observing date ####
@@ -631,3 +644,32 @@ def write_polcal_solution(calid1,calid2,lastnumobs,ratio_fullavg,ratio_fit,ratio
     update_last_calmeta(caldate=new_date,calid1=calid1,calid2=calid2,lastnumobs=lastnumobs,filename=metafilename)
 
     return new_filename
+
+def read_polcal(polcaldate,path=default_path):
+    """
+    This function reads in pol calibration parameters (gxx,gyy) from
+    the calibration file provided
+    """
+    with open(path + polcaldate,'r') as csvfile:
+        reader = csv.reader(csvfile,delimiter=",")
+        for row in reader:
+            if row[0] == "|gxx|/|gyy|":
+                tmp_ratio = np.array(row[1:],dtype="float")
+            elif row[0] == "|gxx|/|gyy| fit":
+                tmp_ratio_fit = np.array(row[1:],dtype="float")
+            if row[0] == "phixx-phiyy":
+                tmp_phase = np.array(row[1:],dtype="float")
+            if row[0] == "phixx-phiyy fit":
+                tmp_phase_fit = np.array(row[1:],dtype="float")
+            if row[0] == "|gyy|":
+                tmp_gainY = np.array(row[1:],dtype="float")
+            if row[0] == "|gyy| FIT":
+                tmp_gainY_fit = np.array(row[1:],dtype="float")
+            if row[0] == "gxx":
+                gxx = np.array(row[1:],dtype="complex")
+            if row[0] == "gyy":
+                gyy = np.array(row[1:],dtype="complex")
+            if row[0] == "freq_axis":
+                freq_axis = np.array(row[1:],dtype="float")
+
+    return gxx,gyy,freq_axis

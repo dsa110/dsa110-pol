@@ -34,8 +34,15 @@ from scipy.ndimage import convolve1d
 from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 ext= ".pdf"
-DEFAULT_DATADIR = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
+import json
+import os
+import sys
+f = open("directories.json","r")
+dirs = json.load(f)
+f.close()
 
+DEFAULT_DATADIR = dirs["data"] + "testimgs/" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
+logfile = dirs["logs"] + "dsapol_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/dsapol_logfile.txt"
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u

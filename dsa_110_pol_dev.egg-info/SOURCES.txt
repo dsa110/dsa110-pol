@@ -25,12 +25,13 @@ dsa_110_pol_dev.egg-info/dependency_links.txt
 dsa_110_pol_dev.egg-info/requires.txt
 dsa_110_pol_dev.egg-info/top_level.txt
 dsapol/RMcal.py
+dsapol/dedisp.py
 dsapol/dsapol.py
+dsapol/filt.py
 dsapol/parsec.py
 dsapol/polbeamform.py
 dsapol/polcal.py
 dsapol/rmtablefuncs.py
-dsapol/widget.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
 dsapol96/RMcal.py
 dsapol96/dsapol.py
@@ -48,9 +49,7 @@ interface/IONEXdata/COD0OPSFIN_20240440000_01D_01H_GIM.INX
 interface/IONEXdata/CODG0780.22I
 interface/IONEXdata/CODG2430.22I
 interface/IONEXdata/CODG3050.22I
-offline_beamforming/beamforming_logfile.txt
 offline_beamforming/move_cal_voltages.bash
-offline_beamforming/polcal_logfile.txt
 offline_beamforming/run_beamformer_offline_bfweightsupdate_cals_sb.bash
 offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash
 offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash

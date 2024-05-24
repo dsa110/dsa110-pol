@@ -3,7 +3,13 @@ from rmtable import rmtable
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 import polspectra
+import json
+f = open("directories.json","r")
+dirs = json.load(f)
+f.close()
 
+
+logfile = dirs["logs"] + "archive_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/archive_logfile.txt"
 
 def make_FRB_polSpectra(state_dict):
 

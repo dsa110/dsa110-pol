@@ -3,6 +3,8 @@ from dsapol import polcal
 from dsapol import RMcal
 from dsapol import dsapol
 from dsapol import rmtablefuncs 
+from dsapol import dedisp
+from dsapol import filt
 import numpy as np
 from matplotlib import pyplot as plt
 from scipy.signal import correlate
@@ -76,23 +78,32 @@ plt.rcParams.update({
                     'legend.borderaxespad': 0,
                     'legend.frameon': False,
                     'legend.loc': 'lower right'})
+import json
+f = open("directories.json","r")
+dirs = json.load(f)
+f.close()
 
 """
 Factors for RM, pol stuff
 """
 RMSF_generated = False
 unbias_factor = 1 #1.57
-default_path = "/media/ubuntu/ssd/sherman/code/"
+default_path = dirs["polcal"]#"/media/ubuntu/ssd/sherman/code/"
 
 """
 Repo path
 """
-repo_path = "/media/ubuntu/ssd/sherman/code/dsa110-pol/"
+repo_path = dirs["cwd"]#"/media/ubuntu/ssd/sherman/code/dsa110-pol/"
 
 """
 Level 3 candidates path
 """
-level3_path = "/dataz/dsa110/candidates/"
+level3_path = dirs["candidates"] #"/dataz/dsa110/candidates/"
+
+"""
+FRB data path
+"""
+frbpath = dirs["data"] #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 
 """
 Read FRB parameters
@@ -227,9 +238,9 @@ state_dict['base_I'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_Q'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_U'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_V'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
-state_dict['fobj'] = None
-state_dict['base_freq_test'] = [np.nan*np.ones(6144)]*4
-state_dict['base_wav_test'] = [np.nan*np.ones(6144)]*4
+#state_dict['fobj'] = None
+state_dict['base_freq_test'] = [np.linspace(1311.25000003072,1498.75,6144)]*4 
+state_dict['base_wav_test'] = [(3e8)/(np.linspace(1311.25000003072,1498.75,6144)*1e6)]*4
 state_dict['base_time_axis'] = np.nan*np.ones(5120)
 state_dict['badchans'] = []
 state_dict['base_I_unnormalized'] = np.nan*np.ones((6144,5120))
@@ -337,7 +348,6 @@ df_beams = pd.DataFrame(
 
 
 #List of initial widget values updated whenever screen loads
-frbpath = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
 def get_frbfiles(path=frbpath):
     frbfiles = glob.glob(path + '2*_*')
     return [frbfiles[i][frbfiles[i].index('us/2')+3:] for i in range(len(frbfiles))]
@@ -760,43 +770,6 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 """
 Dedispersion Tuning state
 """
-def get_min_DM_step(n_t,fminGHz=1.307,fmaxGHz=1.493,res=32.7e-3):
-    return np.around((res)*n_t/(4.15)/((1/fminGHz**2) - (1/fmaxGHz**2)),2)
-
-def dedisperse(dyn_spec,DM,tsamp,freq_axis):
-    """
-    This function dedisperses a dynamic spectrum of shape nsamps x nchans by brute force without accounting for edge effects
-    """
-
-    #get delay axis
-    tdelays = -DM*4.15*(((np.min(freq_axis)*1e-3)**(-2)) - ((freq_axis*1e-3)**(-2)))#(8.3*(chanbw)*burst_DMs[i]/((freq_axis*1e-3)**3))*(1e-3) #ms
-    tdelays_idx_hi = np.array(np.ceil(tdelays/tsamp),dtype=int)
-    tdelays_idx_low = np.array(np.floor(tdelays/tsamp),dtype=int)
-    tdelays_frac = tdelays/tsamp - tdelays_idx_low
-    #print("Trial DM: " + str(DM) + " pc/cc...",end='')#, DM delays (ms): " + str(tdelays) + "...",end='')
-    nchans = len(freq_axis)
-    #print(dyn_spec.shape)
-    dyn_spec_DM = np.zeros(dyn_spec.shape)
-
-    #shift each channel
-    for k in range(nchans):
-        if tdelays_idx_low[k] >= 0:
-            arrlow =  np.pad(dyn_spec[k,:],((0,tdelays_idx_low[k])),mode="constant",constant_values=0)[tdelays_idx_low[k]:]/nchans
-        else:
-            arrlow =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_low[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_low[k]]/nchans
-
-        if tdelays_idx_hi[k] >= 0:
-            arrhi =  np.pad(dyn_spec[k,:],((0,tdelays_idx_hi[k])),mode="constant",constant_values=0)[tdelays_idx_hi[k]:]/nchans
-        else:
-            arrhi =  np.pad(dyn_spec[k,:],((np.abs(tdelays_idx_hi[k]),0)),mode="constant",constant_values=0)[:tdelays_idx_hi[k]]/nchans
-
-        dyn_spec_DM[k,:] = arrlow*(1-tdelays_frac[k]) + arrhi*(tdelays_frac[k])
-    #print("Done!")
-
-    return dyn_spec_DM
-
-
-
 def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton):
     """
     This function updates the dedispersion screen when resolution
@@ -806,7 +779,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 
     #update DM step size
     state_dict['dDM'] = ddm_num.value
-    ddm_num.step = get_min_DM_step(n_t_slider.value*state_dict['base_n_t'])
+    ddm_num.step = dedisp.get_min_DM_step(n_t_slider.value*state_dict['base_n_t'])
 
     #update new DM
     DM_new_display.data = DM_input_display.data + ddm_num.value
@@ -830,10 +803,10 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 
 
     #dedisperse
-    state_dict['I'] = dedisperse(state_dict['I'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
-    state_dict['Q'] = dedisperse(state_dict['Q'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
-    state_dict['U'] = dedisperse(state_dict['U'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
-    state_dict['V'] = dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['I'] = dedisp.dedisperse(state_dict['I'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['Q'] = dedisp.dedisperse(state_dict['Q'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['U'] = dedisp.dedisperse(state_dict['U'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    state_dict['V'] = dedisp.dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
 
     #get time series
     (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
@@ -871,10 +844,10 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
         
         if state_dict['dDM'] != 0:
             #dedisperse base dyn spectrum
-            state_dict['base_I'] = dedisperse(state_dict['base_I'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-            state_dict['base_Q'] = dedisperse(state_dict['base_Q'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-            state_dict['base_U'] = dedisperse(state_dict['base_U'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-            state_dict['base_V'] = dedisperse(state_dict['base_V'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_I'] = dedisp.dedisperse(state_dict['base_I'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_Q'] = dedisp.dedisperse(state_dict['base_Q'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_U'] = dedisp.dedisperse(state_dict['base_U'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_V'] = dedisp.dedisperse(state_dict['base_V'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
         
 
 
@@ -894,35 +867,6 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 """
 Calibration state
 """
-def read_polcal(polcaldate,path=default_path):
-    """
-    This function reads in pol calibration parameters (gxx,gyy) from
-    the calibration file provided
-    """
-    with open(path + polcaldate,'r') as csvfile:
-        reader = csv.reader(csvfile,delimiter=",")
-        for row in reader:
-            if row[0] == "|gxx|/|gyy|":
-                tmp_ratio = np.array(row[1:],dtype="float")
-            elif row[0] == "|gxx|/|gyy| fit":
-                tmp_ratio_fit = np.array(row[1:],dtype="float")
-            if row[0] == "phixx-phiyy":
-                tmp_phase = np.array(row[1:],dtype="float")
-            if row[0] == "phixx-phiyy fit":
-                tmp_phase_fit = np.array(row[1:],dtype="float")
-            if row[0] == "|gyy|":
-                tmp_gainY = np.array(row[1:],dtype="float")
-            if row[0] == "|gyy| FIT":
-                tmp_gainY_fit = np.array(row[1:],dtype="float")
-            if row[0] == "gxx":
-                gxx = np.array(row[1:],dtype="complex")
-            if row[0] == "gyy":
-                gyy = np.array(row[1:],dtype="complex")
-            if row[0] == "freq_axis":
-                freq_axis = np.array(row[1:],dtype="float")
-        
-    return gxx,gyy,freq_axis
-
 
 def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
         polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display,
@@ -938,7 +882,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     
     if polcaldate_menu.value != "":
         #update polcal parameters in state dict
-        state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = read_polcal(polcaldate_menu.value)
+        state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = polcal.read_polcal(polcaldate_menu.value)
     state_dict['polcalfile'] = polcaldate_menu.value
 
     #look for new calibrator files
@@ -1196,7 +1140,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         last_calnum =int(last_calnum)
 
         #read cal solution
-        last_gxx,last_gyy,last_cal_freq_axis = read_polcal('POLCAL_PARAMETERS_' + last_caldate + '.csv')#,fit=False)
+        last_gxx,last_gyy,last_cal_freq_axis = polcal.read_polcal('POLCAL_PARAMETERS_' + last_caldate + '.csv')#,fit=False)
         #last_gxx_fit,last_gyy_fit,last_cal_freq_axis_fit = read_polcal('POLCAL_PARAMETERS_' + last_caldate + '.csv') 
         
         plt.subplot(311)
@@ -1385,20 +1329,6 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
 Filter Weights State
 """
 
-def get_SNR(I_tcal,I_w_t_filtcal,timestart,timestop):
-    """
-    Takes a time series and padded filter weights, and limits and computes the matched filter signal-to-noise
-    """
-
-    I_w_t_filtcal_unpadded=I_w_t_filtcal[timestart:timestop]
-    I_trial_binned = (convolve(I_tcal,I_w_t_filtcal_unpadded))
-    sigbin = np.argmax(I_trial_binned)
-    sig0 = I_trial_binned[sigbin]
-    I_binned = (convolve(I_tcal,I_w_t_filtcal_unpadded))
-    noise = np.std(np.concatenate([I_binned[:sigbin-(timestop-timestart)*2],I_binned[sigbin+(timestop-timestart)*2:]]))
-    return sig0/noise    
-        
-
 def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider,fluxestbutton, Iflux_display,Qflux_display,Uflux_display,Vflux_display):
     
 
@@ -1502,7 +1432,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     state_dict['comps'][state_dict['current_comp']]['intRbuffer'] = 0
 
     #compute S/N and display
-    state_dict['comps'][state_dict['current_comp']]['S/N'] = get_SNR(I_tcal,state_dict['comps'][state_dict['current_comp']]['weights'],
+    state_dict['comps'][state_dict['current_comp']]['S/N'] = filt.get_SNR(I_tcal,state_dict['comps'][state_dict['current_comp']]['weights'],
                                                                     state_dict['comps'][state_dict['current_comp']]['timestart'],
                                                                     state_dict['comps'][state_dict['current_comp']]['timestop'])
     
@@ -1600,7 +1530,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['weights'] = state_dict['weights']/np.sum(state_dict['weights'])
 
         #compute full SNR
-        state_dict['S/N'] = get_SNR(state_dict['I_tcal'],state_dict['weights'],state_dict['timestart'],state_dict['timestop'])
+        state_dict['S/N'] = filt.get_SNR(state_dict['I_tcal'],state_dict['weights'],state_dict['timestart'],state_dict['timestop'])
 
         #get edge conditions from first and last components
         ts1 = []

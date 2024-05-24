@@ -57,6 +57,11 @@ OVRO_lat = 37.2317 #deg
 OVRO_lon = -118.2951 #deg
 OVRO_height = 1216 #m, Big Pine
 
+import json
+f = open("directories.json","r")
+dirs = json.load(f)
+f.close()
+logfile = dirs["logs"] + "RMcal_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/RMcal_logfile.txt"
 
 #function to get ionospheric RM using a file already downloaded from NASA archives
 def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,prefixes=['COD0','CODG','IGSG','CORG','C1PG','UPCG']):
