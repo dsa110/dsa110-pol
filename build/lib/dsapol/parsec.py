@@ -2463,7 +2463,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     return fig,fig_time,fig_freq
 
 
-def archive_screen(savebutton,archivebutton):
+def archive_screen(savebutton,archivebutton,archivepolcalbutton):
 
     """
     screen for RM table and archiving data
@@ -2484,12 +2484,36 @@ def archive_screen(savebutton,archivebutton):
     
             print("Saved Pol Calibrated Filterbanks to h23:" + state_dict['Level3Dir'])
     
-    
+    #move pol cal voltages to dsastorage
+    if archivepolcalbutton.clicked:
+        #find available polcal dirs
+        polcaldirs = [x for x in next(os.walk(polcal.voltage_copy_path))][1]
+        
+        for polcaldir in polcaldirs:
+            #make directories
+            os.system("ssh user@dsa-storage.ovro.pvt mkdir " + dirs["dsastorageCALDir"][dirs["dsastorageCALDir"].index(":")+1:] + "3C48_" + polcaldir)
+            os.system("ssh user@dsa-storage.ovro.pvt mkdir " + dirs["dsastorageCALDir"][dirs["dsastorageCALDir"].index(":")+1:] + "3C286_" + polcaldir)
+            
+            #get corr dirs
+            corrdirs_3C48 = [x for x in next(os.walk(polcal.voltage_copy_path + polcaldir + "/3C48/"))][1]
+            corrdirs_3C286 = [x for x in next(os.walk(polcal.voltage_copy_path + polcaldir + "/3C286/"))][1]
+            
+            #copy
+            for corr in corrdirs_3C48:
+                print("scp -r " + polcal.voltage_copy_path + polcaldir + "/3C48/" + corr + " " + dirs["dsastorageCALDir"] + "3C48_" + polcaldir)
+                os.system("scp -r " + polcal.voltage_copy_path + polcaldir + "/3C48/" + corr + " " + dirs["dsastorageCALDir"] + "3C48_" + polcaldir)
+            print("Archived polcal files from " + polcal.voltage_copy_path + polcaldir + "/3C48 to " + dirs["dsastorageCALDir"] + "3C48_" + polcaldir)
+
+            for corr in corrdirs_3C286:
+                print("scp -r " + polcal.voltage_copy_path + polcaldir + "/3C286/" + corr + " " + dirs["dsastorageCALDir"] + "3C286_" + polcaldir)
+                os.system("scp -r " + polcal.voltage_copy_path + polcaldir + "/3C286/" + corr + " " + dirs["dsastorageCALDir"] + "3C286_" + polcaldir)
+            print("Archived polcal files from " + polcal.voltage_copy_path + polcaldir + "/3C48 to " + dirs["dsastorageCALDir"] + "3C48_" + polcaldir)
+
     #move T3 files to dsastorage
     if archivebutton.clicked:
         state_dict['dsastorageDir'] = dsastorageFRBDir + state_dict['ids'] + "/"
         state_dict['Level3Dir'] = level3_path + state_dict['ids'] + "/Level3/"
         os.system("scp " + state_dict['Level3Dir'] + "*fil " + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/ > " + rmtablefuncs.logfile)
         os.system("scp " + state_dict['Level3Dir'] + "*fits " + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/ > " + rmtablefuncs.logfile)
-
+        print("Archived filterbanks and RMtable to dsastorage:" + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/")
     return

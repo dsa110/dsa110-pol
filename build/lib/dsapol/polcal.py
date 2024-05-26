@@ -63,6 +63,7 @@ bfweights_path = dirs["gen_bfweights"] #"/dataz/dsa110/operations/beamformer_wei
 bfweights_output_path = dirs["polcal"] + "pol_self_calibs_FORPAPER/" #"/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/"
 lastcalfile = dirs["cwd"] + "interface/last_cal_metadata.txt" #"/media/ubuntu/ssd/sherman/code/dsa110-pol/interface/last_cal_metadata.txt"
 default_path = dirs["polcal"] #"/media/ubuntu/ssd/sherman/code/"
+repo_path = dirs["cwd"]
 """
 print(data_path)
 print(voltage_copy_path)
@@ -133,7 +134,7 @@ def copy_voltages(filenames,caldate,calname,path=data_path,new_path=voltage_copy
     for f in filenames:
         #print(f)
         if 'header' not in f:
-            os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
+            os.system(repo_path + "offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
         #print("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
 
     #return output directory
