@@ -780,7 +780,7 @@ Dedispersion Tuning state
 def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton):
     """
     This function updates the dedispersion screen when resolution
-    or dm step are changed
+    or dm,where='post' step are changed
     """
 
 
@@ -825,13 +825,13 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     #display dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I')
+            state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',where='post')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['Q_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Q')
+            state_dict['Q_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Q',where='post')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['U_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='U')
+            state_dict['U_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='U',where='post')
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['V_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V')
+            state_dict['V_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',where='post')
     a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     a0.set_xticks([])
@@ -1376,7 +1376,8 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
     #mask the current and previous component
     state_dict['n_comps'] = int(ncomps_num.value)
-    state_dict['comps'][state_dict['current_comp']] = dict()
+    if state_dict['current_comp'] not in state_dict['comps'].keys():
+        state_dict['comps'][state_dict['current_comp']] = dict()
     Ip = copy.deepcopy(state_dict['Ical'])
     Qp = copy.deepcopy(state_dict['Qcal'])
     Up = copy.deepcopy(state_dict['Ucal'])
@@ -1454,25 +1455,27 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                    state_dict['comps'][state_dict['current_comp']]['right_lim'],
                                                    state_dict['comps'][state_dict['current_comp']]['S/N']]
 
-        RMdf.loc[str(state_dict['current_comp'])] = [np.nan]*6
+        if str(state_dict['current_comp']) not in RMdf.index.tolist():
+            RMdf.loc[str(state_dict['current_comp'])] = [np.nan]*6
 
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated'] = dict()
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1'] = np.nan*np.ones(int(wdict['nRM_num']))
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrs'] = np.nan*np.ones(int(2*wdict['maxRM_num']/wdict['dRM_tools']))
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrszoom'] = np.nan*np.ones(int(2*wdict['RM_window_zoom']/wdict['dRM_tools_zoom']))
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM2"] = [np.nan,np.nan,np.nan,np.nan]
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM1"] = [np.nan,np.nan]
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM1zoom"] = [np.nan,np.nan]
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM_tools"] = [np.nan,np.nan]
-        state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM_toolszoom"] = [np.nan,np.nan]
-        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["RMerrfit"] = np.nan
-        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['maxRM_num'],int(wdict['nRM_num']))
-        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
-        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
-        state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
-
+        if 'RMcalibrated' not in state_dict['comps'][state_dict['current_comp']].keys():
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated'] = dict()
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1'] = np.nan*np.ones(int(wdict['nRM_num']))
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrs'] = np.nan*np.ones(int(2*wdict['maxRM_num']/wdict['dRM_tools']))
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RM_tools_snrszoom'] = np.nan*np.ones(int(2*wdict['RM_window_zoom']/wdict['dRM_tools_zoom']))
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(int(wdict['nRM_num_zoom']))
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM2"] = [np.nan,np.nan,np.nan,np.nan]
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM1"] = [np.nan,np.nan]
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM1zoom"] = [np.nan,np.nan]
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM_tools"] = [np.nan,np.nan]
+            state_dict['comps'][state_dict['current_comp']]['RMcalibrated']["RM_toolszoom"] = [np.nan,np.nan]
+            state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["RMerrfit"] = np.nan
+            state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM1"] = np.linspace(wdict['minRM_num'],wdict['maxRM_num'],int(wdict['nRM_num']))
+            state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM2"] = np.linspace(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],int(wdict['nRM_num_zoom']))
+            state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_tools"] = np.arange(-wdict['maxRM_num'],wdict['maxRM_num'],wdict['dRM_tools'])
+            state_dict['comps'][state_dict['current_comp']]["RMcalibrated"]["trial_RM_toolszoom"] = np.arange(-wdict['RM_window_zoom'],wdict['RM_window_zoom'],wdict['dRM_tools_zoom'])
+        
         df.loc["All"] = [np.nan,
                                                    np.nan,
                                                    np.nan,
@@ -1496,15 +1499,15 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     #display masked dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
-            I_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='I')
+            I_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='I',where='post')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
-            Q_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='Q')
+            Q_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='Q',where='post')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
-            U_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='U')
+            U_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='U',where='post')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
-            V_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='V')
+            V_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='V',where='post')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
-            state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*np.max(I_tcal)/np.max(state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]),label='weights',color='purple',linewidth=4)
+            state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*np.max(I_tcal)/np.max(state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]),label='weights',color='purple',linewidth=4,where='post')
     a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     a0.set_xticks([])
@@ -1529,7 +1532,8 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
 
     if donecompbutton.clicked:
-        
+       
+
         #combine and normalize weights from each component
         state_dict['weights'] = np.zeros(len(state_dict['comps'][state_dict['current_comp']]['weights']))
         for i in range(state_dict['n_comps']):
@@ -1682,19 +1686,24 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
 
 
-    #if run button is clicked, run RM synthesis for all individual subcomponents and full burst
+    #if run button is clicked, run RM synthesis for selected component 
     if getRMbutton.clicked:
-
-        
         #make dynamic spectra w/ high frequency resolution
         Ip_full = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
         Qp_full = dsapol.avg_time(state_dict['base_Qcal'],state_dict['rel_n_t'])
         Up_full = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
         Vp_full = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
 
-        if state_dict['n_comps'] > 1:                
-            #loop through each component
-            for i in range(state_dict['n_comps']):
+        if rmcomp_menu.value != 'All' and rmcomp_menu.value != '':
+            
+
+            if state_dict['n_comps'] > 1:                
+                #loop through each component
+                #for i in range(state_dict['n_comps']):
+                
+                #select component
+                i = int(rmcomp_menu.value)
+                    
                 #mask other components and get spectra
                 Ip = copy.deepcopy(Ip_full)
                 Qp = copy.deepcopy(Qp_full)
@@ -1732,35 +1741,37 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     #update table
                     RMdf.loc[str(i), '1D-Synth'] = RM
                     RMdf.loc[str(i), '1D-Synth Error'] = RMerr
-                   
 
-        If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+        elif rmcomp_menu.value == 'All':
+            If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
         
-        #STAGE 1: RM-TOOLS (Full burst)
-        if useRMTools.value: 
-            RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-            state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
+            #STAGE 1: RM-TOOLS (Full burst)
+            if useRMTools.value: 
+                RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
 
 
-            #update table
-            RMdf.loc['All', 'RM-Tools'] = RM
-            RMdf.loc['All', 'RM-Tools Error'] = RMerr
+                #update table
+                RMdf.loc['All', 'RM-Tools'] = RM
+                RMdf.loc['All', 'RM-Tools Error'] = RMerr
         
-        #STAGE 2: 1D RM synthesis
-        if useRMsynth.value:
-            RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
-            state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+            #STAGE 2: 1D RM synthesis
+            if useRMsynth.value:
+                RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
 
-            #update table
-            RMdf.loc['All', '1D-Synth'] = RM
-            RMdf.loc['All', '1D-Synth Error'] = RMerr
+                #update table
+                RMdf.loc['All', '1D-Synth'] = RM
+                RMdf.loc['All', '1D-Synth Error'] = RMerr
 
-    #if run button 2 is clicked, run RM synthesis for all individual subcomponents and full burst, zoom around initial estimate
-    if getRMbutton_zoom.clicked and (~np.isnan(state_dict["RMcalibrated"]["RM2"][0]) or ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]) or ~np.isnan(state_dict["RMcalibrated"]["RM_tools"][0])):
-        #get center RM
-        if ~np.isnan(state_dict["RMcalibrated"]["RM2"][0]): RMcenter = state_dict["RMcalibrated"]["RM2"][0]
-        elif ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]): RMcenter = state_dict["RMcalibrated"]["RM1"][0]
-        else: RMcenter = state_dict["RMcalibrated"]["RM_tools"][0]
+    #if run button 2 is clicked, run RM synthesis for all selected component, zoom around initial estimate
+    if (getRMbutton_zoom.clicked and 
+        ((rmcomp_menu.value == 'All' and (~np.isnan(state_dict["RMcalibrated"]["RM2"][0]) or 
+                                          ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]) or 
+                                          ~np.isnan(state_dict["RMcalibrated"]["RM_tools"][0]))) or 
+        (rmcomp_menu.value != 'All' and rmcomp_menu.value != '' and (~np.isnan(state_dict['comps'][int(rmcomp_menu.value)]["RMcalibrated"]["RM2"][0]) or 
+                                                                     ~np.isnan(state_dict['comps'][int(rmcomp_menu.value)]["RMcalibrated"]["RM1"][0]) or 
+                                                                     ~np.isnan(state_dict['comps'][int(rmcomp_menu.value)]["RMcalibrated"]["RM_tools"][0]))))):
 
         #make dynamic spectra w/ high frequency resolution
         Ip_full = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
@@ -1768,10 +1779,23 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         Up_full = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
         Vp_full = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
 
-        if state_dict['n_comps'] > 1:
+
+        if rmcomp_menu.value != 'All' and rmcomp_menu.value != '':
+            i = int(rmcomp_menu.value)
+
+            #get center RM
+            if ~np.isnan(state_dict['comps'][i]["RMcalibrated"]["RM2"][0]): RMcenter = state_dict['comps'][i]["RMcalibrated"]["RM2"][0]
+            elif ~np.isnan(state_dict['comps'][i]["RMcalibrated"]["RM1"][0]): RMcenter = state_dict['comps'][i]["RMcalibrated"]["RM1"][0]
+            else: RMcenter = state_dict['comps'][i]["RMcalibrated"]["RM_tools"][0]
+
+            if state_dict['n_comps'] > 1:
         
-            #loop through each component
-            for i in range(state_dict['n_comps']):
+                #loop through each component
+                #for i in range(state_dict['n_comps']):
+                
+                #select component
+                i = int(rmcomp_menu.value)
+                    
                 #mask other components and get spectra
                 Ip = copy.deepcopy(Ip_full)
                 Qp = copy.deepcopy(Qp_full)
@@ -1824,42 +1848,49 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     RMdf.loc[str(i), '2D-Synth'] = RM2
                     RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
 
-        If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+        elif rmcomp_menu.value == 'All':
+            
+            #get center RM
+            if ~np.isnan(state_dict["RMcalibrated"]["RM2"][0]): RMcenter = state_dict["RMcalibrated"]["RM2"][0]
+            elif ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]): RMcenter = state_dict["RMcalibrated"]["RM1"][0]
+            else: RMcenter = state_dict["RMcalibrated"]["RM_tools"][0]
+            
+            If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
 
-        #STAGE 1: RM-TOOLS (Full burst)
-        if useRMTools.value:
-            RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
-            state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
+            #STAGE 1: RM-TOOLS (Full burst)
+            if useRMTools.value:
+                RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
 
-            #update table
-            RMdf.loc['All', 'RM-Tools'] = RM
-            RMdf.loc['All', 'RM-Tools Error'] = RMerr
+                #update table
+                RMdf.loc['All', 'RM-Tools'] = RM
+                RMdf.loc['All', 'RM-Tools Error'] = RMerr
 
-        #STAGE 2: 1D RM synthesis
-        if useRMsynth.value:
-            RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
-            state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
-            state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
-            if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+            #STAGE 2: 1D RM synthesis
+            if useRMsynth.value:
+                RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
+                state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+                state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
+                if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
 
-            #update table
-            RMdf.loc['All', '1D-Synth'] = RM
-            RMdf.loc['All', '1D-Synth Error'] = RMerr
-
-
-        #STAGE 3: 2D RM synthesis
-        if useRM2D.value:
-            n_off = int(NOFFDEF/state_dict['n_t'])
+                #update table
+                RMdf.loc['All', '1D-Synth'] = RM
+                RMdf.loc['All', '1D-Synth Error'] = RMerr
 
 
-            RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
-            state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
-            state_dict['RMcalibrated']['RMerrfit'] = RMerr2
-            state_dict['RMcalibrated']['RMFWHM'] = upp-low
+            #STAGE 3: 2D RM synthesis
+            if useRM2D.value:
+                n_off = int(NOFFDEF/state_dict['n_t'])
 
-            #update table
-            RMdf.loc['All', '2D-Synth'] = RM2
-            RMdf.loc['All', '2D-Synth Error'] = RMerr2
+
+                RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
+                state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+                state_dict['RMcalibrated']['RMerrfit'] = RMerr2
+                state_dict['RMcalibrated']['RMFWHM'] = upp-low
+
+                #update table
+                RMdf.loc['All', '2D-Synth'] = RM2
+                RMdf.loc['All', '2D-Synth Error'] = RMerr2
             
     elif getRMbutton_zoom.clicked:
         print("Run Initial RM synthesis first")
@@ -2212,11 +2243,11 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax6.set_yticks([])
 
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3)
+            I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3,where='post')
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            L_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='L',color="blue",linewidth=2.5)
+            L_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='L',color="blue",linewidth=2.5,where='post')
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            V_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',color="orange",linewidth=2)
+            V_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',color="orange",linewidth=2,where='post')
 
     ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
@@ -2225,17 +2256,17 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax1.set_ylabel(r'S/N')
 
     ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15)
+            100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15,where='post')
     ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15)
+            100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15,where='post')
     ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15)
+            100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15,where='post')
     ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
-            100*pol_t[intL:intR],label='T/I',color="green",linewidth=3)
+            100*pol_t[intL:intR],label='T/I',color="green",linewidth=3,where='post')
     ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
-            100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5)
+            100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5,where='post')
     ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
-            100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2)
+            100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2,where='post')
     
     ax0_f.set_xticks([])
     ax0_f.set_ylabel(r'%')
@@ -2243,16 +2274,16 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax0_f.legend(loc="upper right",fontsize=16)
 
 
-    ax3.step(I_fuse,state_dict['freq_test'][0],color="black",linewidth=3)
-    ax3.step(L_f,state_dict['freq_test'][0],color="blue",linewidth=2.5)
-    ax3.step(C_f,state_dict['freq_test'][0],color="orange",linewidth=2)
+    ax3.step(I_fuse,state_dict['freq_test'][0],color="black",linewidth=3,where='post')
+    ax3.step(L_f,state_dict['freq_test'][0],color="blue",linewidth=2.5,where='post')
+    ax3.step(C_f,state_dict['freq_test'][0],color="orange",linewidth=2,where='post')
     ax3.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
     ax3.set_xlabel(r'S/N') 
     ax3.set_yticks([])
     
-    ax6_f.step(100*pol_f,state_dict['freq_test'][0],color="green",linewidth=3)
-    ax6_f.step(100*(L_f/I_fuse),state_dict['freq_test'][0],color="blue",linewidth=2.5)
-    ax6_f.step(100*(C_f/I_fuse),state_dict['freq_test'][0],color="orange",linewidth=2)
+    ax6_f.step(100*pol_f,state_dict['freq_test'][0],color="green",linewidth=3,where='post')
+    ax6_f.step(100*(L_f/I_fuse),state_dict['freq_test'][0],color="blue",linewidth=2.5,where='post')
+    ax6_f.step(100*(C_f/I_fuse),state_dict['freq_test'][0],color="orange",linewidth=2,where='post')
     ax6_f.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
     ax6_f.set_xlabel(r'%') 
     ax6_f.set_xlim(-120,120)
@@ -2342,11 +2373,11 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax0.set_xticks([])
 
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3)
+            I_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',color="black",linewidth=3,where='post')
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            L_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='L',color="blue",linewidth=2.5)
+            L_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='L',color="blue",linewidth=2.5,where='post')
     ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            V_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',color="orange",linewidth=2)
+            V_tuse[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',color="orange",linewidth=2,where='post')
 
     ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
@@ -2355,17 +2386,17 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax1.set_xlabel("Time (ms)")
 
     ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15)
+            100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15,where='post')
     ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15)
+            100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15,where='post')
     ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15)
+            100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15,where='post')
     ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
-            100*pol_t[intL:intR],label='T/I',color="green",linewidth=3)
+            100*pol_t[intL:intR],label='T/I',color="green",linewidth=3,where='post')
     ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
-            100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5)
+            100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5,where='post')
     ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
-            100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2)
+            100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2,where='post')
     ax0_f.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     ax0_f.set_xticks([])
@@ -2438,16 +2469,16 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax6.set_ylim(-1.4*95,1.1*95)
     ax6.set_xticks([])
 
-    ax3.step(state_dict['freq_test'][0],I_fuse,color="black",linewidth=3)
-    ax3.step(state_dict['freq_test'][0],L_f,color="blue",linewidth=2.5)
-    ax3.step(state_dict['freq_test'][0],C_f,color="orange",linewidth=2)
+    ax3.step(state_dict['freq_test'][0],I_fuse,color="black",linewidth=3,where='post')
+    ax3.step(state_dict['freq_test'][0],L_f,color="blue",linewidth=2.5,where='post')
+    ax3.step(state_dict['freq_test'][0],C_f,color="orange",linewidth=2,where='post')
     ax3.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
     ax3.set_ylabel(r'S/N')
     ax3.set_xlabel("Frequency (MHz)")
 
-    ax6_f.step(state_dict['freq_test'][0],100*pol_f,color="green",linewidth=3)
-    ax6_f.step(state_dict['freq_test'][0],100*(L_f/I_fuse),color="blue",linewidth=2.5)
-    ax6_f.step(state_dict['freq_test'][0],100*(C_f/I_fuse),color="orange",linewidth=2)
+    ax6_f.step(state_dict['freq_test'][0],100*pol_f,color="green",linewidth=3,where='post')
+    ax6_f.step(state_dict['freq_test'][0],100*(L_f/I_fuse),color="blue",linewidth=2.5,where='post')
+    ax6_f.step(state_dict['freq_test'][0],100*(C_f/I_fuse),color="orange",linewidth=2,where='post')
     ax6_f.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
     ax6_f.set_ylabel(r'%')
     ax6_f.set_ylim(-120,120)

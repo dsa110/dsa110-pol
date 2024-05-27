@@ -1,5 +1,13 @@
 import numpy as np
-
+from matplotlib import pyplot as plt
+from scipy.signal import correlate
+from scipy.signal import savgol_filter as sf
+from scipy.signal import convolve
+from scipy.signal import fftconvolve
+from scipy.ndimage import convolve1d
+from scipy.signal import peak_widths
+from scipy.stats import chi
+from scipy.stats import norm
 
 
 """
