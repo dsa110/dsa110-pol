@@ -35,6 +35,7 @@ setup(name='dsa-110_pol-dev',
 import os
 import json
 print("Creating logfiles")
+os.system("rm -r ../dsapol_logfiles")
 os.system("mkdir ../dsapol_logfiles")
 os.system("touch ../dsapol_logfiles/beamform_logfile.txt")
 os.system("touch ../dsapol_logfiles/dedisp_logfile.txt")
@@ -51,6 +52,13 @@ os.system("> ../dsapol_logfiles/filter_logfile.txt")
 os.system("> ../dsapol_logfiles/RMcal_logfile.txt")
 os.system("> ../dsapol_logfiles/dsapol_logfile.txt")
 os.system("> ../dsapol_logfiles/archive_logfile.txt")
+
+os.system("mkdir ../dsapol_logfiles/RM_files")
+import numpy as np
+#np.save("../dsapol_logfiles/RM_files/input_spectrum.npy",np.zeros((0,0)))
+#np.save("../dsapol_logfiles/RM_files/output_spectrum.npy",np.zeros((2,0)))
+#np.save("../dsapol_logfiles/RM_files/output_values.npy",np.nan*np.ones(3))
+#np.save("../dsapol_logfiles/RM_files/trial_rm.npy",np.zeros(0))
 
 print("Finding working directories")
 os.system("pwd > cwdpath.txt")
@@ -77,4 +85,6 @@ f = open("interface/directories.json","w")
 json.dump(dirs,f)
 f.close()
 
-
+f = open("scripts/directories.json","w")
+json.dump(dirs,f)
+f.close()

@@ -50,6 +50,7 @@ from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u
 import os
+import signal
 """
 This file contains code for the Polarization Analysis and RM Synthesis Enabled for Calibration (PARSEC)
 user interface to the dsa110-pol module. The interface will use Mercury and a jupyter notebook to 
@@ -483,6 +484,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'rmcal_menu_choices':['No RM Calibration'],
         'RMdisplay':np.nan,
         'RMerrdisplay':np.nan,
+        'RMsynthbackground':False,
 
         'showghostPA':True,
         'intLbuffer_slider':0,
@@ -777,7 +779,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 """
 Dedispersion Tuning state
 """
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton,saveplotbutton):
     """
     This function updates the dedispersion screen when resolution
     or dm,where='post' step are changed
@@ -844,6 +846,12 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     a1.set_xlabel("Time (ms)")
     a1.set_ylabel("Frequency (MHz)")
     plt.subplots_adjust(hspace=0)
+    if saveplotbutton.clicked:
+        try:
+            plt.savefig(state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_DMplot_PARSEC.pdf")
+            print("Saved Figure to h23:" + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_DMplot_PARSEC.pdf")
+        except Exception as ex:
+            print("Save Failed: " + str(ex))
     plt.show(fig)
 
 
@@ -880,7 +888,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
         phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider,savecalsolnbutton,
-                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag):
+                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,saveplotbutton):
     
     """
     This function updates the polarization calibration screen
@@ -1097,6 +1105,14 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
 
     plt.subplots_adjust(wspace=0)
+    if saveplotbutton.clicked:
+        try:
+            plt.savefig(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
+            plt.savefig(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
+            print("Saved Figure to h23:" + polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
+            print("Saved Figure to h23:" + polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
+        except Exception as ex:
+            print("Save Failed: " + str(ex))
     plt.show()
 
     return beam_dict_3C48,beam_dict_3C286
@@ -1107,7 +1123,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
         phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider,savecalsolnbutton,
-                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,beam_dict_3C48,beam_dict_3C286):
+                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,beam_dict_3C48,beam_dict_3C286,saveplotbutton):
 
 
     #if make filt button pushed, make filterbanks for pol cals
@@ -1307,6 +1323,12 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']),color='magenta',linewidth=4)
     if ((polcal_dict['cal_name_3C48'] != "" or polcal_dict['cal_name_3C286'] != "") and polcal_dict['polcal_findbeams_file'] != "") or state_dict['polcalfile'] != "":
         plt.subplots_adjust(hspace=0)
+        if saveplotbutton.clicked:
+            try:
+                plt.savefig(polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+                print("Saved Figure to h23: " + polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+            except Exception as ex:
+                print("Save Failed: " + str(ex))
         plt.show()
 
 
@@ -1659,12 +1681,26 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 RM Synthesis State
 """
+"""
+def handler(signum,frame):
+    print("Background RM synthesis completed")
+    #get results from file
+    res = np.load(dirs['logs'] + "RM_files/" + state_dict['dname'] + "output_values.npy")
+    RM = res[0]
+    RMerr = res[2]
+    state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+    RMdf.loc['All', '1D-Synth'] = RM
+    RMdf.loc['All', '1D-Synth Error'] = RMerr
 
+    res = np.load(dirs['logs'] + "RM_files/" + state_dict['dname'] + "output_spectrum.npy")
+    state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] =res[1,:],res[0,:]
+    return
+"""
 def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                  maxRM_num,getRMbutton,useRM2D,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,
                  getRMbutton_zoom,RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display,
-                 getRMgal_button,getRMion_button,rmcomp_menu):
-    
+                 getRMgal_button,getRMion_button,rmcomp_menu,RMsynthbackground,refresh_button):
+    #signal.signal(signal.SIGUSR1,handler)    
     #update component options
     update_wdict([rmcomp_menu],['rmcomp_menu'],
                 param='value')
@@ -1735,12 +1771,19 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 if useRMsynth.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
-                    state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
+                    if RMsynthbackground.value:
 
-                    #update table
-                    RMdf.loc[str(i), '1D-Synth'] = RM
-                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
+                        state_dict['comps'][i]['RMcalibrated']['dname'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,background=True)
+
+                        # disregard return values because we'll read from file to see when ready
+                    
+                    else:
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
+                        state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
+
+                        #update table
+                        RMdf.loc[str(i), '1D-Synth'] = RM
+                        RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
         elif rmcomp_menu.value == 'All':
             If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
@@ -1757,12 +1800,17 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
-                RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+                if RMsynthbackground.value:
+                    state_dict['RMcalibrated']['dname'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),background=True)
 
-                #update table
-                RMdf.loc['All', '1D-Synth'] = RM
-                RMdf.loc['All', '1D-Synth Error'] = RMerr
+                else:
+                    
+                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+
+                    #update table
+                    RMdf.loc['All', '1D-Synth'] = RM
+                    RMdf.loc['All', '1D-Synth Error'] = RMerr
 
     #if run button 2 is clicked, run RM synthesis for all selected component, zoom around initial estimate
     if (getRMbutton_zoom.clicked and 
@@ -1898,6 +1946,33 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
 
 
+    if refresh_button.clicked:
+        if 'dname' in state_dict["RMcalibrated"].keys():
+            print("Refreshing...")
+            
+            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "result.npy")
+            RM = res[0]
+            RMerr = res[1]
+            state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+            RMdf.loc['All', '1D-Synth'] = RM
+            RMdf.loc['All', '1D-Synth Error'] = RMerr
+
+            state_dict["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "SNRs.npy")
+            state_dict["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "trialRM.npy")
+        if state_dict['n_comps'] > 1:
+            for i in range(state_dict['n_comps']):
+                if 'dname' in state_dict['comps'][i]['RMcalibrated'].keys():
+                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "result.npy")
+                    RM = res[0]
+                    RMerr = res[1]
+                    state_dict['comps'][i]['RMcalibrated']["RMcalibrated"]["RM1"] = [RM,RMerr]
+                    RMdf.loc[str(i), '1D-Synth'] = RM
+                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
+
+                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "SNRs.npy")
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "trialRM.npy")
+
+
     #1D plots
 
     if rmcomp_menu.value == 'All':
@@ -1908,8 +1983,8 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value,figsize=(38,24))
 
     #update widget dict
-    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D,rmcomp_menu],
-                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D','rmcomp_menu'],param='value')
+    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D,rmcomp_menu,RMsynthbackground],
+                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D','rmcomp_menu','RMsynthbackground'],param='value')
     
     update_wdict([RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display],['RM_gal_display','RM_galerr_display','RM_ion_display','RM_ionerr_display'],param='data')
         

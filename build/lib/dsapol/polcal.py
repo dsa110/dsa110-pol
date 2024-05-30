@@ -51,7 +51,7 @@ most recent calibrator observations, forming beams when known, and smoothing/ave
 with previous solutions.
 """
 import json
-f = open("../directories.json","r")
+f = open("directories.json","r")
 dirs = json.load(f)
 f.close()
 

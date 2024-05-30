@@ -6,7 +6,6 @@ celerybeat-schedule.bak
 celerybeat-schedule.dat
 celerybeat-schedule.dir
 cwdpath.txt
-directories.json
 environment.yml
 files.txt
 requirements.txt
@@ -50,7 +49,9 @@ interface/celerybeat-schedule.bak
 interface/celerybeat-schedule.dat
 interface/celerybeat-schedule.dir
 interface/directories.json
+interface/kill_mercury.sh
 interface/last_cal_metadata.txt
+interface/tmpout.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V2-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
 interface/IONEXdata/COD0OPSFIN_20240440000_01D_01H_GIM.INX
@@ -67,7 +68,6 @@ scripts/RMSNR_all_FRBs.py
 scripts/RM_all_FRBs.py
 scripts/cal_pol.py
 scripts/find_beams.py
-scripts/kill_mercury.sh
 scripts/plot_pol.py
 scripts/process_all_FRBs.py
 scripts/process_all_FRBs_V2.py

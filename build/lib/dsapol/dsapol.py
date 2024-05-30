@@ -3572,7 +3572,7 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
 
 #Estimate RM by maximizing SNR over given trial RM; wav is wavelength array
-def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0): 
+def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0,sendtofile=''): 
     if multithread: assert(numbatch*maxProcesses <= len(trial_RM)) #assert(len(trial_RM)%(maxProcesses*numbatch) == 0)
     #Get wavelength axis
     c = (3e8) #m/s
@@ -3626,19 +3626,19 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
                     #start thread
                     task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
                                             False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
-                                            False,False,1,1,i))
+                                            False,False,1,1,i,sendtofile))
 
                 if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
                     trial_RM_i = trial_RM[numbatch*maxProcesses:]
 
                     task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
                                             False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
-                                            False,False,1,1,maxProcesses*numbatch))
+                                            False,False,1,1,maxProcesses*numbatch,sendtofile))
 
 
                 #wait for tasks to complete
                 #wait(task_list)
-
+                print("done submitting tasks")
                 for future in as_completed(task_list):
                     tmp,tmp,SNRs_i,tmp,i = future.result()
 
@@ -3647,6 +3647,15 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
                     else:
                         SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
 
+
+                    if sendtofile != '':
+                        prevSNRs = np.load(sendtofile)
+                        if i == maxProcesses*numbatch:
+                            prevSNRs = np.concatenate([prevSNRs,np.array([trial_RM[maxProcesses*numbatch:],SNRs_i])],axis=1)
+                        else:
+                            prevSNRs = np.concatenate([prevSNRs,np.array([trial_RM[i*trialsize:(i+1)*trialsize],SNRs_i])],axis=1)
+                        print("saving data for i == " + str(i))
+                        np.save(sendtofile,prevSNRs)
                 executor.shutdown(wait=True)
             
 
