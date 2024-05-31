@@ -1959,6 +1959,11 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
             state_dict["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "SNRs.npy")
             state_dict["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "trialRM.npy")
+
+            order = state_dict["RMcalibrated"]['trial_RM1'].argsort()
+            state_dict["RMcalibrated"]['RMsnrs1'] = state_dict["RMcalibrated"]['RMsnrs1'][order]
+            state_dict["RMcalibrated"]['trial_RM1'] = state_dict["RMcalibrated"]['trial_RM1'][order]
+
         if state_dict['n_comps'] > 1:
             for i in range(state_dict['n_comps']):
                 if 'dname' in state_dict['comps'][i]['RMcalibrated'].keys():
@@ -1972,7 +1977,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "SNRs.npy")
                     state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "trialRM.npy")
 
-
+                    order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'].argsort()
+                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'][order]
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'][order]
     #1D plots
 
     if rmcomp_menu.value == 'All':

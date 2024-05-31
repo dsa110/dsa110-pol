@@ -264,8 +264,8 @@ def future_callback_gR1(future,fit,weights,trial_RM,fit_window,Qcal,Ucal,timesta
     
     #write results to file
     np.save(dirs['logs'] + "RM_files/" + dname + "result.npy",np.array([RM1,RMerr1]))
-    np.save(dirs['logs'] + "RM_files/" + dname + "SNRs.npy",RMsnrs1)
-    np.save(dirs['logs'] + "RM_files/" + dname + "trialRM.npy",trial_RM)
+    #np.save(dirs['logs'] + "RM_files/" + dname + "SNRs.npy",RMsnrs1)
+    #np.save(dirs['logs'] + "RM_files/" + dname + "trialRM.npy",trial_RM)
 
     return 
 
@@ -289,13 +289,13 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
         #make directory for output
         dname = "proc_" + Time.now().isot + "/"
         os.mkdir(dirs['logs'] + "RM_files/" + dname)
-        np.save(dirs['logs'] + "RM_files/" + dname + "result.npy",np.zeros((0,0)))
-        np.save(dirs['logs'] + "RM_files/" + dname + "SNRs.npy",np.zeros((1,0)))
+        np.save(dirs['logs'] + "RM_files/" + dname + "result.npy",np.nan*np.ones(2))
+        np.save(dirs['logs'] + "RM_files/" + dname + "SNRs.npy",np.zeros(0))
         np.save(dirs['logs'] + "RM_files/" + dname + "trialRM.npy",np.zeros(0))
 
         #create executor
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(dsapol.faradaycal,I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,False,dsapol.DEFAULT_DATADIR,"","",1,1,False,100,True,False,True,10,10,0,"",True)    
+        t = executor.submit(dsapol.faradaycal,I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,False,dsapol.DEFAULT_DATADIR,"","",1,1,False,100,True,False,True,10,10,0,dirs['logs'] + "RM_files/" + dname,True)    
         t.add_done_callback(lambda future: future_callback_gR1(future,fit,weights,trial_RM,fit_window,Qcal,Ucal,timestart,timestop,dname))
 
         return dname
