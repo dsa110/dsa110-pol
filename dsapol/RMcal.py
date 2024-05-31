@@ -295,7 +295,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
 
         #create executor
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(dsapol.faradaycal,I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,False,dsapol.DEFAULT_DATADIR,"","",1,1,False,100,True,False,True,100,1,0,"")    
+        t = executor.submit(dsapol.faradaycal,I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,False,dsapol.DEFAULT_DATADIR,"","",1,1,False,100,True,False,True,10,10,0,"",True)    
         t.add_done_callback(lambda future: future_callback_gR1(future,fit,weights,trial_RM,fit_window,Qcal,Ucal,timestart,timestop,dname))
 
         return dname

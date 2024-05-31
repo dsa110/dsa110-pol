@@ -6,7 +6,6 @@ celerybeat-schedule.bak
 celerybeat-schedule.dat
 celerybeat-schedule.dir
 cwdpath.txt
-environment.yml
 files.txt
 requirements.txt
 setup.py
@@ -54,6 +53,7 @@ interface/last_cal_metadata.txt
 interface/tmpout.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V2-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
+interface/IONEXdata/COD0OPSFIN_20230660000_01D_01H_GIM.INX
 interface/IONEXdata/COD0OPSFIN_20240440000_01D_01H_GIM.INX
 interface/IONEXdata/CODG0780.22I
 interface/IONEXdata/CODG2430.22I
@@ -66,12 +66,15 @@ scripts/FRB_quick_pol_analysis.py
 scripts/FRB_upper_limits.py
 scripts/RMSNR_all_FRBs.py
 scripts/RM_all_FRBs.py
+scripts/RM_synthesis.py
 scripts/cal_pol.py
+scripts/directories.json
 scripts/find_beams.py
 scripts/plot_pol.py
 scripts/process_all_FRBs.py
 scripts/process_all_FRBs_V2.py
 scripts/process_all_FRBs_V3.py
+scripts/tmpfile.txt
 tests/calibration_test.py
 tests/faraday_test.py
 tests/freq_test.py
