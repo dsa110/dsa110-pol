@@ -1773,12 +1773,12 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
                     if RMsynthbackground.value:
 
-                        state_dict['comps'][i]['RMcalibrated']['dname'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,background=True)
+                        state_dict['comps'][i]['RMcalibrated']['dname_1D'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,fit=False,weights=state_dict['comps'][i]['weights'],background=True)
 
                         # disregard return values because we'll read from file to see when ready
                     
                     else:
-                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off)
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,fit=False,weights=state_dict['comps'][i]['weights'])
                         state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
 
                         #update table
@@ -1801,11 +1801,11 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
-                    state_dict['RMcalibrated']['dname'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),background=True)
+                    state_dict['RMcalibrated']['dname_1D'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=False,weights=state_dict['weights'],background=True)
 
                 else:
                     
-                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=False,weights=state_dict['weights'])
                     state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
 
                     #update table
@@ -1873,28 +1873,33 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
+                    
+                    if RMsynthbackground.value:
+                        state_dict['comps'][i]["RMcalibrated"]["dname_1D_zoom"] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'],background=True)
+                    else:
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
+                        state_dict['comps'][i]['RMcalibrated']["RM1zoom"] = [RM,RMerr]
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
+                        if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
 
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
-                    state_dict['comps'][i]['RMcalibrated']["RM1zoom"] = [RM,RMerr]
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
-                    if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
-
-                    #update table
-                    RMdf.loc[str(i), '1D-Synth'] = RM
-                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
+                        #update table
+                        RMdf.loc[str(i), '1D-Synth'] = RM
+                        RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
                 #STAGE 3: 2D RM synthesis
                 if useRM2D.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
-
-                    RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['fobj'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
-                    state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
-                    state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
-                    state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
-                    #update table
-                    RMdf.loc[str(i), '2D-Synth'] = RM2
-                    RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
+                    if RMsynthbackground.value:
+                        state_dict['comps'][i]["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['fobj'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'],background=True)
+                    else:
+                        RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['fobj'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
+                        state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+                        state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
+                        state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
+                        #update table
+                        RMdf.loc[str(i), '2D-Synth'] = RM2
+                        RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
 
         elif rmcomp_menu.value == 'All':
             
@@ -1916,29 +1921,34 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
-                RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
-                state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
-                state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
-                if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+                if RMsynthbackground.value:
+                    state_dict["RMcalibrated"]["dname_1D_zoom"] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'],background=True)
+                else:
+                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
+                    state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+                    state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
+                    if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
 
-                #update table
-                RMdf.loc['All', '1D-Synth'] = RM
-                RMdf.loc['All', '1D-Synth Error'] = RMerr
+                    #update table
+                    RMdf.loc['All', '1D-Synth'] = RM
+                    RMdf.loc['All', '1D-Synth Error'] = RMerr
 
 
             #STAGE 3: 2D RM synthesis
             if useRM2D.value:
                 n_off = int(NOFFDEF/state_dict['n_t'])
 
+                if RMsynthbackground.value:
+                    state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'],background=True)
+                else:
+                    RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
+                    state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+                    state_dict['RMcalibrated']['RMerrfit'] = RMerr2
+                    state_dict['RMcalibrated']['RMFWHM'] = upp-low
 
-                RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
-                state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
-                state_dict['RMcalibrated']['RMerrfit'] = RMerr2
-                state_dict['RMcalibrated']['RMFWHM'] = upp-low
-
-                #update table
-                RMdf.loc['All', '2D-Synth'] = RM2
-                RMdf.loc['All', '2D-Synth Error'] = RMerr2
+                    #update table
+                    RMdf.loc['All', '2D-Synth'] = RM2
+                    RMdf.loc['All', '2D-Synth Error'] = RMerr2
             
     elif getRMbutton_zoom.clicked:
         print("Run Initial RM synthesis first")
@@ -1947,39 +1957,105 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
 
     if refresh_button.clicked:
-        if 'dname' in state_dict["RMcalibrated"].keys():
-            print("Refreshing...")
+        print("Refreshing...")
+        if 'dname_1D' in state_dict["RMcalibrated"].keys():
             
-            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "result.npy")
+            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "result.npy")
             RM = res[0]
             RMerr = res[1]
             state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
             RMdf.loc['All', '1D-Synth'] = RM
             RMdf.loc['All', '1D-Synth Error'] = RMerr
 
-            state_dict["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "SNRs.npy")
-            state_dict["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname'] + "trialRM.npy")
+            state_dict["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "SNRs.npy")
+            state_dict["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "trialRM.npy")
 
             order = state_dict["RMcalibrated"]['trial_RM1'].argsort()
             state_dict["RMcalibrated"]['RMsnrs1'] = state_dict["RMcalibrated"]['RMsnrs1'][order]
             state_dict["RMcalibrated"]['trial_RM1'] = state_dict["RMcalibrated"]['trial_RM1'][order]
 
+        if 'dname_1D_zoom' in state_dict["RMcalibrated"].keys():
+            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "result.npy")
+            RM = res[0]
+            RMerr = res[1]
+            state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+            RMdf.loc['All', '1D-Synth'] = RM
+            RMdf.loc['All', '1D-Synth Error'] = RMerr
+
+            state_dict["RMcalibrated"]['RMsnrs1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
+            state_dict["RMcalibrated"]['trial_RM1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
+
+            order = state_dict["RMcalibrated"]['trial_RM1zoom'].argsort()
+            state_dict["RMcalibrated"]['RMsnrs1zoom'] = state_dict["RMcalibrated"]['RMsnrs1zoom'][order]
+            state_dict["RMcalibrated"]['trial_RM1zoom'] = state_dict["RMcalibrated"]['trial_RM1zoom'][order]
+
+            state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
+            if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+
+
+        if 'dname_2D' in state_dict["RMcalibrated"].keys():
+            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "result.npy") 
+            RM2,RMerr2,upp,low = res
+
+            state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+            state_dict['RMcalibrated']['RMerrfit'] = RMerr2
+            state_dict['RMcalibrated']['RMFWHM'] = upp-low
+
+            #update table
+            RMdf.loc['All', '2D-Synth'] = RM2
+            RMdf.loc['All', '2D-Synth Error'] = RMerr2
+
         if state_dict['n_comps'] > 1:
             for i in range(state_dict['n_comps']):
-                if 'dname' in state_dict['comps'][i]['RMcalibrated'].keys():
-                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "result.npy")
+                if 'dname_1D' in state_dict['comps'][i]['RMcalibrated'].keys():
+                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "result.npy")
                     RM = res[0]
                     RMerr = res[1]
                     state_dict['comps'][i]['RMcalibrated']["RMcalibrated"]["RM1"] = [RM,RMerr]
                     RMdf.loc[str(i), '1D-Synth'] = RM
                     RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
-                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "SNRs.npy")
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname'] + "trialRM.npy")
+                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "SNRs.npy")
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "trialRM.npy")
 
                     order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'].argsort()
                     state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'][order]
                     state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'][order]
+
+                if 'dname_1D_zoom' in state_dict['comps'][i]["RMcalibrated"].keys():
+                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "result.npy")
+                    RM = res[0]
+                    RMerr = res[1]
+                    state_dict['comps'][i]["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+                    RMdf.loc[str(i), '1D-Synth'] = RM
+                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
+
+                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
+
+                    order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'].argsort()
+                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'][order]
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'][order]
+
+                    state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
+                    if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
+
+
+
+
+                if 'dname_2D' in state_dict['comps'][i]['RMcalibrated'].keys():
+                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_2D'] + "result.npy")
+                    RM2,RMerr2,upp,low = res
+
+                    state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+                    state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
+                    state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
+                    #update table
+                    RMdf.loc[str(i), '2D-Synth'] = RM2
+                    RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
+
+                    
+
     #1D plots
 
     if rmcomp_menu.value == 'All':

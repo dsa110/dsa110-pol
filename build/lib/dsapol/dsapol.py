@@ -3815,7 +3815,7 @@ def faraday_error(Q_f,U_f,freq_test,RM,phi=0):
     return method1HWHM
 
 #Specific Faraday calibration to get SNR spectrum in range around peak
-def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0):
+def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0,sendtodir='',monitor=False):
     if multithread: assert(numbatch*maxProcesses <= len(trial_RM))
     #Get wavelength axis
     c = (3e8) #m/s
@@ -3930,8 +3930,9 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         if multithread:
 
 
-
-            for j in range(numbatch):
+            if monitor: itrf = tqdm(range(numbatch),token=os.environ["RMSYNTHTOKEN"],channel="rmsynthstatus",position=0,desc="2D RM Synthesis;" + str(numbatch) + " Batches")
+            else: itrf = range(numbatch)
+            for j in itrf:
 
                 #create executor
                 with ProcessPoolExecutor(maxProcesses) as executor:
@@ -4001,6 +4002,23 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                             SNRs[numbatch*maxProcesses:,0] = SNRs_i
                         else:
                             SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+
+                        if sendtodir != '':
+                            prevSNRs = np.load(sendtodir + "/SNRs.npy")
+                            prevSNRs = np.concatenate([prevSNRs,SNRs_i])
+                            np.save(sendtodir + "/SNRs.npy",prevSNRs)
+
+                            prevSNRs = np.load(sendtodir + "/SNRs_full.npy")
+                            prevSNRs = np.concatenate([prevSNRs,SNRs_full_i],axis=0)
+                            np.save(sendtodir + "/SNRs_full.npy",prevSNRs)
+
+                            prevRMs = np.load(sendtodir + "/trialRM.npy")
+                            if i == maxProcesses*numbatch:
+                                prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
+                            else:
+                                prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
+                            np.save(sendtodir + "/trialRM.npy",prevRMs)
+
 
                 #executor.shutdown(wait=True)
         else:
