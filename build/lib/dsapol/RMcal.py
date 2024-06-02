@@ -245,6 +245,29 @@ def lorentz_scint(x,bw,amp,off):
     return off + amp*(bw/(x**2 + (0.5*bw**2)))
 
 
+def trials_to_multiprocess(ntrials,maxthreads=100,maxbatches=10,maxtrials_per_thread=1000):
+    """
+    This function takes the number of RM trials and returns an optimized number of 
+    batches and threads per batch to be used for RM synthesis. The number of batches is set to
+    ~1/100 of the number of trials, but with a maximum of 10 batches and 100 threads. 
+    """
+    
+    #get number of threads per batch
+    for nthreads in range(1,maxthreads+1):
+        trials_per_thread = ntrials//nthreads
+        if trials_per_thread > maxtrials_per_thread:
+            continue
+        else:
+            break
+
+    #get number of batches
+    if trials_per_thread > maxtrials_per_thread:
+        nbatches = int(np.min([10,trials_per_thread//maxtrials_per_thread]))
+    else:
+        nbatches = 1
+
+    return nbatches,nthreads
+
 def future_callback_gR1(future,dname):#,fit,weights,trial_RM,fit_window,Qcal,Ucal,timestart,timestop,dname):
     print("RM Synthesis Complete")
     RM1,RMerr1,RMsnrs1,trial_RM = future.result()
@@ -311,8 +334,12 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
         
         return dname
 
+    #get opt. number of processes, batches
+    nbatches,nthreads = trials_to_multiprocess(len(trial_RM))
+    multithread = nthreads > 1
+
     #run RM synthesis
-    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=fit_window,err=True,matrixmethod=False,multithread=True,maxProcesses=100,numbatch=1,sendtodir=sendtodir,monitor=monitor)
+    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=fit_window,err=True,matrixmethod=False,multithread=multithread,maxProcesses=nthreads,numbatch=nbatches,sendtodir=sendtodir,monitor=monitor)
 
     #if set, use better fit of FDF for error
     if fit:
@@ -393,7 +420,10 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
         return dname
 
 
-
+    #get opt. number of processes, batches
+    nbatches,nthreads = trials_to_multiprocess(len(trial_RM))
+    multithread = nthreads > 1
+    
     #run RM synthesis
     RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,QUnoise,SNRs_full,peak_RMs,tmp = dsapol.faradaycal_SNR(Ical,Qcal,Ucal,Vcal,freq_test,trial_RM,trial_phi,
                                                                                         width_native,t_samp,plot=False,n_f=n_f,n_t=n_t,
@@ -401,7 +431,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
                                                                                         timeaxis=timeaxis,full=True,
                                                                                         input_weights=weights[timestart:timestop],
                                                                                         timestart_in=timestart,timestop_in=timestop,matrixmethod=False,
-                                                                                        multithread=True,maxProcesses=10,numbatch=10,sendtodir=sendtodir,monitor=monitor)
+                                                                                        multithread=multithread,maxProcesses=nthreads,numbatch=nbatches,sendtodir=sendtodir,monitor=monitor)
     
     #use error from the exponential fit
     RMerr2 = dsapol.RM_error_fit(np.max(RMsnrs2))
