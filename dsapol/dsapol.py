@@ -3935,30 +3935,31 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             for j in itrf:
 
                 #create executor
-                with ProcessPoolExecutor(maxProcesses) as executor:
+                #with ProcessPoolExecutor(maxProcesses) as executor:
+                executor = ProcessPoolExecutor(maxProcesses)
 
-                    task_list = []
-                    trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
-                    for i in range(maxProcesses*j,maxProcesses*(j+1)):
-                        trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
+                task_list = []
+                trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
+                for i in range(maxProcesses*j,maxProcesses*(j+1)):
+                    trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
 
-                        #start thread
-                        task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                    #start thread
+                    task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
                                                                                                 t_samp,False,datadir,calstr,label,n_f,n_t,False,
                                                                                                 False,buff,weighted,n_t_weight,timeaxis,
                                                                                                 sf_window_weights,n_off,full,input_weights,
-                                                                                                timestart_in,timestop_in,False,False,1,1,i))
+                                                                                                timestart_in,timestop_in,False,False,1,1,i,sendtodir,monitor))
                         
                         
-                    if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
-                        trial_RM_i = trial_RM[numbatch*maxProcesses:]
+                if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
+                    trial_RM_i = trial_RM[numbatch*maxProcesses:]
 
 
-                        task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                    task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
                                                                                                 t_samp,False,datadir,calstr,label,n_f,n_t,False,
                                                                                                 False,buff,weighted,n_t_weight,timeaxis,
                                                                                                 sf_window_weights,n_off,full,input_weights,
-                                                                                                timestart_in,timestop_in,False,False,1,1,numbatch*maxProcesses))
+                                                                                                timestart_in,timestop_in,False,False,1,1,numbatch*maxProcesses,sendtodir,monitor))
 
                     """
 
@@ -3981,46 +3982,46 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 
                     
 
-                    #wait for tasks to complete
-                    #wait(task_list)
-                    for future in as_completed(task_list):
+                #wait for tasks to complete
+                #wait(task_list)
+                for future in as_completed(task_list):
                     
-                        if full:
-                            tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
+                    if full:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
                             
-                            if i == numbatch*maxProcesses:
-                                SNRs_full[numbatch*maxProcesses:,:] = SNRs_full_i
-                            else:
-                                SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
-                      
-                        else:
-                            tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
-                            
-                        
-                        
                         if i == numbatch*maxProcesses:
-                            SNRs[numbatch*maxProcesses:,0] = SNRs_i
+                            SNRs_full[numbatch*maxProcesses:,:] = SNRs_full_i
                         else:
-                            SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                            SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                      
+                    else:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
+                            
+                        
+                        
+                    if i == numbatch*maxProcesses:
+                        SNRs[numbatch*maxProcesses:,0] = SNRs_i
+                    else:
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
 
-                        if sendtodir != '':
-                            prevSNRs = np.load(sendtodir + "/SNRs.npy")
-                            prevSNRs = np.concatenate([prevSNRs,SNRs_i])
-                            np.save(sendtodir + "/SNRs.npy",prevSNRs)
+                    if sendtodir != '':
+                        prevSNRs = np.load(sendtodir + "/SNRs.npy")
+                        prevSNRs = np.concatenate([prevSNRs,SNRs_i])
+                        np.save(sendtodir + "/SNRs.npy",prevSNRs)
 
-                            prevSNRs = np.load(sendtodir + "/SNRs_full.npy")
-                            prevSNRs = np.concatenate([prevSNRs,SNRs_full_i],axis=0)
-                            np.save(sendtodir + "/SNRs_full.npy",prevSNRs)
+                        prevSNRs = np.load(sendtodir + "/SNRs_full.npy")
+                        prevSNRs = np.concatenate([prevSNRs,SNRs_full_i],axis=0)                            
+                        np.save(sendtodir + "/SNRs_full.npy",prevSNRs)
 
-                            prevRMs = np.load(sendtodir + "/trialRM.npy")
-                            if i == maxProcesses*numbatch:
-                                prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
-                            else:
-                                prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
-                            np.save(sendtodir + "/trialRM.npy",prevRMs)
+                        prevRMs = np.load(sendtodir + "/trialRM.npy")
+                        if i == maxProcesses*numbatch:
+                            prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
+                        else:
+                            prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
+                        np.save(sendtodir + "/trialRM.npy",prevRMs)
 
 
-                #executor.shutdown(wait=True)
+                executor.shutdown(wait=True)
         else:
             for i in range(len(trial_RM)):
                 for j in range(len(trial_phi)):
@@ -4098,12 +4099,21 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         RMerr = None
         upper = None
         lower = None
+    
+    
+    if sendtodir != '':
+        np.save(sendtodir + "/result.npy",np.array([trial_RM[max_RM_idx],RMerr,upper,lower]))
+    
     if full:
         #for full time-dependent analysis, get RM vs time
-        peak_RMs = trial_RM[np.argmax(SNRs_full,axis=1)]
+        #print(trial_RM,trial_RM.shape)
+        #print(SNRs_full,SNRs_full.shape)
+        peak_RMs = trial_RM[np.argmax(SNRs_full,axis=0)]
         return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,SNRs_full,peak_RMs,mt_offset)
     else:
         return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,mt_offset)
+
+    
 
 #Calculate Error for SNR method
 def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):

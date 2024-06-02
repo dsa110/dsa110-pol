@@ -316,26 +316,29 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
 
     #if set, use better fit of FDF for error
     if fit:
-        #assert(weights is not None)
-        try:
-            poptpar,pcovpar = curve_fit(fit_parabola,trial_RM[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window],
+        assert(weights is not None)
+
+        poptpar,pcovpar = curve_fit(fit_parabola,trial_RM[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window],
                 RMsnrs1[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window],
                 p0=[1,1,RM1],sigma=1/RMsnrs1[np.argmax(RMsnrs1)-fit_window:np.argmax(RMsnrs1)+fit_window])
-            RM1 = poptpar[2]
+        RM1 = poptpar[2]
         
-            FWHMRM1zoom,tmp,tmp,tmp = peak_widths(RMsnrs1,[np.argmax(RMsnrs1)])
-            noisezoom = L_sigma(Qcal,Ucal,timestart,timestop,plot=False,weighted=True,I_w_t_filt=weights)
-            RMerr1 = FWHMRM1zoom*(trial_RM[1]-trial_RM[0])*noisezoom/(2*np.max(RMsnrs1))
-        except Exception as exc:
-            f =open("EXCEPTIONOUTPUTFILE.txt","w")
-            f.write(str(exc))
-            print(exc)
-            f.close()
+        FWHMRM1zoom,tmp,tmp,tmp = peak_widths(RMsnrs1,[np.argmax(RMsnrs1)])
+        noisezoom = L_sigma(Qcal,Ucal,timestart,timestop,plot=False,weighted=True,I_w_t_filt=weights)
+        RMerr1 = FWHMRM1zoom*(trial_RM[1]-trial_RM[0])*noisezoom/(2*np.max(RMsnrs1))
+    
     return RM1,RMerr1,RMsnrs1,trial_RM
     
    
-def future_callback_gR2(future,fit,weights,trial_RM,fit_window,dname):
+def future_callback_gR2(future,dname):#fit,weights,trial_RM,fit_window,dname):
     print("RM Synthesis Complete")
+    RM2,RMerr2,upp,low,RMsnrs2,SNRs_full,trial_RM = future.result()
+    #RM2,RMerr2,upp,low = future.result()
+
+    np.save(dirs['logs'] + "RM_files/" + dname + "result.npy",np.array([RM2,RMerr2,upp,low]))
+    return
+    """
+
     RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,QUnoise,SNRs_full,peak_RMs,tmp = future.result()
 
     RMerr2 = dsapol.RM_error_fit(np.max(RMsnrs2))
@@ -355,9 +358,9 @@ def future_callback_gR2(future,fit,weights,trial_RM,fit_window,dname):
     #np.save(dirs['logs'] + "RM_files/" + dname + "trialRM.npy",trial_RM)
 
     return
-
+    """
 #function to run 2D RM synthesis
-def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,n_t,freq_test,timeaxis,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,weights=None,background=False):
+def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,weights=None,background=False,sendtodir="",monitor=False):
     """
     This function uses the manual 2D RM synthesis module to run RM synthesis
     """
@@ -367,7 +370,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,
     trial_phi = [0]
 
 
-
+    
     if background:
         print("Running 2D RM Synthesis in the background...")
 
@@ -375,17 +378,17 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,
         #make directory for output
         dname = "proc_2D_" + Time.now().isot + "/"
         os.mkdir(dirs['logs'] + "RM_files/" + dname)
-        np.save(dirs['logs'] + "RM_files/" + dname + "result.npy",np.nan*np.ones(2))
+        np.save(dirs['logs'] + "RM_files/" + dname + "result.npy",np.nan*np.ones(4))
         np.save(dirs['logs'] + "RM_files/" + dname + "SNRs.npy",np.zeros(0))
+        np.save(dirs['logs'] + "RM_files/" + dname + "SNRs_full.npy",np.zeros((0,timestop-timestart)))
         np.save(dirs['logs'] + "RM_files/" + dname + "trialRM.npy",np.zeros(0))
 
         #create executor
+
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(dsapol.faradaycal_SNR,Ical,Qcal,Ucal,Vcal,freq_test,trial_RM,trial_phi,width_native,fobj.header.tsamp,False,dsapol.DEFAULT_DATADIR,
-                                                "","",n_f,n_t,False,True,buff,True,1,timeaxis,45,3000,True,weights[timestart:timestop],timestart,timestop,
-                                                False,True,100,10,0,dirs['logs'] + "RM_files/" + dname,True)
-                
-        t.add_done_callback(lambda future: future_callback_gR2(future,fit,weights,trial_RM,fit_window,dname))
+        t = executor.submit(get_RM_2D,Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,True)
+        t.add_done_callback(lambda future: future_callback_gR2(future,dname))
+
 
         return dname
 
@@ -393,24 +396,23 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,fobj,buff,n_f,
 
     #run RM synthesis
     RM2,phi2,RMsnrs2,RMerr2,upp,low,sig,QUnoise,SNRs_full,peak_RMs,tmp = dsapol.faradaycal_SNR(Ical,Qcal,Ucal,Vcal,freq_test,trial_RM,trial_phi,
-                                                                                        width_native,fobj.header.tsamp,plot=False,n_f=n_f,n_t=n_t,
+                                                                                        width_native,t_samp,plot=False,n_f=n_f,n_t=n_t,
                                                                                         show=False,err=True,buff=buff,weighted=True,n_off=n_off,
                                                                                         timeaxis=timeaxis,full=True,
                                                                                         input_weights=weights[timestart:timestop],
                                                                                         timestart_in=timestart,timestop_in=timestop,matrixmethod=False,
-                                                                                        multithread=True,maxProcesses=100,numbatch=10)
+                                                                                        multithread=True,maxProcesses=10,numbatch=10,sendtodir=sendtodir,monitor=monitor)
+    
     #use error from the exponential fit
     RMerr2 = dsapol.RM_error_fit(np.max(RMsnrs2))
 
     #if set, use better fit of FDF for peak
     if fit:
         assert(weights is not None)
-
         poptpar,pcovpar = curve_fit(fit_parabola,trial_RM[np.argmax(RMsnrs2)-fit_window:np.argmax(RMsnrs2)+fit_window],
                 RMsnrs2[np.argmax(RMsnrs2)-fit_window:np.argmax(RMsnrs2)+fit_window],
                 p0=[1,1,RM2],sigma=1/RMsnrs2[np.argmax(RMsnrs2)-fit_window:np.argmax(RMsnrs2)+fit_window])
         RM2 = poptpar[2]
-
     return RM2,RMerr2,upp,low,RMsnrs2,SNRs_full,trial_RM
 
 
