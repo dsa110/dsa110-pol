@@ -1452,14 +1452,16 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         FWHM,heights,intL,intR = peak_widths(state_dict['comps'][state_dict['current_comp']]['weights'],pks)
         state_dict['comps'][state_dict['current_comp']]['intL'] = intL[0]
         state_dict['comps'][state_dict['current_comp']]['intR'] = intR[-1]
+        state_dict['comps'][state_dict['current_comp']]['FWHM'] = state_dict['comps'][state_dict['current_comp']]['intR'] - state_dict['comps'][state_dict['current_comp']]['intL']
     else:
-        FWHM,heights,state_dict['comps'][state_dict['current_comp']]['intL'],state_dict['comps'][state_dict['current_comp']]['intR'] = peak_widths(state_dict['comps'][state_dict['current_comp']]['weights'],
+        state_dict['comps'][state_dict['current_comp']]['FWHM'],heights,state_dict['comps'][state_dict['current_comp']]['intL'],state_dict['comps'][state_dict['current_comp']]['intR'] = peak_widths(state_dict['comps'][state_dict['current_comp']]['weights'],
                                     [np.argmax(state_dict['comps'][state_dict['current_comp']]['weights'])])
 
     state_dict['comps'][state_dict['current_comp']]['intL'] = int(state_dict['comps'][state_dict['current_comp']]['intL'])
     state_dict['comps'][state_dict['current_comp']]['intR'] = int(state_dict['comps'][state_dict['current_comp']]['intR'])
     state_dict['comps'][state_dict['current_comp']]['intLbuffer'] = 0
     state_dict['comps'][state_dict['current_comp']]['intRbuffer'] = 0
+    state_dict['comps'][state_dict['current_comp']]['FWHM'] = int(state_dict['comps'][state_dict['current_comp']]['FWHM'])
 
     #compute S/N and display
     state_dict['comps'][state_dict['current_comp']]['S/N'] = filt.get_SNR(I_tcal,state_dict['comps'][state_dict['current_comp']]['weights'],
@@ -1586,6 +1588,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['buff'] = [b1[first],b2[last]]
         state_dict['intL'] = l1[first]
         state_dict['intR'] = l2[last]
+        state_dict['FWHM'] = state_dict['intR'] - state_dict['intL']
         state_dict['intLbuffer'] = 0
         state_dict['intRbuffer'] = 0
 
@@ -1676,25 +1679,14 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
 
 
+def scatter_screen():
+    return
 
 
+def scint_screen():
+    return
 """
 RM Synthesis State
-"""
-"""
-def handler(signum,frame):
-    print("Background RM synthesis completed")
-    #get results from file
-    res = np.load(dirs['logs'] + "RM_files/" + state_dict['dname'] + "output_values.npy")
-    RM = res[0]
-    RMerr = res[2]
-    state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
-    RMdf.loc['All', '1D-Synth'] = RM
-    RMdf.loc['All', '1D-Synth Error'] = RMerr
-
-    res = np.load(dirs['logs'] + "RM_files/" + state_dict['dname'] + "output_spectrum.npy")
-    state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] =res[1,:],res[0,:]
-    return
 """
 def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                  maxRM_num,getRMbutton,useRM2D,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,
