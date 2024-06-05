@@ -463,6 +463,12 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'Uflux_display':np.nan,
          'Vflux_display':np.nan,
 
+        'scattermenu':['All'],
+        'scattermenu_choices':['All'],
+        'scatterLbuffer_slider':0,
+        'scatterRbuffer_slider':0,
+
+
         'useRMTools':True, ################ (5) RM Synthesis ################
         'maxRM_num_tools':1e6,
         'dRM_tools':200,
@@ -676,6 +682,13 @@ def update_wdict(objects,labels,param='value'):
                     RMcaldict['2D-Synth']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM2'][1]
 
         wdict['rmcal_menu_choices'] = make_rmcal_menu_choices()
+
+    #update scatter comps
+    if state_dict['n_comps'] > 1:
+        wdict['scattermenu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
+    else:
+        wdict['scattermenu_choices'] = ['All']
+
     #update polcomps
     if state_dict['n_comps'] > 1: 
         wdict['polcomp_menu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
@@ -1678,8 +1691,14 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     return
 
 
+"""
+Scattering Analysis State
+"""
+def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider):
 
-def scatter_screen():
+    #update wdict
+    update_wdict([scattermenu,scatterLbuffer_slider,scatterRbuffer_slider],
+            ['scattermenu','scatterLbuffer_slider','scatterRbuffer_slider'])
     return
 
 
