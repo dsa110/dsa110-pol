@@ -299,7 +299,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0,verbose=False):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0,verbose=False,fixchansfile='',fixchansfile_overwrite=False):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -340,14 +340,20 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     if fixchans == True:
         #bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
         #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
-        bad_idxs = np.all(I==0,axis=1)
-        good_idxs = np.logical_not(bad_idxs)
-        bad_chans = np.arange(I.shape[0])[bad_idxs]
-        good_chans = np.arange(I.shape[0])[good_idxs]
+        if fixchansfile != '':
+            bad_chans = np.load(fixchansfile)
+            good_chans = np.array(list(set(np.arange(I.shape[0])) - set(bad_chans)))
+        else:
+            bad_idxs = np.all(I==0,axis=1)
+            good_idxs = np.logical_not(bad_idxs)
+            bad_chans = np.arange(I.shape[0])[bad_idxs]
+            good_chans = np.arange(I.shape[0])[good_idxs]
+            if fixchansfile_overwrite:
+                np.save(datadir + "/badchans.npy",bad_chans)
+                print("Saving bad channels to " + datadir + "/badchans.npy")
         if verbose:
             print("Bad Channels: " + str(bad_chans))
         
-
 
 
 

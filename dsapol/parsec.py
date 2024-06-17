@@ -404,6 +404,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'mjd_display':mjd,
          'DM_init_display':DMinit,
          'showlog':True,
+         'polcalloadbutton':False,
 
          'n_t_slider':1, ############### (1) Dedispersion ##################
          'logn_f_slider':5,
@@ -711,7 +712,7 @@ class StopExecution(Exception):
 Load data state
 """
 NOFFDEF = 2000
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -738,7 +739,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
     #see if filterbanks exist
     state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
-
+    polcals_available = np.sum([((state_dict['datadir'] in str(f)) and ('polcal' in str(f))) for f in state_dict['fils']])
+    
     #find beamforming weights date
     state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
 
@@ -747,10 +749,22 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         update_FRB_params()
 
     #if button is clicked, load FRB data and go to next screen
-    if loadbutton.clicked:
+    if loadbutton.clicked:# and (not polcalloadbutton.value):
 
         #load data at base resolution
-        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + "_dev",5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=True,fixchans=True,verbose=False)
+        if polcalloadbutton.value and (polcals_available > 0):
+            fixchansfile = state_dict['datadir'] + '/badchans.npy'
+            sub_offpulse_mean = False
+            suff = "_dev_polcal"
+            fixchansfile_overwrite = False
+        else:
+            fixchansfile = ''
+            sub_offpulse_mean = True
+            suff = "_dev"
+            fixchansfile_overwrite = True
+            if polcalloadbutton.value: 
+                print("Pre-Calibrated Data Not Available, Loading Uncalibrated Stokes Parameters")
+        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + suff,5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=sub_offpulse_mean,fixchans=True,verbose=False,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
         
         #mask bad channels if not masked already
         """if len(badchans) > 0:
@@ -772,6 +786,45 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_time_axis'] = np.arange(I.shape[1])*32.7*state_dict['base_n_t']
         state_dict['badchans'] = badchans
 
+        if polcalloadbutton.value and (polcals_available > 0):
+
+            #get downsampled versions
+            state_dict['I'] = dsapol.avg_time(state_dict['base_I'],state_dict['rel_n_t'])
+            state_dict['I'] = dsapol.avg_freq(state_dict['I'],state_dict['rel_n_f'])
+            state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],state_dict['rel_n_t'])
+            state_dict['Q'] = dsapol.avg_freq(state_dict['Q'],state_dict['rel_n_f'])
+            state_dict['U'] = dsapol.avg_time(state_dict['base_U'],state_dict['rel_n_t'])
+            state_dict['U'] = dsapol.avg_freq(state_dict['U'],state_dict['rel_n_f'])
+            state_dict['V'] = dsapol.avg_time(state_dict['base_V'],state_dict['rel_n_t'])
+            state_dict['V'] = dsapol.avg_freq(state_dict['V'],state_dict['rel_n_f'])
+
+
+            #default case: not RM calibrated
+            state_dict['Ical'] = copy.deepcopy(state_dict['I'])
+            state_dict['Qcal'] = copy.deepcopy(state_dict['Q'])
+            state_dict['Ucal'] = copy.deepcopy(state_dict['U'])
+            state_dict['Vcal'] = copy.deepcopy(state_dict['V'])
+
+            state_dict['IcalRM'] = copy.deepcopy(state_dict['Ical'])
+            state_dict['QcalRM'] = copy.deepcopy(state_dict['Qcal'])
+            state_dict['UcalRM'] = copy.deepcopy(state_dict['Ucal'])
+            state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
+
+            #get time series
+            (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+
+            state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
+            state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
+            state_dict['U_tcalRM'] = copy.deepcopy(state_dict['U_tcal'])
+            state_dict['V_tcalRM'] = copy.deepcopy(state_dict['V_tcal'])
+
+            state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
+
+            #get timestart, timestop
+            (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+
+
+
 
         #state_dict['current_state'] += 1
 
@@ -781,8 +834,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
     #update widget dict
-    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init],
-                    ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init"],
+    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
+                    ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
                     param='value')
     update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display],
                     ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display"],
