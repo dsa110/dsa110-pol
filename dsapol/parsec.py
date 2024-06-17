@@ -283,7 +283,9 @@ state_dict['snr'] = np.nan
 state_dict['Tsnr'] =np.nan
 state_dict['Lsnr']= np.nan
 state_dict['Vsnr'] = np.nan
-
+state_dict['Tclass'] = ""
+state_dict['Lclass'] = ""
+state_dict['Vclass'] = ""
 
 df = pd.DataFrame(
     {
@@ -497,7 +499,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'intLbuffer_slider':0,
         'intRbuffer_slider':0,
         'polcomp_menu':'All',
-        'polcomp_menu_choices':['All']
+        'polcomp_menu_choices':['All'],
+        'notesinput':""
 }
 
 
@@ -545,14 +548,17 @@ poldf = pd.DataFrame(
             'T/I (%)': [np.nan],
             'T/I Error (%)': [np.nan],
             'T S/N': [np.nan],
+            'T Class':[""],
             'L/I (%)': [np.nan],
             'L/I Error (%)': [np.nan],
             'L S/N': [np.nan],
+            "L Class":[""],
             'V/I (%)': [np.nan],
             'V/I Error (%)': [np.nan],
             '|V|/I (%)': [np.nan],
             '|V|/I Error (%)': [np.nan],
             'V S/N': [np.nan],
+            "V Class":[""],
             'PA (deg)': [np.nan],
             'PA Error (deg)': [np.nan]
         },
@@ -2345,19 +2351,51 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
             state_dict['comps'][i]['Vpol_err'] = sigma_C
             state_dict['comps'][i]['Vsnr'] = snr_C
 
+
+            #classify
+            if np.abs(state_dict['comps'][i]['Tpol']/state_dict['comps'][i]['Tpol_err']) < 3 and np.abs(1-state_dict['comps'][i]['Tpol'])/state_dict['comps'][i]['Tpol_err'] > 3:
+                state_dict['comps'][i]['Tclass'] = "consistent with 0%"
+            elif np.abs(state_dict['comps'][i]['Tpol']/state_dict['comps'][i]['Tpol_err']) > 3 and np.abs(1-state_dict['comps'][i]['Tpol'])/state_dict['comps'][i]['Tpol_err'] > 3:
+                state_dict['comps'][i]['Tclass'] = "intermediate"
+            elif np.abs(state_dict['comps'][i]['Tpol']/state_dict['comps'][i]['Tpol_err']) > 3 and np.abs(1-state_dict['comps'][i]['Tpol'])/state_dict['comps'][i]['Tpol_err'] < 3:
+                state_dict['comps'][i]['Tclass'] = "consistent with 100%"
+            else:
+                state_dict['comps'][i]['Tclass'] = "unconstrained"
+
+            if np.abs(state_dict['comps'][i]['Lpol']/state_dict['comps'][i]['Lpol_err']) < 3 and np.abs(1-state_dict['comps'][i]['Lpol'])/state_dict['comps'][i]['Lpol_err'] > 3:
+                state_dict['comps'][i]['Lclass'] = "consistent with 0%"
+            elif np.abs(state_dict['comps'][i]['Lpol']/state_dict['comps'][i]['Lpol_err']) > 3 and np.abs(1-state_dict['comps'][i]['Lpol'])/state_dict['comps'][i]['Lpol_err'] > 3:
+                state_dict['comps'][i]['Lclass'] = "intermediate"
+            elif np.abs(state_dict['comps'][i]['Lpol']/state_dict['comps'][i]['Lpol_err']) > 3 and np.abs(1-state_dict['comps'][i]['Lpol'])/state_dict['comps'][i]['Lpol_err'] < 3:
+                state_dict['comps'][i]['Lclass'] = "consistent with 100%"
+            else:
+                state_dict['comps'][i]['Lclass'] = "unconstrained"
+
+            if np.abs(state_dict['comps'][i]['absVpol']/state_dict['comps'][i]['absVpol_err']) < 3 and np.abs(1-state_dict['comps'][i]['absVpol'])/state_dict['comps'][i]['absVpol_err'] > 3:
+                state_dict['comps'][i]['Vclass'] = "consistent with 0%"
+            elif np.abs(state_dict['comps'][i]['absVpol']/state_dict['comps'][i]['absVpol_err']) > 3 and np.abs(1-state_dict['comps'][i]['absVpol'])/state_dict['comps'][i]['absVpol_err'] > 3:
+                state_dict['comps'][i]['Vclass'] = "intermediate"
+            elif np.abs(state_dict['comps'][i]['absVpol']/state_dict['comps'][i]['absVpol_err']) > 3 and np.abs(1-state_dict['comps'][i]['absVpol'])/state_dict['comps'][i]['absVpol_err'] < 3:
+                state_dict['comps'][i]['Vclass'] = "consistent with 100%"
+            else:
+                state_dict['comps'][i]['Vclass'] = "unconstrained"
+
             #upate dataframe
             poldf.loc['Component ' + str(i)] = [np.around(state_dict['comps'][i]['snr'],2),
                         np.around(100*state_dict['comps'][i]['Tpol'],2),
                         np.around(100*state_dict['comps'][i]['Tpol_err'],2),
                         np.around(state_dict['comps'][i]['Tsnr'],2),
+                        state_dict['comps'][i]['Tclass'],
                         np.around(100*state_dict['comps'][i]['Lpol'],2),
                         np.around(100*state_dict['comps'][i]['Lpol_err'],2),
                         np.around(state_dict['comps'][i]['Lsnr'],2),
+                        state_dict['comps'][i]['Lclass'],
                         np.around(100*state_dict['comps'][i]['Vpol'],2),
                         np.around(100*state_dict['comps'][i]['Vpol_err'],2),
                         np.around(100*state_dict['comps'][i]['absVpol'],2),
                         np.around(100*state_dict['comps'][i]['absVpol_err'],2),
                         np.around(state_dict['comps'][i]['Vsnr'],2),
+                        state_dict['comps'][i]['Vclass'],
                         np.around((180/np.pi)*state_dict['comps'][i]['avg_PA'],2),
                         np.around((180/np.pi)*state_dict['comps'][i]['PA_err'],2)]
         
@@ -2400,6 +2438,35 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     state_dict['Vpol_err'] = sigma_C
     state_dict['Vsnr'] = snr_C
 
+    #classify
+    if np.abs(state_dict['Tpol']/state_dict['Tpol_err']) < 3 and np.abs(1-state_dict['Tpol'])/state_dict['Tpol_err'] > 3:
+        state_dict['Tclass'] = "consistent with 0%"
+    elif np.abs(state_dict['Tpol']/state_dict['Tpol_err']) > 3 and np.abs(1-state_dict['Tpol'])/state_dict['Tpol_err'] > 3:
+        state_dict['Tclass'] = "intermediate"
+    elif np.abs(state_dict['Tpol']/state_dict['Tpol_err']) > 3 and np.abs(1-state_dict['Tpol'])/state_dict['Tpol_err'] < 3:
+        state_dict['Tclass'] = "consistent with 100%"
+    else:
+        state_dict['Tclass'] = "unconstrained"
+
+    if np.abs(state_dict['Lpol']/state_dict['Lpol_err']) < 3 and np.abs(1-state_dict['Lpol'])/state_dict['Lpol_err'] > 3:
+        state_dict['Lclass'] = "consistent with 0%"
+    elif np.abs(state_dict['Lpol']/state_dict['Lpol_err']) > 3 and np.abs(1-state_dict['Lpol'])/state_dict['Lpol_err'] > 3:
+        state_dict['Lclass'] = "intermediate"
+    elif np.abs(state_dict['Lpol']/state_dict['Lpol_err']) > 3 and np.abs(1-state_dict['Lpol'])/state_dict['Lpol_err'] < 3:
+        state_dict['Lclass'] = "consistent with 100%"
+    else:
+        state_dict['Lclass'] = "unconstrained"
+
+    if np.abs(state_dict['absVpol']/state_dict['absVpol_err']) < 3 and np.abs(1-state_dict['absVpol'])/state_dict['absVpol_err'] > 3:
+        state_dict['Vclass'] = "consistent with 0%"
+    elif np.abs(state_dict['absVpol']/state_dict['absVpol_err']) > 3 and np.abs(1-state_dict['absVpol'])/state_dict['absVpol_err'] > 3:
+        state_dict['Vclass'] = "intermediate"
+    elif np.abs(state_dict['absVpol']/state_dict['absVpol_err']) > 3 and np.abs(1-state_dict['absVpol'])/state_dict['absVpol_err'] < 3:
+        state_dict['Vclass'] = "consistent with 100%"
+    else:
+        state_dict['Vclass'] = "unconstrained"
+
+
     unbias_factor = 1
 
     L_t = L_t*I_tuse
@@ -2430,14 +2497,17 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
                         np.around(100*state_dict['Tpol'],2),
                         np.around(100*state_dict['Tpol_err'],2),
                         np.around(state_dict['Tsnr'],2),
+                        state_dict['Tclass'],
                         np.around(100*state_dict['Lpol'],2),
                         np.around(100*state_dict['Lpol_err'],2),
                         np.around(state_dict['Lsnr'],2),
+                        state_dict['Lclass'],
                         np.around(100*state_dict['Vpol'],2),
                         np.around(100*state_dict['Vpol_err'],2),
                         np.around(100*state_dict['absVpol'],2),
                         np.around(100*state_dict['absVpol_err'],2),
                         np.around(state_dict['Vsnr'],2),
+                        state_dict['Vclass'],
                         np.around((180/np.pi)*state_dict['avg_PA'],2),
                         np.around((180/np.pi)*state_dict['PA_err'],2)]
 
@@ -2740,7 +2810,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     return fig,fig_time,fig_freq
 
 
-def archive_screen(savebutton,archivebutton,archivepolcalbutton):
+def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutton,notesinput):
 
     """
     screen for RM table and archiving data
@@ -2791,4 +2861,161 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton):
         os.system("scp " + state_dict['Level3Dir'] + "*fil " + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/ > " + rmtablefuncs.logfile)
         os.system("scp " + state_dict['Level3Dir'] + "*fits " + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/ > " + rmtablefuncs.logfile)
         print("Archived filterbanks and RMtable to dsastorage:" + state_dict['dsastorageDir'] + state_dict['ids'] + "/Level3/")
+
+    #save as a csv for dsa spreadsheet
+    if spreadsheetbutton.clicked:
+        rows = []
+        #first make a row for full burst
+        mPA = ""
+        mPA_err = ""
+        iPA = ""
+        iPA_err = ""
+        if "RMcal" in state_dict["RMcalibrated"].keys():
+            iPA = state_dict['avg_PA']
+            iPA_err = state_dict['PA_err']
+        else:
+            mPA = state_dict['avg_PA']
+            mPA_err = state_dict['PA_err']
+
+        rows.append([state_dict["nickname"],
+                     state_dict["DM"],
+                     "", #DM_exgal
+                     "", #z
+                     "", #DM_host
+                     "", #DM_host + err
+                     "", #DM_host -err
+                     state_dict["n_t"],
+                     state_dict["n_f"],
+                     state_dict['polcalfile'],
+                     'RMcal' in state_dict['RMcalibrated'].keys(),
+                     state_dict["RMcalibrated"]["RM1"][0],
+                     state_dict["RMcalibrated"]["RM1"][1],
+                     state_dict["RMcalibrated"]['RM_tools'][0],
+                     state_dict["RMcalibrated"]['RM_tools'][1],
+                     state_dict['RMcalibrated']['RM2'][0],
+                     state_dict['RMcalibrated']['RM2'][1],
+                     state_dict['RMcalibrated']['RMFWHM'],
+                     np.max(state_dict['RMcalibrated']['RMsnrs2']),
+                     state_dict['RM_gal'],
+                     state_dict['RM_galerr'],
+                     state_dict['RM_ion'],
+                     state_dict['RM_ionerr'],
+                     "", #RM opt
+                     "", #RM exgal
+                     "", #RM exgal error
+                     "", #RM source
+                     "", #RM host
+                     "", #RM host err
+                     "", #B field
+                     "", #B field + err
+                     "", #B field - err
+                     state_dict['Tpol'],
+                     state_dict['Tpol_err'],
+                     state_dict['Tclass'],
+                     "", #upper limit
+                     state_dict['Lpol'],
+                     state_dict['Lpol_err'],
+                     state_dict['Lclass'],
+                     "", #upper limit
+                     state_dict['absVpol'],
+                     state_dict['absVpol_err'],
+                     state_dict['absVclass'],
+                     "", #upper limit
+                     state_dict['Vpol'],
+                     state_dict['Vpol_err'],
+                     "",
+                     mPA,
+                     mPA_err,
+                     iPA,
+                     iPA_err,
+                     "",
+                     (state_dict['intR']-state_dict['intL'])*(32.7e-3)*state_dict['n_t'],
+                     state_dict['snr'],
+                     state_dict['Tsnr'],
+                     state_dict['Lsnr'],
+                     state_dict['Vsnr'],
+                     notesinput.value]
+                     )
+       
+        if state_dict['ncomps'] > 1:
+            for i in range(state_dict['ncomps']):
+                #first make a row for full burst
+                mPA = ""
+                mPA_err = ""
+                iPA = ""
+                iPA_err = ""
+                if "RMcal" in state_dict['comps'][i]["RMcalibrated"].keys():
+                    iPA = state_dict['comps'][i]['avg_PA']
+                    iPA_err = state_dict['comps'][i]['PA_err']
+                else:
+                    mPA = state_dict['comps'][i]['avg_PA']
+                    mPA_err = state_dict['comps'][i]['PA_err']
+
+                rows.append(["--" + state_dict["nickname"] + " (peak " + str(i) + ")",
+                     state_dict["DM"],
+                     "", #DM_exgal
+                     "", #z
+                     "", #DM_host
+                     "", #DM_host + err
+                     "", #DM_host -err
+                     state_dict["n_t"],
+                     state_dict["n_f"],
+                     state_dict['polcalfile'],
+                     'RMcal' in state_dict['comps'][i]['RMcalibrated'].keys(),
+                     state_dict['comps'][i]["RMcalibrated"]["RM1"][0],
+                     state_dict['comps'][i]["RMcalibrated"]["RM1"][1],
+                     state_dict['comps'][i]["RMcalibrated"]['RM_tools'][0],
+                     state_dict['comps'][i]["RMcalibrated"]['RM_tools'][1],
+                     state_dict['comps'][i]['RMcalibrated']['RM2'][0],
+                     state_dict['comps'][i]['RMcalibrated']['RM2'][1],
+                     state_dict['comps'][i]['RMcalibrated']['RMFWHM'],
+                     np.max(state_dict['comps'][i]['RMcalibrated']['RMsnrs2']),
+                     state_dict['RM_gal'],
+                     state_dict['RM_galerr'],
+                     state_dict['RM_ion'],
+                     state_dict['RM_ionerr'],
+                     "", #RM opt
+                     "", #RM exgal
+                     "", #RM exgal error
+                     "", #RM source
+                     "", #RM host
+                     "", #RM host err
+                     "", #B field
+                     "", #B field + err
+                     "", #B field - err
+                     state_dict['comps'][i]['Tpol'],
+                     state_dict['comps'][i]['Tpol_err'],
+                     state_dict['comps'][i]['Tclass'],
+                     "", #upper limit
+                     state_dict['comps'][i]['Lpol'],
+                     state_dict['comps'][i]['Lpol_err'],
+                     state_dict['comps'][i]['Lclass'],
+                     "", #upper limit
+                     state_dict['comps'][i]['absVpol'],
+                     state_dict['comps'][i]['absVpol_err'],
+                     state_dict['comps'][i]['absVclass'],
+                     "", #upper limit
+                     state_dict['comps'][i]['Vpol'],
+                     state_dict['comps'][i]['Vpol_err'],
+                     "",
+                     mPA,
+                     mPA_err,
+                     iPA,
+                     iPA_err,
+                     "",
+                     (state_dict['comps'][i]['intR']-state_dict['comps'][i]['intL'])*(32.7e-3)*state_dict['n_t'],
+                     state_dict['comps'][i]['snr'],
+                     state_dict['comps'][i]['Tsnr'],
+                     state_dict['comps'][i]['Lsnr'],
+                     state_dict['comps'][i]['Vsnr'],
+                     ""]
+                     )
+
+        with open(state_dict['datadir'] + '/' + state_dict['ids'] + '_spreadsheet.csv','w',newline='') as csvfile:
+            wr = csv.writer(csvfile,delimiter=',')
+            for r in rows:
+                wr.writerow(r)
+
+
+    update_wdict([notesinput],["notesinput"],param="value")
     return
