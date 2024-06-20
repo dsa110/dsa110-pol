@@ -51,6 +51,9 @@ from astropy.coordinates import EarthLocation
 import astropy.units as u
 import os
 import signal
+from lmfit import minimize, Parameters, fit_report, Model
+from tqdm import tqdm
+from scintillation import scint
 """
 This file contains code for the Polarization Analysis and RM Synthesis Enabled for Calibration (PARSEC)
 user interface to the dsa110-pol module. The interface will use Mercury and a jupyter notebook to 
@@ -206,6 +209,7 @@ state_map = {'load':0,
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
+state_dict['base_df'] = 30.4E3 #Hz
 state_dict['rel_n_t'] = 1
 state_dict['rel_n_f'] = 2**5
 state_dict['Iflux'] = np.nan 
@@ -355,6 +359,24 @@ df_beams = pd.DataFrame(
             r'beamformer weights':[]},
         index=[]
         )
+
+
+#table for scintillation bw fit values
+df_scint = pd.DataFrame(
+    {
+        r'$\gamma$': [np.nan],#*len(corrarray),
+        r'$\gamma$ Error':[np.nan],
+        r'm': [np.nan],#*len(corrarray),
+        r'm Error':[np.nan],
+        r'c': [np.nan],
+        r'c Error':[np.nan]
+    },
+        index=["All"]#copy.deepcopy(corrarray)
+    )
+
+
+
+
 
 
 #List of initial widget values updated whenever screen loads
@@ -828,7 +850,6 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
             #get timestart, timestop
             (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
-
 
 
 
@@ -1516,6 +1537,14 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                                 sf_window_weights=state_dict['comps'][state_dict['current_comp']]['sf_window_weights'],
                                                                 padded=True,norm=False)
 
+    #get spectrum
+    (state_dict['comps'][state_dict['current_comp']]['I_fcal'],state_dict['comps'][state_dict['current_comp']]['Q_fcal'],state_dict['comps'][state_dict['current_comp']]['U_fcal'],state_dict['comps'][state_dict['current_comp']]['V_fcal']) = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['comps'][state_dict['current_comp']]['buff'],weighted=True,input_weights=state_dict['comps'][state_dict['current_comp']]['weights'],
+                                                        fobj=state_dict['fobj'])
+
+
+
 
     if multipeaks.value:
         height = np.max(state_dict['comps'][state_dict['current_comp']]['weights'])*multipeaks_height_slider.value
@@ -1638,7 +1667,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
         #compute full SNR
         state_dict['S/N'] = filt.get_SNR(state_dict['I_tcal'],state_dict['weights'],state_dict['timestart'],state_dict['timestop'])
-
+    
         #get edge conditions from first and last components
         ts1 = []
         ts2 = []
@@ -1663,6 +1692,13 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['FWHM'] = state_dict['intR'] - state_dict['intL']
         state_dict['intLbuffer'] = 0
         state_dict['intRbuffer'] = 0
+
+        #get spectrum
+        (state_dict['I_fcal'],state_dict['Q_fcal'],state_dict['U_fcal'],state_dict['V_fcal']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=True,input_weights=state_dict['weights'],
+                                                        fobj=state_dict['fobj'])
+
 
         #add to dataframe
         df.loc["All"] = [state_dict['buff'][0],
@@ -1761,7 +1797,49 @@ def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider):
     return
 
 
-def scint_screen():
+def scint_screen(calc_bw_button):
+    
+
+    if calc_bw_button.clicked:
+        # Define frequency resolution (Hz) 
+        f_res = state_dict['n_f']*state_dict['base_df'] #Hz
+
+        # Define a lag range for fitting the ACF in frequency lag space
+        lagrange_for_fit = 100
+
+        # Load profile data as numpy array or convert data to numpy array
+        spec = state_dict['I_fcal']#np.load('./37888771_sb1.npy')
+
+        # Compute the autocorrelation function (ACF)
+        acf = scint.autocorr(spec)
+
+        # Create array of lag values
+        lags = np.arange(len(acf)) + 1
+        acf = acf[1:]
+        lags = lags[1:]
+
+        # Create symmetric ACF and lags for fitting
+        acf = np.concatenate((acf[::-1], acf))
+        lags = np.concatenate((-1 * lags[::-1], lags)) * f_res
+
+        # Set up the fit of a Lorentzian function to the ACF
+        gmodel = Model(scint.lorentz)
+        acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+        lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+
+        # Execute the fit
+        result = gmodel.fit(acf_for_fit, x = lags_for_fit, gamma1 = 10, m1 = 1, c = 0)
+
+        # Print or output the fit report for display
+        print(result.fit_report())
+
+        df_scint.loc["All"] = [result.params['gamma1'].value,
+                               result.params['gamma1'].stderr,
+                               result.params['m1'].value,
+                               result.params['m1'].stderr,
+                               results.params['c'].value,
+                               results.params['c'].stderr]
+
     return
 """
 RM Synthesis State
