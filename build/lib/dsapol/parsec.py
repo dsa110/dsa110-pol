@@ -1903,23 +1903,25 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
     
         #compute autocorrelation function
         state_dict['autocorr_I'] = scint.autocorr(state_dict['I_fcal'])
-        state_dict['scint_lags'] = np.arange(len(state_dict['autocorr_I']) + 1)
+        state_dict['scint_lags'] = np.arange(len(state_dict['autocorr_I'])) + 1
     
         # Create array of lag values
-        state_dict['scint_lags'] = np.arange(len(state_dict['autocorr_I'])) + 1
         state_dict['autocorr_I'] = state_dict['autocorr_I'][1:]
         state_dict['scint_lags'] = state_dict['scint_lags'][1:]
 
         # Create symmetric ACF and lags for fitting
         state_dict['autocorr_I'] = np.concatenate((state_dict['autocorr_I'][::-1],state_dict['autocorr_I']))
         state_dict['scint_lags'] = np.concatenate((-1 * state_dict['scint_lags'][::-1], state_dict['scint_lags'])) * f_res
+
+        state_dict['autocorr_I'] = (state_dict['autocorr_I'] - np.nanmean(state_dict['autocorr_I']))/np.nanmax(state_dict['autocorr_I'])
+
     else:
         state_dict['autocorr_I'] = np.nan*np.ones(len(state_dict['I_fcal']))
         state_dict['scint_lags'] = np.nan*np.ones(len(state_dict['I_fcal']))
     
     #plot frequency spectrum and initial guess fit autocorrelation spectrum
     plt.figure(figsize=(18,12))
-    plt.subplot(211) 
+    plt.subplot(311) 
     if ~np.all(np.isnan(state_dict['I_fcal'])):
         plt.plot(state_dict['freq_test'][0],state_dict['I_fcal'],label='Spectrum')
     plt.xlabel("Frequency (MHz)")
@@ -1927,15 +1929,16 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
     plt.legend(loc='upper right')
 
 
-    plt.subplot(212)
+    plt.subplot(312)
     if ~np.all(np.isnan(state_dict['I_fcal'])):
         plt.plot(state_dict['scint_lags'],state_dict['autocorr_I'],label='ACF')
         plt.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Guess',color='purple')
     plt.xlabel("Lag (MHz)")
-    plt.ylabel("S/N")
+    plt.ylabel("Intensity")
 
 
     if calc_bw_button.clicked:
+        """
         # Define frequency resolution (Hz) 
         f_res = state_dict['n_f']*state_dict['base_df'] #Hz
 
@@ -1954,8 +1957,15 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
         lags = lags[1:]
 
         # Create symmetric ACF and lags for fitting
-        acf = np.concatenate((acf[::-1], acf))
-        lags = np.concatenate((-1 * lags[::-1], lags)) * f_res
+        #acf = np.concatenate((acf[::-1], acf))
+        #lags = np.concatenate((-1 * lags[::-1], lags)) * f_res
+        """
+
+        # Define a lag range for fitting the ACF in frequency lag space
+        lagrange_for_fit = 100
+
+        acf = state_dict['autocorr_I']
+        lags = state_dict['scint_lags']
 
         # Set up the fit of a Lorentzian function to the ACF
         gmodel = Model(scint.lorentz)
@@ -1978,11 +1988,21 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
         state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
         state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
         state_dict['c_best'] = [results.params['c'].value,results.params['c'].stderr]
-
+        state_dict['scint_residuals'] = state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0])
     #plot the resulting fit
     if 'gamma_best' in state_dict.keys():
         plt.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0]),label='Least-Squares Fit',color='red')
     plt.legend(loc='upper right')
+    
+    
+    plt.subplot(313)
+    if ~np.all(np.isnan(state_dict['I_fcal'])):
+        plt.plot(state_dict['scint_lags'],state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Residuals',color='purple')
+        plt.plot(state_dict['scint_lags'],state_dict['scint_residuals'],label='LSF Residuals',color='red')
+    plt.axhline(0,linestyle='--',color='black')
+    plt.xlabel("Lag (Hz)")
+    plt.ylabel(r"$\Delta$")
+
     plt.show()
 
 
