@@ -275,6 +275,26 @@ state_dict['base_Ical_f_unnormalized_errs'] = np.nan*np.ones(6144)
 state_dict['base_Qcal_f_unnormalized_errs'] = np.nan*np.ones(6144)
 state_dict['base_Ucal_f_unnormalized_errs'] = np.nan*np.ones(6144)
 state_dict['base_Vcal_f_unnormalized_errs'] = np.nan*np.ones(6144)        
+state_dict['I_f'] = np.nan*np.ones(6144)
+state_dict['Q_f'] = np.nan*np.ones(6144)
+state_dict['U_f'] = np.nan*np.ones(6144)
+state_dict['V_f'] = np.nan*np.ones(6144)
+state_dict['I_f_unweighted'] = np.nan*np.ones(6144)
+state_dict['Q_f_unweighted'] = np.nan*np.ones(6144)
+state_dict['U_f_unweighted'] = np.nan*np.ones(6144)
+state_dict['V_f_unweighted'] = np.nan*np.ones(6144)
+state_dict['I_fcal'] = np.nan*np.ones(6144)
+state_dict['Q_fcal'] = np.nan*np.ones(6144)
+state_dict['U_fcal'] = np.nan*np.ones(6144)
+state_dict['V_fcal'] = np.nan*np.ones(6144)
+state_dict['I_fcal_unweighted'] = np.nan*np.ones(6144)
+state_dict['Q_fcal_unweighted'] = np.nan*np.ones(6144)
+state_dict['U_fcal_unweighted'] = np.nan*np.ones(6144)
+state_dict['V_fcal_unweighted'] = np.nan*np.ones(6144)
+state_dict['I_fcalRM'] = np.nan*np.ones(6144)
+state_dict['Q_fcalRM'] = np.nan*np.ones(6144)
+state_dict['U_fcalRM'] = np.nan*np.ones(6144)
+state_dict['V_fcalRM'] = np.nan*np.ones(6144)
 state_dict['Tpol'] = np.nan
 state_dict['Tpol_err'] = np.nan
 state_dict['Lpol'] = np.nan
@@ -492,6 +512,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scattermenu_choices':['All'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
+
+        'gamma_guess':10, 
+        'm_guess':1,
+        'c_guess':0,
 
 
         'useRMTools':True, ################ (5) RM Synthesis ################
@@ -851,6 +875,30 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             #get timestart, timestop
             (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
+            #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
+            (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=state_dict['fobj'])
+
+            state_dict['I_fcalRM_unweighted'] = copy.deepcopy(state_dict['I_fcal_unweighted'])
+            state_dict['Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['Q_fcal_unweighted'])
+            state_dict['U_fcalRM_unweighted'] = copy.deepcopy(state_dict['U_fcal_unweighted'])
+            state_dict['V_fcalRM_unweighted'] = copy.deepcopy(state_dict['V_fcal_unweighted'])
+
+
+            """#get UNWEIGHTED spectrum at max resolution -- at this point, haven't gotten ideal filter weights yet
+            (state_dict['base_I_fcal_unweighted'],state_dict['base_Q_fcal_unweighted'],state_dict['base_U_fcal_unweighted'],state_dict['base_V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['base_n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=state_dict['fobj'])
+
+            state_dict['base_I_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_I_fcal_unweighted'])
+            state_dict['base_Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_Q_fcal_unweighted'])
+            state_dict['base_U_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_U_fcal_unweighted'])
+            state_dict['base_V_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_V_fcal_unweighted'])"""
 
 
         #state_dict['current_state'] += 1
@@ -917,6 +965,15 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     #get timestart, timestop
     (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
+
+    #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
+    (state_dict['I_f_unweighted'],state_dict['Q_f_unweighted'],state_dict['U_f_unweighted'],state_dict['V_f_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=state_dict['fobj'])
+
+
     #display dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
@@ -957,6 +1014,14 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
             state_dict['base_U'] = dedisp.dedisperse(state_dict['base_U'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
             state_dict['base_V'] = dedisp.dedisperse(state_dict['base_V'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
         
+
+
+        """#get UNWEIGHTED spectrum at max resolution-- at this point, haven't gotten ideal filter weights yet
+        (state_dict['base_I_f_unweighted'],state_dict['base_Q_f_unweighted'],state_dict['base_U_f_unweighted'],state_dict['base_V_f_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['base_n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=state_dict['fobj'])"""
 
 
         #state_dict['current_state'] += 1
@@ -1076,6 +1141,31 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
         #get timestart, timestop
         (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+
+
+        #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
+        (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=state_dict['fobj'])
+
+        state_dict['I_fcalRM_unweighted'] = copy.deepcopy(state_dict['I_fcal_unweighted'])
+        state_dict['Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['Q_fcal_unweighted'])
+        state_dict['U_fcalRM_unweighted'] = copy.deepcopy(state_dict['U_fcal_unweighted'])
+        state_dict['V_fcalRM_unweighted'] = copy.deepcopy(state_dict['V_fcal_unweighted'])
+
+        """#get UNWEIGHTED spectrum at max resolution -- at this point, haven't gotten ideal filter weights yet
+        (state_dict['base_I_fcal_unweighted'],state_dict['base_Q_fcal_unweighted'],state_dict['base_U_fcal_unweighted'],state_dict['base_V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+                                                        state_dict['base_n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=state_dict['fobj'])
+
+        state_dict['base_I_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_I_fcal_unweighted'])
+        state_dict['base_Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_Q_fcal_unweighted'])
+        state_dict['base_U_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_U_fcal_unweighted'])
+        state_dict['base_V_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_V_fcal_unweighted'])"""
 
         #state_dict['current_state'] += 1
 
@@ -1537,11 +1627,16 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                                 sf_window_weights=state_dict['comps'][state_dict['current_comp']]['sf_window_weights'],
                                                                 padded=True,norm=False)
 
-    #get spectrum
+    #get calibrated WEIGHTED spectra
     (state_dict['comps'][state_dict['current_comp']]['I_fcal'],state_dict['comps'][state_dict['current_comp']]['Q_fcal'],state_dict['comps'][state_dict['current_comp']]['U_fcal'],state_dict['comps'][state_dict['current_comp']]['V_fcal']) = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],state_dict['fobj'].header.tsamp,
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['comps'][state_dict['current_comp']]['buff'],weighted=True,input_weights=state_dict['comps'][state_dict['current_comp']]['weights'],
                                                         fobj=state_dict['fobj'])
+    state_dict['comps'][state_dict['current_comp']]['I_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['I_fcal'])
+    state_dict['comps'][state_dict['current_comp']]['Q_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['Q_fcal'])
+    state_dict['comps'][state_dict['current_comp']]['U_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['U_fcal'])
+    state_dict['comps'][state_dict['current_comp']]['V_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['V_fcal'])
+
 
 
 
@@ -1698,7 +1793,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['buff'],weighted=True,input_weights=state_dict['weights'],
                                                         fobj=state_dict['fobj'])
-
+        state_dict['I_fcalRM'] = copy.deepcopy(state_dict['I_fcal'])
+        state_dict['Q_fcalRM'] = copy.deepcopy(state_dict['Q_fcal'])
+        state_dict['U_fcalRM'] = copy.deepcopy(state_dict['U_fcal'])
+        state_dict['V_fcalRM'] = copy.deepcopy(state_dict['V_fcal'])
 
         #add to dataframe
         df.loc["All"] = [state_dict['buff'][0],
@@ -1797,8 +1895,45 @@ def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider):
     return
 
 
-def scint_screen(calc_bw_button):
+def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
     
+    if ~np.all(np.isnan(state_dict['I_fcal'])):
+        # Define frequency resolution (Hz)
+        f_res = state_dict['n_f']*state_dict['base_df'] #Hz
+    
+        #compute autocorrelation function
+        state_dict['autocorr_I'] = scint.autocorr(state_dict['I_fcal'])
+        state_dict['scint_lags'] = np.arange(len(state_dict['autocorr_I']) + 1)
+    
+        # Create array of lag values
+        state_dict['scint_lags'] = np.arange(len(state_dict['autocorr_I'])) + 1
+        state_dict['autocorr_I'] = state_dict['autocorr_I'][1:]
+        state_dict['scint_lags'] = state_dict['scint_lags'][1:]
+
+        # Create symmetric ACF and lags for fitting
+        state_dict['autocorr_I'] = np.concatenate((state_dict['autocorr_I'][::-1],state_dict['autocorr_I']))
+        state_dict['scint_lags'] = np.concatenate((-1 * state_dict['scint_lags'][::-1], state_dict['scint_lags'])) * f_res
+    else:
+        state_dict['autocorr_I'] = np.nan*np.ones(len(state_dict['I_fcal']))
+        state_dict['scint_lags'] = np.nan*np.ones(len(state_dict['I_fcal']))
+    
+    #plot frequency spectrum and initial guess fit autocorrelation spectrum
+    plt.figure(figsize=(18,12))
+    plt.subplot(211) 
+    if ~np.all(np.isnan(state_dict['I_fcal'])):
+        plt.plot(state_dict['freq_test'][0],state_dict['I_fcal'],label='Spectrum')
+    plt.xlabel("Frequency (MHz)")
+    plt.ylabel("S/N")
+    plt.legend(loc='upper right')
+
+
+    plt.subplot(212)
+    if ~np.all(np.isnan(state_dict['I_fcal'])):
+        plt.plot(state_dict['scint_lags'],state_dict['autocorr_I'],label='ACF')
+        plt.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Guess',color='purple')
+    plt.xlabel("Lag (MHz)")
+    plt.ylabel("S/N")
+
 
     if calc_bw_button.clicked:
         # Define frequency resolution (Hz) 
@@ -1811,7 +1946,7 @@ def scint_screen(calc_bw_button):
         spec = state_dict['I_fcal']#np.load('./37888771_sb1.npy')
 
         # Compute the autocorrelation function (ACF)
-        acf = scint.autocorr(spec)
+        acf = state_dict['autocorr_I']#scint.autocorr(spec)
 
         # Create array of lag values
         lags = np.arange(len(acf)) + 1
@@ -1828,7 +1963,7 @@ def scint_screen(calc_bw_button):
         lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
 
         # Execute the fit
-        result = gmodel.fit(acf_for_fit, x = lags_for_fit, gamma1 = 10, m1 = 1, c = 0)
+        result = gmodel.fit(acf_for_fit, x = lags_for_fit, gamma1=gamma_guess.value,m1=m_guess.value,c1=c_guess.value)#gamma1 = 10, m1 = 1, c = 0)
 
         # Print or output the fit report for display
         print(result.fit_report())
@@ -1839,6 +1974,21 @@ def scint_screen(calc_bw_button):
                                result.params['m1'].stderr,
                                results.params['c'].value,
                                results.params['c'].stderr]
+
+        state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
+        state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
+        state_dict['c_best'] = [results.params['c'].value,results.params['c'].stderr]
+
+    #plot the resulting fit
+    if 'gamma_best' in state_dict.keys():
+        plt.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0]),label='Least-Squares Fit',color='red')
+    plt.legend(loc='upper right')
+    plt.show()
+
+
+    #update wdict
+    update_wdict([gamma_guess,m_guess,c_guess],
+            ['gamma_guess','m_guess','c_guess'])
 
     return
 """
