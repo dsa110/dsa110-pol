@@ -51,9 +51,10 @@ from astropy.coordinates import EarthLocation
 import astropy.units as u
 import os
 import signal
-from lmfit import minimize, Parameters, fit_report, Model
+from lmfit import minimize, Parameters, fit_report, Model,Parameter
 from tqdm import tqdm
 from scintillation import scint
+from scattering import scat
 """
 This file contains code for the Polarization Analysis and RM Synthesis Enabled for Calibration (PARSEC)
 user interface to the dsa110-pol module. The interface will use Mercury and a jupyter notebook to 
@@ -295,6 +296,12 @@ state_dict['I_fcalRM'] = np.nan*np.ones(6144)
 state_dict['Q_fcalRM'] = np.nan*np.ones(6144)
 state_dict['U_fcalRM'] = np.nan*np.ones(6144)
 state_dict['V_fcalRM'] = np.nan*np.ones(6144)
+
+state_dict['I_tcal'] = np.nan*np.ones(5120)
+state_dict['Q_tcal'] = np.nan*np.ones(5120)
+state_dict['U_tcal'] = np.nan*np.ones(5120)
+state_dict['V_tcal'] = np.nan*np.ones(5120)
+
 state_dict['Tpol'] = np.nan
 state_dict['Tpol_err'] = np.nan
 state_dict['Lpol'] = np.nan
@@ -512,8 +519,16 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scattermenu_choices':['All'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
+        'x0_guess':0.35e-3,
+        'amp_guess':1,
+        'sigma_guess':1,
+        'tau_guess':1,
 
-        'gamma_guess':10, 
+        'scintmenu':'All',
+        'scintmenu_choices':['All'],
+        'scint_fit_range':1,
+
+        'gamma_guess':10e6, 
         'm_guess':1,
         'c_guess':0,
 
@@ -742,6 +757,12 @@ def update_wdict(objects,labels,param='value'):
     else:
         wdict['scattermenu_choices'] = ['All']
 
+    #update scatter comps
+    if state_dict['n_comps'] > 1:
+        wdict['scintmenu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
+    else:
+        wdict['scintmenu_choices'] = ['All']
+
     #update polcomps
     if state_dict['n_comps'] > 1: 
         wdict['polcomp_menu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
@@ -763,6 +784,95 @@ class StopExecution(Exception):
 """
 Load data state
 """
+from dsaT3 import filplot_funcs as fpf
+def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
+             ndm=32, suptitle='', heimsnr=-1,
+             ibeam=-1, rficlean=True, nfreq_plot=32, 
+             classify=False, heim_raw_tres=1, 
+             showplot=True, save_data=True, candname=None,
+             fnT2clust=None, imjd=0, injected=False, fast_classify=False):
+    """
+    This is a modified version of the filplot function found in https://github.com/dsa110/dsa110-T3/blob/main/dsaT3/filplot_funcs.py,
+    that displays the dynamic spectrum, DM transform, and power and intensity vs time plots.
+    Vizualize FRB candidates on DSA-110
+    fn is filterbnak file name.
+    dm is dispersion measure as float.
+    ibox is timecar box width as integer.
+
+    """
+    #read data and pre-process
+    dataft, datadm, tsdm0, dms, datadm0 = fpf.proc_cand_fil(fn, dm, ibox, snrheim=-1, 
+                                               pre_rebin=1, nfreq_plot=nfreq_plot,
+                                               ndm=ndm, rficlean=rficlean,
+                                               heim_raw_tres=heim_raw_tres)
+
+
+    beam_time_arr = None
+    multibeam_dm0ts = None
+
+    datats = dataft.mean(0)
+    datadmt = datadm
+    dms = [dms[0],dms[-1]]
+
+    #plotting
+    classification_dict = {'prob' : [],
+                           'snr_dm0_ibeam' : [],
+                           'snr_dm0_allbeam' : []}
+    datats /= np.std(datats[datats!=np.max(datats)])
+    nfreq, ntime = dataft.shape
+    xminplot,xmaxplot = 500.-300*ibox/16.,500.+300*ibox/16 # milliseconds
+    if xminplot<0:
+        xmaxplot=xminplot+500+300*ibox/16
+        xminplot=0
+#    xminplot,xmaxplot = 0, 1000.
+    dm_min, dm_max = dms[0], dms[1]
+    tmin, tmax = 0., 1e3*dataft.header['tsamp']*ntime
+    freqmax = dataft.header['fch1']
+    freqmin = freqmax + dataft.header['nchans']*dataft.header['foff']
+    freqs = np.linspace(freqmin, freqmax, nfreq)
+    tarr = np.linspace(tmin, tmax, ntime)
+    fig, axs = plt.subplots(2, 2, figsize=(18,12))#, constrained_layout=True)
+    
+    #dynamic spectrum
+    extentft=[tmin,tmax,freqmin,freqmax]
+    axs[0][0].imshow(dataft, aspect='auto',extent=extentft, interpolation='nearest')
+    DM0_delays = xminplot + dm * 4.15E6 * (freqmin**-2 - freqs**-2)
+    axs[0][0].plot(DM0_delays, freqs, c='r', lw='2', alpha=0.35)
+    axs[0][0].set_xlim(xminplot,xmaxplot)
+    axs[0][0].set_xlabel('Time (ms)')
+    axs[0][0].set_ylabel('Freq (MHz)')
+
+    #DM transform
+    extentdm=[tmin, tmax, dm_min, dm_max]
+    axs[0][1].imshow(datadmt[::-1], aspect='auto',extent=extentdm)
+    axs[0][1].set_xlim(xminplot,xmaxplot)
+    axs[0][1].set_xlabel('Time (ms)')
+    axs[0][1].set_ylabel(r'DM (pc cm$^{-3}$)')
+
+    #Power vs time
+    axs[1][0].plot(tarr, datats)
+    axs[1][0].grid('on', alpha=0.25)
+    axs[1][0].set_xlabel('Time (ms)')
+    axs[1][0].set_ylabel(r'Power ($\sigma$)')
+    axs[1][0].set_xlim(xminplot,xmaxplot)
+    axs[1][0].text(0.51*(xminplot+xmaxplot), 0.5*(max(datats)+np.median(datats)),
+            'Heimdall S/N : %0.1f\nHeimdall DM : %d\
+            \nHeimdall ibox : %d\nibeam : %d' % (heimsnr,dm,ibox,ibeam),
+            fontsize=24, verticalalignment='center')
+
+    #Intensity vs time
+    datadm0 -= np.median(datadm0.mean(0))
+    datadm0_sigmas = datadm0.mean(0)/np.std(datadm0.mean(0)[-500:])
+    snr_dm0ts_iBeam = np.max(datadm0_sigmas)
+    axs[1][1].plot(np.linspace(0, tmax, len(datadm0[0])), datadm0_sigmas, c='k')
+    classification_dict['snr_dm0_ibeam'] = snr_dm0ts_iBeam
+    axs[1][1].set_xlabel('Time (ms)')
+    axs[1][1].set_ylabel(r'Power ($\sigma$)')
+    axs[1][1].legend(['DM=0 Timestream'], loc=2, fontsize=24)
+    fig.suptitle(suptitle, color='C1',fontsize=24)
+    plt.show()
+    return fig
+
 NOFFDEF = 2000
 def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
     """
@@ -1728,6 +1838,14 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
             V_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='V',where='post')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*np.max(I_tcal)/np.max(state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]),label='weights',color='purple',linewidth=4,where='post')
+
+    #plot weights from others
+    for k in range(state_dict['current_comp']):
+
+        a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3, 
+                state_dict['comps'][k]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*state_dict['I_tcal'][state_dict['comps'][k]['peak']]/state_dict['comps'][k]['weights'][state_dict['comps'][k]['peak']],
+                linewidth=4,color='purple',linestyle='--',where='post')
+    
     a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     a0.set_xticks([])
@@ -1887,20 +2005,67 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider):
+def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess,sigma_guess,tau_guess,amp_guess):
+
+    #plot components and initial fits
+    g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
+    fig = plt.figure(figsize=(18,12))
+    ax1 = fig.add_subplot(g2[0,:])
+    if 'All' in scattermenu.value and ~np.all(np.isnan(state_dict['I_tcal'])):
+        ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Timeseries',where='post')
+        ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            scat.exp_gauss_1(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess.value, amp_guess.value, sigma_guess.value, tau_guess.value),color='purple',label='Initial Guess')
+        """elif 'All' not in scattermenu.value and state_dict['n_comps'] > 1:
+        Ip = copy.deepcopy(state_dict['Ical'])
+        mask = np.zeros(state_dict['Ical'].shape)
+        for k in range(state_dict['current_comp']):
+            if 'Component ' + str(k) not in scattermenu.value:
+                #mask = np.zeros(state_dict['Ical'].shape)
+                mask[:,state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
+        Ip = ma(Ip,mask)"""
+        ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax1.set_xlabel("Time (ms)")
+    ax1.set_ylabel("S/N")
+    ax1.set_xticks([])
+    ax1.legend(loc='upper right')
+    
+
+    ax3 = fig.add_subplot(g2[1,:])#,sharex=ax1)
+    if 'All' in scattermenu.value and ~np.all(np.isnan(state_dict['I_tcal'])):
+        ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            scat.exp_gauss_1(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess.value, amp_guess.value, sigma_guess.value, tau_guess.value)-state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Residuals')
+        """elif 'All' not in scattermenu.value and state_dict['n_comps'] > 1:
+        Ip = copy.deepcopy(state_dict['Ical'])
+        mask = np.zeros(state_dict['Ical'].shape)
+        for k in range(state_dict['current_comp']):
+            if 'Component ' + str(k) not in scattermenu.value:
+                #mask = np.zeros(state_dict['Ical'].shape)
+                mask[:,state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
+        Ip = ma(Ip,mask)"""
+        ax3.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax3.set_xlabel("Time (ms)")
+    ax3.set_ylabel(r"$\Delta$")
+    ax3.legend(loc='upper right')
+
+
+    plt.show()
+
 
     #update wdict
-    update_wdict([scattermenu,scatterLbuffer_slider,scatterRbuffer_slider],
-            ['scattermenu','scatterLbuffer_slider','scatterRbuffer_slider'])
+    update_wdict([scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess,sigma_guess,tau_guess,amp_guess],
+            ['scattermenu','scatterLbuffer_slider','scatterRbuffer_slider','x0_guess','sigma_guess','tau_guess','amp_guess'])
     return
 
 
-def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
-    
+def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range):
+    # Define frequency resolution (Hz)
+    f_res = state_dict['n_f']*state_dict['base_df'] #Hz
+
+
     if ~np.all(np.isnan(state_dict['I_fcal'])):
-        # Define frequency resolution (Hz)
-        f_res = state_dict['n_f']*state_dict['base_df'] #Hz
-    
         #compute autocorrelation function
         state_dict['autocorr_I'] = scint.autocorr(state_dict['I_fcal'])
         state_dict['scint_lags'] = np.arange(len(state_dict['autocorr_I'])) + 1
@@ -1914,28 +2079,69 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
         state_dict['scint_lags'] = np.concatenate((-1 * state_dict['scint_lags'][::-1], state_dict['scint_lags'])) * f_res
 
         state_dict['autocorr_I'] = (state_dict['autocorr_I'] - np.nanmean(state_dict['autocorr_I']))/np.nanmax(state_dict['autocorr_I'])
-
+    
     else:
         state_dict['autocorr_I'] = np.nan*np.ones(len(state_dict['I_fcal']))
         state_dict['scint_lags'] = np.nan*np.ones(len(state_dict['I_fcal']))
+
+    #update autocorr spectra for each component
+    if state_dict['n_comps'] > 1:
+        for i in range(state_dict['n_comps']):
+            if ~np.all(np.isnan(state_dict['comps'][i]['I_fcal'])):
+                #compute autocorrelation function
+                state_dict['comps'][i]['autocorr_I'] = scint.autocorr(state_dict['comps'][i]['I_fcal'])
+                state_dict['comps'][i]['scint_lags'] = np.arange(len(state_dict['comps'][i]['I_fcal'])) + 1
+
+                # Create array of lag values
+                state_dict['comps'][i]['autocorr_I'] = state_dict['comps'][i]['autocorr_I'][1:]
+                state_dict['comps'][i]['scint_lags'] = state_dict['comps'][i]['scint_lags'][1:]
+
+                # Create symmetric ACF and lags for fitting
+                state_dict['comps'][i]['autocorr_I'] = np.concatenate((state_dict['comps'][i]['autocorr_I'][::-1],state_dict['comps'][i]['autocorr_I']))
+                state_dict['comps'][i]['scint_lags'] = np.concatenate((-1 * state_dict['comps'][i]['scint_lags'][::-1], state_dict['comps'][i]['scint_lags'])) * f_res
+
+                state_dict['comps'][i]['autocorr_I'] = (state_dict['comps'][i]['autocorr_I'] - np.nanmean(state_dict['comps'][i]['autocorr_I']))/np.nanmax(state_dict['comps'][i]['autocorr_I'])
+            else:
+                state_dict['comps'][i]['autocorr_I'] = np.nan*np.ones(len(state_dict['comps'][i]['I_fcal']))
+                state_dict['comps'][i]['scint_lags'] = np.nan*np.ones(len(state_dict['comps'][i]['I_fcal']))
+
+
     
     #plot frequency spectrum and initial guess fit autocorrelation spectrum
-    plt.figure(figsize=(18,12))
-    plt.subplot(311) 
-    if ~np.all(np.isnan(state_dict['I_fcal'])):
-        plt.plot(state_dict['freq_test'][0],state_dict['I_fcal'],label='Spectrum')
-    plt.xlabel("Frequency (MHz)")
-    plt.ylabel("S/N")
-    plt.legend(loc='upper right')
+    #plt.figure(figsize=(18,12))
+    #plt.subplot(311)
 
+    g1 = plt.GridSpec(3,1,height_ratios=[2,2,1])
+    g2 = plt.GridSpec(3,1,hspace=0,height_ratios=[2,2,1],top=0.7)
+    fig = plt.figure(figsize=(18,12))
+    ax1 = fig.add_subplot(g1[0,:])
+    if scintmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
+        ax1.plot(state_dict['freq_test'][0],state_dict['I_fcal'],label='Spectrum')
+        ax1.set_title("All Components")
+        ax1.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    elif scintmenu.value != 'All' and state_dict['n_comps'] > 1:
+        i = int(scintmenu.value[-1])
+        ax1.plot(state_dict['freq_test'][0],state_dict['comps'][i]['I_fcal'],label='Spectrum')
+        ax1.set_title("Component " + str(i))
+        ax1.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax1.set_xlabel("Frequency (MHz)")
+    ax1.set_ylabel("S/N")
+    ax1.legend(loc='upper right')
 
-    plt.subplot(312)
-    if ~np.all(np.isnan(state_dict['I_fcal'])):
-        plt.plot(state_dict['scint_lags'],state_dict['autocorr_I'],label='ACF')
-        plt.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Guess',color='purple')
-    plt.xlabel("Lag (MHz)")
-    plt.ylabel("Intensity")
-
+    #plt.subplot(312)
+    ax2 = fig.add_subplot(g2[1,:])
+    if scintmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
+        ax2.plot(state_dict['scint_lags'],state_dict['autocorr_I'],label='ACF')
+        ax2.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Guess',color='purple')
+        ax2.set_xlim(np.min(state_dict['scint_lags']),np.max(state_dict['scint_lags']))
+    elif scintmenu.value != 'All' and state_dict['n_comps'] > 1:
+        i = int(scintmenu.value[-1])
+        ax2.plot(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['autocorr_I'],label='ACF')
+        ax2.plot(state_dict['comps'][i]['scint_lags'],scint.lorentz(state_dict['comps'][i]['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Guess',color='purple')
+        ax2.set_xlim(np.min(state_dict['scint_lags']),np.max(state_dict['scint_lags']))
+    #plt.xlabel("Lag (MHz)")
+    ax2.set_ylabel("Intensity")
+    ax2.set_title("ACF")
 
     if calc_bw_button.clicked:
         """
@@ -1961,54 +2167,95 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess):
         #lags = np.concatenate((-1 * lags[::-1], lags)) * f_res
         """
 
+        
         # Define a lag range for fitting the ACF in frequency lag space
-        lagrange_for_fit = 100
+        lagrange_for_fit = scint_fit_range.value*1e6 #100E6
 
-        acf = state_dict['autocorr_I']
-        lags = state_dict['scint_lags']
+        badflag = 0
+        if scintmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
+            acf = state_dict['autocorr_I']
+            lags = state_dict['scint_lags']
+        elif scintmenu.value != 'All' and state_dict['n_comps'] > 1 and ~np.all(np.isnan(state_dict['comps'][int(str(scintmenu.value[-1]))]['I_fcal'])):
+            i = int(scintmenu.value[-1])
+            acf = state_dict['comps'][i]['autocorr_I']
+            lags = state_dict['comps'][i]['scint_lags']
+        else: 
+            badflag = 1
+            print("Previous Stages Required")
 
-        # Set up the fit of a Lorentzian function to the ACF
-        gmodel = Model(scint.lorentz)
-        acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
-        lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+        if badflag == 0:
+            acf = acf[~np.isnan(acf)]
+            lags = lags[~np.isnan(lags)]
+            # Set up the fit of a Lorentzian function to the ACF
+            gmodel = Model(lambda x, gamma1,m1,c: np.nan_to_num(scint.lorentz(x,gamma1,m1,c)),independent_vars=['x'],nan_policy='omit')
+            acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+            lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
 
-        # Execute the fit
-        result = gmodel.fit(acf_for_fit, x = lags_for_fit, gamma1=gamma_guess.value,m1=m_guess.value,c1=c_guess.value)#gamma1 = 10, m1 = 1, c = 0)
+            # Execute the fit
+            result = gmodel.fit(acf_for_fit, x = lags_for_fit, 
+                                gamma1=Parameter(gamma_guess.value,min=1,max=50e6),
+                                m1=Parameter(m_guess.value,min=0,max=1),
+                                c1=Parameter(c_guess.value,min=-1,max=1))#gamma1 = 10, m1 = 1, c = 0)
 
-        # Print or output the fit report for display
-        print(result.fit_report())
+            # Print or output the fit report for display
+            #print(result.fit_report())
 
-        df_scint.loc["All"] = [result.params['gamma1'].value,
+            df_scint.loc[str(scintmenu.value)] = [result.params['gamma1'].value,
                                result.params['gamma1'].stderr,
                                result.params['m1'].value,
                                result.params['m1'].stderr,
-                               results.params['c'].value,
-                               results.params['c'].stderr]
+                               result.params['c'].value,
+                               result.params['c'].stderr]
+            if str(scintmenu.value) == 'All':
+                state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
+                state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
+                state_dict['c_best'] = [result.params['c'].value,result.params['c'].stderr]
+                state_dict['scint_residuals'] = state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0])
+            else:
+                i = int(scintmenu.value[-1])
+                state_dict['comps'][i]['gamma_best'] = [result.params['comps'][i]['gamma1'].value,result.params['comps'][i]['gamma1'].stderr]
+                state_dict['comps'][i]['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
+                state_dict['comps'][i]['c_best'] = [result.params['c'].value,result.params['c'].stderr]
+                state_dict['comps'][i]['scint_residuals'] = state_dict['comps'][i]['autocorr_I'] - scint.lorentz(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['gamma_best'][0],state_dict['comps'][i]['m_best'][0],state_dict['comps'][i]['c_best'][0])
 
-        state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
-        state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
-        state_dict['c_best'] = [results.params['c'].value,results.params['c'].stderr]
-        state_dict['scint_residuals'] = state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0])
     #plot the resulting fit
-    if 'gamma_best' in state_dict.keys():
-        plt.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0]),label='Least-Squares Fit',color='red')
-    plt.legend(loc='upper right')
-    
-    
-    plt.subplot(313)
-    if ~np.all(np.isnan(state_dict['I_fcal'])):
-        plt.plot(state_dict['scint_lags'],state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Residuals',color='purple')
-        plt.plot(state_dict['scint_lags'],state_dict['scint_residuals'],label='LSF Residuals',color='red')
-    plt.axhline(0,linestyle='--',color='black')
-    plt.xlabel("Lag (Hz)")
-    plt.ylabel(r"$\Delta$")
+    if scintmenu.value == 'All' and 'gamma_best' in state_dict.keys():
+        ax2.plot(state_dict['scint_lags'],scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0]),label='Least-Squares Fit',color='red')
+    elif scintmenu.value != 'All' and state_dict['n_comps'] > 1:
+        i = int(scintmenu.value[-1])
+        if 'gamma_best' in state_dict['comps'][i].keys():
+            ax2.plot(state_dict['comps'][i]['scint_lags'],scint.lorentz(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['gamma_best'][0],state_dict['comps'][i]['m_best'][0],state_dict['comps'][i]['c_best'][0]),label='Least-Squares Fit',color='red')
+    ax2.legend(loc='upper right')
+    ax2.axvspan(-scint_fit_range.value*1e6,scint_fit_range.value*1e6,color='red',alpha=0.2)
+    ax2.set_xticks([])
+
+    #plot the residuals
+    #plt.subplot(313)
+    ax3 = fig.add_subplot(g2[2,:])#,sharex=ax2)
+    if scintmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
+        ax3.plot(state_dict['scint_lags'],state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Residuals',color='purple')
+        if 'gamma_best' in state_dict.keys():
+            ax3.plot(state_dict['scint_lags'],state_dict['scint_residuals'],label='LSF Residuals',color='red')
+        ax3.set_xlim(np.min(state_dict['scint_lags']),np.max(state_dict['scint_lags']))
+    elif scintmenu.value != 'All' and state_dict['n_comps'] > 1:
+        i = int(scintmenu.value[-1])
+        if ~np.all(np.isnan(state_dict['comps'][i]['I_fcal'])) and state_dict['n_comps'] > 1:
+            ax3.plot(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['autocorr_I'] - scint.lorentz(state_dict['comps'][i]['scint_lags'],gamma_guess.value,m_guess.value,c_guess.value),label='Initial Residuals',color='purple')
+            if 'gamma_best' in state_dict['comps'][i].keys():
+                ax3.plot(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['scint_residuals'],label='LSF Residuals',color='red')
+            ax3.set_xlim(np.min(state_dict['scint_lags']),np.max(state_dict['scint_lags']))
+    ax3.axvspan(-scint_fit_range.value*1e6,scint_fit_range.value*1e6,color='red',alpha=0.2)
+    ax3.axhline(0,linestyle='--',color='black')
+    ax3.set_xlabel("Lag (Hz)")
+    ax3.set_ylabel(r"$\Delta$")
+    ax3.legend(loc='upper right')
 
     plt.show()
 
 
     #update wdict
-    update_wdict([gamma_guess,m_guess,c_guess],
-            ['gamma_guess','m_guess','c_guess'])
+    update_wdict([gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range],
+            ['gamma_guess','m_guess','c_guess','scintmenu','scint_fit_range'])
 
     return
 """
@@ -3185,8 +3432,8 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                      notesinput.value]
                      )
        
-        if state_dict['ncomps'] > 1:
-            for i in range(state_dict['ncomps']):
+        if state_dict['n_comps'] > 1:
+            for i in range(state_dict['n_comps']):
                 #first make a row for full burst
                 mPA = ""
                 mPA_err = ""
