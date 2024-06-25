@@ -1,3 +1,4 @@
+from dsaT3 import filplot_funcs as fpf
 from dsapol import polbeamform
 from dsapol import polcal
 from dsapol import RMcal
@@ -29,7 +30,7 @@ from scipy.signal import find_peaks
 from scipy.signal import peak_widths
 import copy
 import numpy as np
-
+import mercury as mr
 from sigpyproc import FilReader
 from sigpyproc.Filterbank import FilterbankBlock
 from sigpyproc.Header import Header
@@ -47,7 +48,7 @@ from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 from astropy.time import Time
-from astropy.coordinates import EarthLocation
+from astropy.coordinates import EarthLocation,SkyCoord
 import astropy.units as u
 import os
 import signal
@@ -55,6 +56,7 @@ from lmfit import minimize, Parameters, fit_report, Model,Parameter
 from tqdm import tqdm
 from scintillation import scint
 from scattering import scat
+from PIL import Image
 """
 This file contains code for the Polarization Analysis and RM Synthesis Enabled for Calibration (PARSEC)
 user interface to the dsa110-pol module. The interface will use Mercury and a jupyter notebook to 
@@ -123,6 +125,7 @@ Read FRB parameters
 FRB_RA = []
 FRB_DEC = []
 FRB_DM = []
+FRB_heimSNR = []
 FRBs= []
 FRB_mjd = []
 FRB_z = []
@@ -146,6 +149,11 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
                 else:
                     FRB_mjd.append(-1)
                 
+                if row[2] != "":
+                    FRB_heimSNR.append(float(row[2]))
+                else:
+                    FRB_heimSNR.append(-1)
+
                 if row[4] != "":
                     FRB_DM.append(float(row[4]))
                 elif row[3] != "":
@@ -784,7 +792,6 @@ class StopExecution(Exception):
 """
 Load data state
 """
-from dsaT3 import filplot_funcs as fpf
 def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
              ndm=32, suptitle='', heimsnr=-1,
              ibeam=-1, rficlean=True, nfreq_plot=32, 
@@ -870,8 +877,13 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
     axs[1][1].set_ylabel(r'Power ($\sigma$)')
     axs[1][1].legend(['DM=0 Timestream'], loc=2, fontsize=24)
     fig.suptitle(suptitle, color='C1',fontsize=24)
-    plt.show()
-    return fig
+    if figname is not None:
+        plt.savefig(figname)
+    if showplot:
+        plt.show()
+    else:
+        plt.close()
+    return
 
 NOFFDEF = 2000
 def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
@@ -891,6 +903,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['buff'] = [buff_L_slider_init.value,buff_R_slider_init.value]
     state_dict['width_native'] = 2**logibox_slider.value
     state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
+    state_dict['heimSNR'] = FRB_heimSNR[FRB_IDS.index(state_dict['ids'])]
+
 
     #update displays
     RA_display.data = state_dict['RA']
@@ -1018,6 +1032,59 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'])
         print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
+
+
+    #plot filplot
+    pngname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
+    if len(pngname) != 0:
+        #show the existing image
+        im = Image.open(pngname[0])
+    else:
+        #create the image, first find fil file
+        filname = glob.glob("/dataz/dsa110/candidates/" + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
+        if len(filname) == 0:
+            #couldn't find file on h23, try to copy from dsastorage
+            if state_dict['ibeam'] < 64:
+                corr = "corr01"
+            elif 64 < state_dict['ibeam'] < 128:
+                corr = "corr02"
+            elif 128 < state_dict['ibeam'] < 192:
+                corr = "corr09"
+            else: #192 < state_dict['ibeam'] < 256:
+                corr = "corr13"
+            
+            os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil .")
+            filname = glob.glob(state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+        if len(filname) == 0:
+            im = mr.Markdown("## No candidate plot for " + str(state_dict['ids']) + "_"+ str(state_dict['nickname']))
+
+        else:
+            c = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs')
+            state_dict['gall'] = c.galactic.l.value
+            state_dict['galb'] = c.galactic.b.value
+            
+            custom_filplot(filname[0],
+                                state_dict['DM0'],
+                                state_dict['width_native'],
+                                multibeam=None,
+                                figname= state_dict['datadir'] + state_dict['ids'] + "_parsec.png",
+                                ndm=32,
+                                suptitle='candname:%s  DM:%0.1f  boxcar:%d  ibeam:%d \nMJD:%f  Ra/Dec=%0.1f,%0.1f Gal lon/lat=%0.1f,%0.1f' % (state_dict['ids'], state_dict['DM0'], state_dict['width_native'], state_dict['ibeam'], state_dict['mjd'], state_dict['RA'], state_dict['DEC'], state_dict['gall'], state_dict['galb']),
+                                heimsnr=state_dict['heimSNR'],
+                                ibeam=state_dict['ibeam'],
+                                rficlean=False,
+                                nfreq_plot=32,
+                                classify=False,
+                                heim_raw_tres=1,
+                                showplot=False,
+                                save_data=False,
+                                candname=state_dict['ids'],
+                                imjd=state_dict['mjd'],
+                                injected=False,
+                                fast_classify=False)
+            os.system("rm " + filname[0])
+            im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
+    
     #update widget dict
     update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
                     ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
@@ -1025,7 +1092,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display],
                     ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display"],
                     param='data')
-    return
+    return im
     
 """
 Dedispersion Tuning state

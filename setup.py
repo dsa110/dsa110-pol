@@ -75,7 +75,9 @@ dirs = {"cwd":cwd,
         "logs":cwd[:cwd.index("dsa110-pol")] + "dsapol_logfiles/",
         "gen_bfweights":"/dataz/dsa110/operations/beamformer_weights/generated/",
         "dsastorageFRBDir":"user@dsa-storage.ovro.pvt:/home/user/data/candidates/candidates/",
-        "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/"}
+        "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/",
+        "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/"}
+
 print(dirs)
 f = open(dirs["polcal"] + "directories.json","w")
 json.dump(dirs,f)
