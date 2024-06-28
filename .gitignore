@@ -1,0 +1,10 @@
+#cache files for parsec
+interface/.current_state
+
+
+#celery files
+celery*
+interface/celery*
+
+#current working dir
+cwdpath.txt

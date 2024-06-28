@@ -25,6 +25,7 @@ dsa_110_pol_dev.egg-info/dependency_links.txt
 dsa_110_pol_dev.egg-info/requires.txt
 dsa_110_pol_dev.egg-info/top_level.txt
 dsapol/RMcal.py
+dsapol/customfilplotfuncs.py
 dsapol/dedisp.py
 dsapol/dsapol.py
 dsapol/filt.py

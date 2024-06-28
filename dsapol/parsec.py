@@ -1,4 +1,6 @@
-from dsaT3 import filplot_funcs as fpf
+from rmtable import rmtable
+#from dsaT3.filplot_funcs import proc_cand_fil
+from dsapol import customfilplotfuncs as cfpf
 from dsapol import polbeamform
 from dsapol import polcal
 from dsapol import RMcal
@@ -7,6 +9,7 @@ from dsapol import rmtablefuncs
 from dsapol import dedisp
 from dsapol import filt
 import numpy as np
+import matplotlib
 from matplotlib import pyplot as plt
 from scipy.signal import correlate
 from scipy.signal import savgol_filter as sf
@@ -48,6 +51,7 @@ from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 from astropy.time import Time
+from astropy.table import Table
 from astropy.coordinates import EarthLocation,SkyCoord
 import astropy.units as u
 import os
@@ -205,6 +209,7 @@ General Layout:
 """
 
 # default values for state and polcal dicts and dataframe tables
+global state_dict 
 state_dict = dict()
 ##state_dict['current_state'] = 0
 state_map = {'load':0,
@@ -219,6 +224,8 @@ state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
 state_dict['base_df'] = 30.4E3 #Hz
+state_dict['dDM'] = 0
+state_dict['window'] = 2**5
 state_dict['rel_n_t'] = 1
 state_dict['rel_n_f'] = 2**5
 state_dict['Iflux'] = np.nan 
@@ -260,6 +267,7 @@ state_dict['base_Q'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_U'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_V'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 #state_dict['fobj'] = None
+state_dict['tsamp'] = 32.7e-6
 state_dict['base_freq_test'] = [np.linspace(1311.25000003072,1498.75,6144)]*4 
 state_dict['base_wav_test'] = [(3e8)/(np.linspace(1311.25000003072,1498.75,6144)*1e6)]*4
 state_dict['base_time_axis'] = np.nan*np.ones(5120)
@@ -326,6 +334,7 @@ state_dict['Tclass'] = ""
 state_dict['Lclass'] = ""
 state_dict['Vclass'] = ""
 
+global df 
 df = pd.DataFrame(
     {
         r'${\rm buff}_{L}$': [np.nan],
@@ -354,6 +363,7 @@ corrarray = ["corr03",
                "corr19", 
                "corr21", 
                "corr22"]
+global df_polcal 
 df_polcal = pd.DataFrame(
     {
         r'3C48': [],#*len(corrarray),
@@ -363,6 +373,7 @@ df_polcal = pd.DataFrame(
     },
         index=[]#copy.deepcopy(corrarray)
     )
+global polcal_dict 
 polcal_dict = dict()
 polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
 #populate w/ calibrator files
@@ -388,6 +399,7 @@ for k in mapping3C48_init.keys():
     polcal_dict[str(k)]['3C286'] = mapping3C286_init[k]
     polcal_dict[str(k)]['3C48_bfweights'] = bfweights3C48
     polcal_dict[str(k)]['3C286_bfweights'] = bfweights3C286
+global df_beams 
 df_beams = pd.DataFrame(
         {r'beam':[],
             r'mjd':[],
@@ -397,6 +409,7 @@ df_beams = pd.DataFrame(
 
 
 #table for scintillation bw fit values
+global df_scint 
 df_scint = pd.DataFrame(
     {
         r'$\gamma$': [np.nan],#*len(corrarray),
@@ -450,6 +463,7 @@ polcalfiles = [polcalfiles[i][polcalfiles[i].index('POLCAL'):] for i in range(le
 
 
 
+global wdict 
 wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##################
          'frbfiles_menu':frbfiles[0],
          'base_n_t_slider':1,
@@ -574,7 +588,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
 
 
 #create a mapping system for possible RMs to calibrate with
-RMcaldict = {
+global RMcaldict 
+RMcaldict= {
         'RM-Tools':{
             'coarse':{
                 'All Components':{
@@ -599,6 +614,7 @@ RMcaldict = {
                 'Error':np.nan}}
             }
 
+global RMdf 
 RMdf = pd.DataFrame(
     {
         'RM-Tools': [np.nan],
@@ -611,6 +627,7 @@ RMdf = pd.DataFrame(
         index=['All']
     )
 
+global poldf 
 poldf = pd.DataFrame(
         {
             'S/N': [np.nan],
@@ -693,7 +710,9 @@ state_dict['RMcalibrated']['RMFWHM'] = np.nan
 
 
 #archive dict
+global RMtable_archive_df 
 RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
+global polspec_archive_df 
 polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
 def update_wdict(objects,labels,param='value'):
     """
@@ -792,101 +811,9 @@ class StopExecution(Exception):
 """
 Load data state
 """
-def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
-             ndm=32, suptitle='', heimsnr=-1,
-             ibeam=-1, rficlean=True, nfreq_plot=32, 
-             classify=False, heim_raw_tres=1, 
-             showplot=True, save_data=True, candname=None,
-             fnT2clust=None, imjd=0, injected=False, fast_classify=False):
-    """
-    This is a modified version of the filplot function found in https://github.com/dsa110/dsa110-T3/blob/main/dsaT3/filplot_funcs.py,
-    that displays the dynamic spectrum, DM transform, and power and intensity vs time plots.
-    Vizualize FRB candidates on DSA-110
-    fn is filterbnak file name.
-    dm is dispersion measure as float.
-    ibox is timecar box width as integer.
-
-    """
-    #read data and pre-process
-    dataft, datadm, tsdm0, dms, datadm0 = fpf.proc_cand_fil(fn, dm, ibox, snrheim=-1, 
-                                               pre_rebin=1, nfreq_plot=nfreq_plot,
-                                               ndm=ndm, rficlean=rficlean,
-                                               heim_raw_tres=heim_raw_tres)
-
-
-    beam_time_arr = None
-    multibeam_dm0ts = None
-
-    datats = dataft.mean(0)
-    datadmt = datadm
-    dms = [dms[0],dms[-1]]
-
-    #plotting
-    classification_dict = {'prob' : [],
-                           'snr_dm0_ibeam' : [],
-                           'snr_dm0_allbeam' : []}
-    datats /= np.std(datats[datats!=np.max(datats)])
-    nfreq, ntime = dataft.shape
-    xminplot,xmaxplot = 500.-300*ibox/16.,500.+300*ibox/16 # milliseconds
-    if xminplot<0:
-        xmaxplot=xminplot+500+300*ibox/16
-        xminplot=0
-#    xminplot,xmaxplot = 0, 1000.
-    dm_min, dm_max = dms[0], dms[1]
-    tmin, tmax = 0., 1e3*dataft.header['tsamp']*ntime
-    freqmax = dataft.header['fch1']
-    freqmin = freqmax + dataft.header['nchans']*dataft.header['foff']
-    freqs = np.linspace(freqmin, freqmax, nfreq)
-    tarr = np.linspace(tmin, tmax, ntime)
-    fig, axs = plt.subplots(2, 2, figsize=(18,12))#, constrained_layout=True)
-    
-    #dynamic spectrum
-    extentft=[tmin,tmax,freqmin,freqmax]
-    axs[0][0].imshow(dataft, aspect='auto',extent=extentft, interpolation='nearest')
-    DM0_delays = xminplot + dm * 4.15E6 * (freqmin**-2 - freqs**-2)
-    axs[0][0].plot(DM0_delays, freqs, c='r', lw='2', alpha=0.35)
-    axs[0][0].set_xlim(xminplot,xmaxplot)
-    axs[0][0].set_xlabel('Time (ms)')
-    axs[0][0].set_ylabel('Freq (MHz)')
-
-    #DM transform
-    extentdm=[tmin, tmax, dm_min, dm_max]
-    axs[0][1].imshow(datadmt[::-1], aspect='auto',extent=extentdm)
-    axs[0][1].set_xlim(xminplot,xmaxplot)
-    axs[0][1].set_xlabel('Time (ms)')
-    axs[0][1].set_ylabel(r'DM (pc cm$^{-3}$)')
-
-    #Power vs time
-    axs[1][0].plot(tarr, datats)
-    axs[1][0].grid('on', alpha=0.25)
-    axs[1][0].set_xlabel('Time (ms)')
-    axs[1][0].set_ylabel(r'Power ($\sigma$)')
-    axs[1][0].set_xlim(xminplot,xmaxplot)
-    axs[1][0].text(0.51*(xminplot+xmaxplot), 0.5*(max(datats)+np.median(datats)),
-            'Heimdall S/N : %0.1f\nHeimdall DM : %d\
-            \nHeimdall ibox : %d\nibeam : %d' % (heimsnr,dm,ibox,ibeam),
-            fontsize=24, verticalalignment='center')
-
-    #Intensity vs time
-    datadm0 -= np.median(datadm0.mean(0))
-    datadm0_sigmas = datadm0.mean(0)/np.std(datadm0.mean(0)[-500:])
-    snr_dm0ts_iBeam = np.max(datadm0_sigmas)
-    axs[1][1].plot(np.linspace(0, tmax, len(datadm0[0])), datadm0_sigmas, c='k')
-    classification_dict['snr_dm0_ibeam'] = snr_dm0ts_iBeam
-    axs[1][1].set_xlabel('Time (ms)')
-    axs[1][1].set_ylabel(r'Power ($\sigma$)')
-    axs[1][1].legend(['DM=0 Timestream'], loc=2, fontsize=24)
-    fig.suptitle(suptitle, color='C1',fontsize=24)
-    if figname is not None:
-        plt.savefig(figname)
-    if showplot:
-        plt.show()
-    else:
-        plt.close()
-    return
 
 NOFFDEF = 2000
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,savesessionbutton,restoresessionbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -899,6 +826,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['DEC'] = FRB_DEC[FRB_IDS.index(state_dict['ids'])]
     state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
     state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
+    state_dict['DM'] = state_dict['DM0'] + state_dict['dDM']
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
     state_dict['buff'] = [buff_L_slider_init.value,buff_R_slider_init.value]
     state_dict['width_native'] = 2**logibox_slider.value
@@ -920,6 +848,17 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     #find beamforming weights date
     state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
 
+
+    #if save/restore session button clicked
+    if savesessionbutton.clicked:
+        savestate(Time.now())
+
+    if restoresessionbutton.clicked:
+        try:
+            restorestate()
+        except OSError as ex:
+            print("No cached state available")
+
     #if update button is clicked, refresh FRB data from csv
     if updatebutton.clicked:
         update_FRB_params()
@@ -931,16 +870,16 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         if polcalloadbutton.value and (polcals_available > 0):
             fixchansfile = state_dict['datadir'] + '/badchans.npy'
             sub_offpulse_mean = False
-            suff = "_dev_polcal"
+            state_dict['suff'] = "_dev_polcal"
             fixchansfile_overwrite = False
         else:
             fixchansfile = ''
             sub_offpulse_mean = True
-            suff = "_dev"
+            state_dict['suff'] = "_dev"
             fixchansfile_overwrite = True
             if polcalloadbutton.value: 
                 print("Pre-Calibrated Data Not Available, Loading Uncalibrated Stokes Parameters")
-        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + suff,5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=sub_offpulse_mean,fixchans=True,verbose=False,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
+        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + state_dict['suff'],5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=sub_offpulse_mean,fixchans=True,verbose=False,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
         
         #mask bad channels if not masked already
         """if len(badchans) > 0:
@@ -956,13 +895,20 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_Q'] = Q
         state_dict['base_U'] = U
         state_dict['base_V'] = V
-        state_dict['fobj'] = fobj
+        state_dict['tsamp'] = fobj.header.tsamp
+        #state_dict['fobj'] = fobj
         state_dict['base_freq_test'] = freq_test
         state_dict['base_wav_test'] = wav_test
         state_dict['base_time_axis'] = np.arange(I.shape[1])*32.7*state_dict['base_n_t']
         state_dict['badchans'] = badchans
 
         if polcalloadbutton.value and (polcals_available > 0):
+
+            #save calibrated dyn spectra
+            state_dict['base_Ical'] = copy.deepcopy(state_dict['base_I'])
+            state_dict['base_Qcal'] = copy.deepcopy(state_dict['base_Q'])
+            state_dict['base_Ucal'] = copy.deepcopy(state_dict['base_U'])
+            state_dict['base_Vcal'] = copy.deepcopy(state_dict['base_V'])
 
             #get downsampled versions
             state_dict['I'] = dsapol.avg_time(state_dict['base_I'],state_dict['rel_n_t'])
@@ -987,24 +933,29 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
 
             #get time series
-            (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+            (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
 
             state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
             state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
             state_dict['U_tcalRM'] = copy.deepcopy(state_dict['U_tcal'])
             state_dict['V_tcalRM'] = copy.deepcopy(state_dict['V_tcal'])
 
+            state_dict['I_t'] = copy.deepcopy(state_dict['I_tcal'])
+            state_dict['Q_t'] = copy.deepcopy(state_dict['Q_tcal'])
+            state_dict['U_t'] = copy.deepcopy(state_dict['U_tcal'])
+            state_dict['V_t'] = copy.deepcopy(state_dict['V_tcal'])
+
             state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
 
             #get timestart, timestop
-            (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+            (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['tsamp'],n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
             #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
-            (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+            (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
                                                         n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['buff'],weighted=False,
-                                                        fobj=state_dict['fobj'])
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
 
             state_dict['I_fcalRM_unweighted'] = copy.deepcopy(state_dict['I_fcal_unweighted'])
             state_dict['Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['Q_fcal_unweighted'])
@@ -1063,7 +1014,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             state_dict['gall'] = c.galactic.l.value
             state_dict['galb'] = c.galactic.b.value
             
-            custom_filplot(filname[0],
+            cfpf.custom_filplot(filname[0],
                                 state_dict['DM0'],
                                 state_dict['width_native'],
                                 multibeam=None,
@@ -1136,19 +1087,19 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     state_dict['V'] = dedisp.dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
 
     #get time series
-    (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+    (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
     state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_t']))
 
     #get timestart, timestop
-    (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+    (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['tsamp'],n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
 
     #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
-    (state_dict['I_f_unweighted'],state_dict['Q_f_unweighted'],state_dict['U_f_unweighted'],state_dict['V_f_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+    (state_dict['I_f_unweighted'],state_dict['Q_f_unweighted'],state_dict['U_f_unweighted'],state_dict['V_f_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
                                                         n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['buff'],weighted=False,
-                                                        fobj=state_dict['fobj'])
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
 
 
     #display dynamic spectrum
@@ -1179,7 +1130,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
             print("Saved Figure to h23:" + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_DMplot_PARSEC.pdf")
         except Exception as ex:
             print("Save Failed: " + str(ex))
-    plt.show(fig)
+    plt.show()
 
 
     if DMdonebutton.clicked:# and (state_dict['dDM'] != 0):
@@ -1284,7 +1235,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         print("done calibrating...",file=f)
 
         #parallactic angle calibration
-        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['fobj'],state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
         ParA_display.data = np.around(state_dict['ParA']*180/np.pi,2)
         print("done ParA calibrating...",file=f)
         #get downsampled versions
@@ -1307,7 +1258,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         print("done downsampling...",file=f)
         f.close()
         #get time series
-        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
 
         state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
         state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
@@ -1317,15 +1268,15 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
 
         #get timestart, timestop
-        (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['fobj'].header.tsamp,n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+        (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['tsamp'],n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
 
 
         #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
-        (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+        (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
                                                         n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['buff'],weighted=False,
-                                                        fobj=state_dict['fobj'])
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil")) 
 
         state_dict['I_fcalRM_unweighted'] = copy.deepcopy(state_dict['I_fcal_unweighted'])
         state_dict['Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['Q_fcal_unweighted'])
@@ -1783,32 +1734,33 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     (state_dict['comps'][state_dict['current_comp']]['peak'],
     state_dict['comps'][state_dict['current_comp']]['timestart'],
     state_dict['comps'][state_dict['current_comp']]['timestop']) = dsapol.find_peak(Ip,state_dict['comps'][state_dict['current_comp']]['width_native'],
-                                                                                    state_dict['fobj'].header.tsamp,n_t=state_dict['n_t'],
+                                                                                    state_dict['tsamp'],n_t=state_dict['n_t'],
                                                                                     peak_range=None,pre_calc_tf=False,
                                                                                     buff=state_dict['comps'][state_dict['current_comp']]['buff'])
     state_dict['comps'][state_dict['current_comp']]['left_lim'] = np.argmin(np.abs(state_dict['time_axis']*1e-3 - (state_dict['comps'][state_dict['current_comp']]['timestart']*state_dict['n_t']*32.7e-3 - state_dict['window']*state_dict['n_t']*32.7e-3 + comprange_slider.value[0])))
     state_dict['comps'][state_dict['current_comp']]['right_lim'] = np.argmin(np.abs(state_dict['time_axis']*1e-3 - (state_dict['comps'][state_dict['current_comp']]['timestart']*state_dict['n_t']*32.7e-3 - state_dict['window']*state_dict['n_t']*32.7e-3 + comprange_slider.value[1])))
 
     (I_tcal,Q_tcal,U_tcal,V_tcal) = dsapol.get_stokes_vs_time(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],
-                                                state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),
+                                                state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),
                                                 plot=False,show=False,normalize=True,buff=state_dict['comps'][state_dict['current_comp']]['buff'],window=30)
 
     state_dict['comps'][state_dict['current_comp']]['weights'] = dsapol.get_weights_1D(I_tcal,Q_tcal,U_tcal,V_tcal,
                                                                                 state_dict['comps'][state_dict['current_comp']]['timestart'],
                                                                                 state_dict['comps'][state_dict['current_comp']]['timestop'],
                                                                                 state_dict['comps'][state_dict['current_comp']]['width_native'],
-                                                                                state_dict['fobj'].header.tsamp,1,state_dict['n_t'],
-                                                                                state_dict['freq_test'],state_dict['time_axis'],state_dict['fobj'],
+                                                                                state_dict['tsamp'],1,state_dict['n_t'],
+                                                                                state_dict['freq_test'],state_dict['time_axis'],
+                                                                                FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),
                                                                                 n_off=int(NOFFDEF//state_dict['n_t']),buff=state_dict['buff'],
                                                                                 n_t_weight=state_dict['comps'][state_dict['current_comp']]['avger_w'],
                                                                 sf_window_weights=state_dict['comps'][state_dict['current_comp']]['sf_window_weights'],
                                                                 padded=True,norm=False)
 
     #get calibrated WEIGHTED spectra
-    (state_dict['comps'][state_dict['current_comp']]['I_fcal'],state_dict['comps'][state_dict['current_comp']]['Q_fcal'],state_dict['comps'][state_dict['current_comp']]['U_fcal'],state_dict['comps'][state_dict['current_comp']]['V_fcal']) = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],state_dict['fobj'].header.tsamp,
+    (state_dict['comps'][state_dict['current_comp']]['I_fcal'],state_dict['comps'][state_dict['current_comp']]['Q_fcal'],state_dict['comps'][state_dict['current_comp']]['U_fcal'],state_dict['comps'][state_dict['current_comp']]['V_fcal']) = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],state_dict['tsamp'],
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['comps'][state_dict['current_comp']]['buff'],weighted=True,input_weights=state_dict['comps'][state_dict['current_comp']]['weights'],
-                                                        fobj=state_dict['fobj'])
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
     state_dict['comps'][state_dict['current_comp']]['I_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['I_fcal'])
     state_dict['comps'][state_dict['current_comp']]['Q_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['Q_fcal'])
     state_dict['comps'][state_dict['current_comp']]['U_fcalRM'] = copy.deepcopy(state_dict['comps'][state_dict['current_comp']]['U_fcal'])
@@ -1974,10 +1926,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['intRbuffer'] = 0
 
         #get spectrum
-        (state_dict['I_fcal'],state_dict['Q_fcal'],state_dict['U_fcal'],state_dict['V_fcal']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
+        (state_dict['I_fcal'],state_dict['Q_fcal'],state_dict['U_fcal'],state_dict['V_fcal']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
                                                         normalize=True,buff=state_dict['buff'],weighted=True,input_weights=state_dict['weights'],
-                                                        fobj=state_dict['fobj'])
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
         state_dict['I_fcalRM'] = copy.deepcopy(state_dict['I_fcal'])
         state_dict['Q_fcalRM'] = copy.deepcopy(state_dict['Q_fcal'])
         state_dict['U_fcalRM'] = copy.deepcopy(state_dict['U_fcal'])
@@ -2045,10 +1997,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                                                 state_dict['base_Q_unnormalized'],
                                                                                 state_dict['base_U_unnormalized'],
                                                                                 state_dict['base_V_unnormalized'],
-                                                                                state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],
+                                                                                state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_f'],
                                                                                 state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),
                                                                                 plot=False,show=False,normalize=False,buff=state_dict['buff'],
-                                                                                weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+                                                                                weighted=True,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),input_weights=state_dict['weights'])
         state_dict['base_Ical_f_unnormalized_errs'] = np.nanstd(state_dict['base_Ical_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
         state_dict['base_Qcal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Qcal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
         state_dict['base_Ucal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Ucal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
@@ -2254,7 +2206,8 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_
             acf = acf[~np.isnan(acf)]
             lags = lags[~np.isnan(lags)]
             # Set up the fit of a Lorentzian function to the ACF
-            gmodel = Model(lambda x, gamma1,m1,c: np.nan_to_num(scint.lorentz(x,gamma1,m1,c)),independent_vars=['x'],nan_policy='omit')
+            #gmodel = Model(lambda x, gamma1,m1,c: np.nan_to_num(scint.lorentz(x,gamma1,m1,c)),independent_vars=['x'],nan_policy='omit')
+            gmodel = Model(scint.lorentz,independent_vars=['x'],nan_policy='omit')
             acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
             lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
 
@@ -2385,7 +2338,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         Qp = ma(Qp,mask)
                         Up = ma(Up,mask)
                         Vp = ma(Vp,mask)
-                If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['comps'][i]['buff'],weighted=True,n_t_weight=state_dict['comps'][i]['avger_w'],timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],sf_window_weights=state_dict['comps'][i]['sf_window_weights'],input_weights=state_dict['comps'][i]['weights'])
+                If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['comps'][i]['buff'],weighted=True,n_t_weight=state_dict['comps'][i]['avger_w'],timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),sf_window_weights=state_dict['comps'][i]['sf_window_weights'],input_weights=state_dict['comps'][i]['weights'])
                 
                 #STAGE 1: RM-TOOLS
                 if useRMTools.value: #STAGE 1: RM-TOOLS
@@ -2418,7 +2371,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
         elif rmcomp_menu.value == 'All':
-            If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+            If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),input_weights=state_dict['weights'])
         
             #STAGE 1: RM-TOOLS (Full burst)
             if useRMTools.value: 
@@ -2489,7 +2442,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         Qp = ma(Qp,mask)
                         Up = ma(Up,mask)
                         Vp = ma(Vp,mask)
-                If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['comps'][i]['buff'],weighted=True,n_t_weight=state_dict['comps'][i]['avger_w'],timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],sf_window_weights=state_dict['comps'][i]['sf_window_weights'],input_weights=state_dict['comps'][i]['weights'])
+                If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip,Qp,Up,Vp,state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['comps'][i]['buff'],weighted=True,n_t_weight=state_dict['comps'][i]['avger_w'],timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),sf_window_weights=state_dict['comps'][i]['sf_window_weights'],input_weights=state_dict['comps'][i]['weights'])
 
                 #STAGE 1: RM-TOOLS
                 if useRMTools.value: #STAGE 1: RM-TOOLS
@@ -2523,9 +2476,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
                     if RMsynthbackground.value:
-                        state_dict['comps'][i]["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'],background=True)
+                        state_dict['comps'][i]["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'],background=True)
                     else:
-                        RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
+                        RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
                         state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                         state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
                         state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
@@ -2540,7 +2493,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             elif ~np.isnan(state_dict["RMcalibrated"]["RM1"][0]): RMcenter = state_dict["RMcalibrated"]["RM1"][0]
             else: RMcenter = state_dict["RMcalibrated"]["RM_tools"][0]
             
-            If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=state_dict['fobj'],input_weights=state_dict['weights'])
+            If,Qf,Uf,Vf = dsapol.get_stokes_vs_freq(Ip_full,Qp_full,Up_full,Vp_full,state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_f'],state_dict['n_t'],state_dict['base_freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],weighted=True,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),input_weights=state_dict['weights'])
 
             #STAGE 1: RM-TOOLS (Full burst)
             if useRMTools.value:
@@ -2571,9 +2524,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 n_off = int(NOFFDEF/state_dict['n_t'])
 
                 if RMsynthbackground.value:
-                    state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'],background=True)
+                    state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'],background=True)
                 else:
-                    RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
+                    RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
                     state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                     state_dict['RMcalibrated']['RMerrfit'] = RMerr2
                     state_dict['RMcalibrated']['RMFWHM'] = upp-low
@@ -2759,7 +2712,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
                                                                                                         RM,0,state_dict['freq_test'],
                                                                                                         stokes=True) #total derotation
 
-        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
 
 
 
@@ -2789,7 +2742,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
 
         show_calibrated = ~np.isnan(state_dict['RMcalibrated']['RMcal'])
 
-        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
 
         RMcal.plot_RM_2D(state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],int(NOFFDEF/state_dict['n_t']),state_dict['n_t'],state_dict['time_axis'],state_dict['timestart'],state_dict['timestop'],state_dict['RMcalibrated']['RM2'][0],state_dict['RMcalibrated']['RM2'][1],state_dict['RMcalibrated']['trial_RM2'],state_dict['RMcalibrated']['SNRs_full'],Qnoise=np.std(state_dict['Qcal'].mean(0)[:int(NOFFDEF/state_dict['n_t'])]),show_calibrated=show_calibrated,RMcal=state_dict['RMcalibrated']['RMcal'],RMcalerr=state_dict['RMcalibrated']['RMcalerr'],I_tcal_trm=state_dict['I_tcalRM'],Q_tcal_trm=state_dict['Q_tcalRM'],U_tcal_trm=state_dict['U_tcalRM'],V_tcal_trm=state_dict['V_tcalRM'],wind=state_dict['window']*32.7*state_dict['n_t']*1e-3)#,rmbuff=500,cmapname='viridis',wind=5)
 
@@ -2882,10 +2835,11 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
              PA_f_errs,
              PA_t_errs,
              state_dict['comps'][i]['avg_PA'],
-             state_dict['comps'][i]['PA_err']) = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,
+             state_dict['comps'][i]['PA_err']) = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['tsamp'],
                                                                     state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),
                                                                     normalize=True,buff=state_dict['comps'][i]['buff'],weighted=weighted,input_weights=weights_use,
-                                                                    fobj=state_dict['fobj'],intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
+                                                                    fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),
+                                                                    intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
                                                                     intR=state_dict['comps'][i]['intR']+state_dict['comps'][i]['intRbuffer'])
 
 
@@ -2893,11 +2847,12 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
             [(pol_f,pol_t,avg,sigma_frac,snr_frac),
             (L_f,L_t,avg_L,sigma_L,snr_L),
             (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
-            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['fobj'].header.tsamp,
+            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['tsamp'],
                                                                     state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
                                                                     n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
                                                                     buff=state_dict['comps'][i]['buff'],full=False,weighted=weighted,input_weights=weights_use,
-                                                                    fobj=state_dict['fobj'],intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
+                                                                    fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),
+                                                                    intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
                                                                     intR=state_dict['comps'][i]['intR']+state_dict['comps'][i]['intRbuffer'])
 
             state_dict['comps'][i]['Tpol'] = avg
@@ -2963,15 +2918,15 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
         
     
     #compute PA for full burst
-    state_dict['PA_f'],state_dict['PA_t'],state_dict['PA_f_errs'],state_dict['PA_t_errs'],state_dict['avg_PA'],state_dict['PA_err'] = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=state_dict['fobj'],intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
+    state_dict['PA_f'],state_dict['PA_t'],state_dict['PA_f_errs'],state_dict['PA_t_errs'],state_dict['avg_PA'],state_dict['PA_err'] = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
 
 
 
     #compute frequency spectrum
-    (I_fuse,Q_fuse,U_fuse,V_fuse) = dsapol.get_stokes_vs_freq(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,
+    (I_fuse,Q_fuse,U_fuse,V_fuse) = dsapol.get_stokes_vs_freq(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['tsamp'],
                                                         state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],n_off=n_off,plot=False,
                                                         normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,
-                                                        fobj=state_dict['fobj'])
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
     state_dict['I_f'],state_dict['Q_f'],state_dict['U_f'],state_dict['V_f'] = (I_fuse,Q_fuse,U_fuse,V_fuse)
     
 
@@ -2979,11 +2934,12 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     [(pol_f,pol_t,avg,sigma_frac,snr_frac),
             (L_f,L_t,avg_L,sigma_L,snr_L),
             (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
-            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['fobj'].header.tsamp,
+            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['tsamp'],
                                                                     state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
                                                                     n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
                                                                     buff=state_dict['buff'],full=False,weighted=weighted,input_weights=weights_use,
-                                                                    fobj=state_dict['fobj'],intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
+                                                                    fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),
+                                                                    intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
 
 
     #update state dict
@@ -3389,7 +3345,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
         polspec_archive_df.write_FITS(state_dict['Level3Dir'] + state_dict['ids'] + "_PolSpectra.fits",overwrite=True) 
         print("Saved RMtable and PolSpectra to h23:" + state_dict['Level3Dir'])
         if 'base_Ical' in state_dict.keys():
-            dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),state_dict['fobj'],state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
+            dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
     
             print("Saved Pol Calibrated Filterbanks to h23:" + state_dict['Level3Dir'])
     
@@ -3580,4 +3536,110 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
 
 
     update_wdict([notesinput],["notesinput"],param="value")
+    return
+
+
+def savestate(tsave):
+    f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','wb')
+    pkl.dump({"cache_time":tsave.isot},f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','wb')
+    pkl.dump(state_dict,f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/wdict.pkl','wb')
+    pkl.dump(wdict,f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/polcal_dict.pkl','wb')
+    pkl.dump(polcal_dict,f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/RMcaldict.pkl','wb')
+    pkl.dump(RMcaldict,f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/df.pkl','wb')
+    df.to_pickle(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/df_polcal.pkl','wb')
+    df_polcal.to_pickle(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/df_beams.pkl','wb')
+    df_beams.to_pickle(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/df_scint.pkl','wb')
+    df_scint.to_pickle(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/RMdf.pkl','wb')
+    RMdf.to_pickle(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/poldf.pkl','wb')
+    poldf.to_pickle(f)
+    f.close()
+
+
+    RMtable_archive_df.write_tsv(dirs['cwd'] + '/interface/.current_state/RMtable_archive_df.tsv',overwrite=True)
+
+    polspec_archive_df.write_FITS(dirs['cwd'] + '/interface/.current_state/polspec_archive_df.fits',overwrite=True)
+
+    return
+
+
+def restorestate():
+    f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','rb')
+    print("Restoring session from " + str(pkl.load(f)['cache_time']))
+    f.close()
+
+
+
+    f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','rb')
+    state_dict = pkl.load(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/wdict.pkl','rb')
+    wdict = pkl.load(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/polcal_dict.pkl','rb')
+    polcal_dict = pkl.load(f)
+    f.close()
+    
+    f = open(dirs['cwd'] + '/interface/.current_state/RMcaldict.pkl','rb')
+    RMcaldict = pkl.load(f)
+    f.close()
+    
+    f = open(dirs['cwd'] + '/interface/.current_state/df.pkl','rb')
+    df = pd.read_pickle(f)
+    f.close()
+    
+    f = open(dirs['cwd'] + '/interface/.current_state/df_polcal.pkl','rb')
+    df_polcal = pd.read_pickle(f)
+    f.close()
+    
+    f = open(dirs['cwd'] + '/interface/.current_state/df_beams.pkl','rb')
+    df_beams = pd.read_pickle(f)
+    f.close()
+    
+    f = open(dirs['cwd'] + '/interface/.current_state/df_scint.pkl','rb')
+    df_scint = pd.read_pickle(f)
+    f.close()
+    
+    f = open(dirs['cwd'] + '/interface/.current_state/RMdf.pkl','rb')
+    RMdf = pd.read_pickle(f)
+    f.close()
+
+    f = open(dirs['cwd'] + '/interface/.current_state/poldf.pkl','rb')
+    poldf = pd.read_pickle(f)
+    f.close()
+
+    RMtable_archive_df = rmtable.RMTable.read_tsv(dirs['cwd'] + '/interface/.current_state/RMtable_archive_df.tsv')
+    polspec_archive_df.read_FITS(dirs['cwd'] + '/interface/.current_state/polspec_archive_df.fits')
+
     return
