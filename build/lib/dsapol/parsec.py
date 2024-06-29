@@ -209,7 +209,6 @@ General Layout:
 """
 
 # default values for state and polcal dicts and dataframe tables
-global state_dict 
 state_dict = dict()
 ##state_dict['current_state'] = 0
 state_map = {'load':0,
@@ -334,7 +333,6 @@ state_dict['Tclass'] = ""
 state_dict['Lclass'] = ""
 state_dict['Vclass'] = ""
 
-global df 
 df = pd.DataFrame(
     {
         r'${\rm buff}_{L}$': [np.nan],
@@ -363,7 +361,6 @@ corrarray = ["corr03",
                "corr19", 
                "corr21", 
                "corr22"]
-global df_polcal 
 df_polcal = pd.DataFrame(
     {
         r'3C48': [],#*len(corrarray),
@@ -373,7 +370,6 @@ df_polcal = pd.DataFrame(
     },
         index=[]#copy.deepcopy(corrarray)
     )
-global polcal_dict 
 polcal_dict = dict()
 polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
 #populate w/ calibrator files
@@ -399,7 +395,6 @@ for k in mapping3C48_init.keys():
     polcal_dict[str(k)]['3C286'] = mapping3C286_init[k]
     polcal_dict[str(k)]['3C48_bfweights'] = bfweights3C48
     polcal_dict[str(k)]['3C286_bfweights'] = bfweights3C286
-global df_beams 
 df_beams = pd.DataFrame(
         {r'beam':[],
             r'mjd':[],
@@ -409,7 +404,6 @@ df_beams = pd.DataFrame(
 
 
 #table for scintillation bw fit values
-global df_scint 
 df_scint = pd.DataFrame(
     {
         r'$\gamma$': [np.nan],#*len(corrarray),
@@ -463,7 +457,6 @@ polcalfiles = [polcalfiles[i][polcalfiles[i].index('POLCAL'):] for i in range(le
 
 
 
-global wdict 
 wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##################
          'frbfiles_menu':frbfiles[0],
          'base_n_t_slider':1,
@@ -588,7 +581,6 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
 
 
 #create a mapping system for possible RMs to calibrate with
-global RMcaldict 
 RMcaldict= {
         'RM-Tools':{
             'coarse':{
@@ -614,7 +606,6 @@ RMcaldict= {
                 'Error':np.nan}}
             }
 
-global RMdf 
 RMdf = pd.DataFrame(
     {
         'RM-Tools': [np.nan],
@@ -627,7 +618,6 @@ RMdf = pd.DataFrame(
         index=['All']
     )
 
-global poldf 
 poldf = pd.DataFrame(
         {
             'S/N': [np.nan],
@@ -710,9 +700,7 @@ state_dict['RMcalibrated']['RMFWHM'] = np.nan
 
 
 #archive dict
-global RMtable_archive_df 
 RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
-global polspec_archive_df 
 polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
 def update_wdict(objects,labels,param='value'):
     """
@@ -811,9 +799,27 @@ class StopExecution(Exception):
 """
 Load data state
 """
+def restore_screen(savesessionbutton,restoresessionbutton):
+    #if save/restore session button clicked
+    if savesessionbutton.clicked:
+        savestate(Time.now())
+
+    if restoresessionbutton.clicked:
+        try:
+            restorestate()
+        except OSError as ex:
+            print("No cached state available")
+    
+    if len(glob.glob(dirs['cwd'] + '/interface/.current_state/cache_time.pkl')) > 0:
+        f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','rb')
+        cache = pkl.load(f)
+        f.close()
+        return "Cached Session: " + str(cache['frb']) + " (" + str(cache['cache_time']) + ")"
+    else:
+        return "Cached Session: None"
 
 NOFFDEF = 2000
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,savesessionbutton,restoresessionbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -848,16 +854,6 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     #find beamforming weights date
     state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
 
-
-    #if save/restore session button clicked
-    if savesessionbutton.clicked:
-        savestate(Time.now())
-
-    if restoresessionbutton.clicked:
-        try:
-            restorestate()
-        except OSError as ex:
-            print("No cached state available")
 
     #if update button is clicked, refresh FRB data from csv
     if updatebutton.clicked:
@@ -2024,7 +2020,14 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess,sigma_guess,tau_guess,amp_guess):
+def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess,sigma_guess,tau_guess,amp_guess,guess_button):
+
+    #added a button to guess initial params from component info
+    if guess_button.clicked:
+        wdict['x0_guess'] = state_dict['peak']*32.7e-3
+        wdict['sigma_guess'] = state_dict['FWHM']*32.7e-3
+        wdict['tau_guess'] = (state_dict['intR'] - state_dict['peak'])*32.7e-3
+        wdict['amp_guess'] = state_dict['I_tcal'][int(state_dict['peak'])]
 
     #plot components and initial fits
     g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
@@ -3541,7 +3544,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
 
 def savestate(tsave):
     f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','wb')
-    pkl.dump({"cache_time":tsave.isot},f)
+    pkl.dump({"cache_time":tsave.isot,"frb":state_dict['ids']+"_"+state_dict['nickname']},f)
     f.close()
 
     f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','wb')
@@ -3593,8 +3596,23 @@ def savestate(tsave):
 
 
 def restorestate():
+    global state_dict
+    global df
+    global df_polcal
+    global polcal_dict
+    global df_beams
+    global df_scint
+    global wdict
+    global RMcaldict
+    global RMdf
+    global poldf
+    global RMtable_archive_df
+    global polspec_archive_df
+    
+    
     f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','rb')
-    print("Restoring session from " + str(pkl.load(f)['cache_time']))
+    cache = pkl.load(f)
+    print("Restoring session for FRB " + str(cache['frb']) + " from " + str(cache['cache_time']))
     f.close()
 
 
