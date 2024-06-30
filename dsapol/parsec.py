@@ -530,14 +530,38 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'Uflux_display':np.nan,
          'Vflux_display':np.nan,
 
-        'scattermenu':['All'],
-        'scattermenu_choices':['All'],
+        'scattermenu':['Component 0'],
+        'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
+        'scatter_init_all':False,
         'x0_guess':0.35e-3,
         'amp_guess':1,
         'sigma_guess':1,
         'tau_guess':1,
+        'x0_guess_0':0.35e-3,
+        'amp_guess_0':1,
+        'sigma_guess_0':1,
+        'tau_guess_0':1,
+        'x0_guess_1':0.35e-3,
+        'amp_guess_1':1,
+        'sigma_guess_1':1,
+        'tau_guess_1':1,
+        'x0_guess_2':0.35e-3,
+        'amp_guess_2':1,
+        'sigma_guess_2':1,
+        'tau_guess_2':1,
+        'x0_guess_3':0.35e-3,
+        'amp_guess_3':1,
+        'sigma_guess_3':1,
+        'tau_guess_3':1,
+        'x0_guess_4':0.35e-3,
+        'amp_guess_4':1,
+        'sigma_guess_4':1,
+        'tau_guess_4':1,
+
+        
+
 
         'scintmenu':'All',
         'scintmenu_choices':['All'],
@@ -713,6 +737,7 @@ def update_wdict(objects,labels,param='value'):
             wdict[labels[i]] = objects[i].value
         elif param == 'data':
             wdict[labels[i]] = objects[i].data
+    
     if 'DM_init_display' in labels:
         wdict['DM_input_display'] = wdict['DM_init_display']
         wdict['DM_new_display'] = wdict['DM_init_display'] + wdict['ddm_num']
@@ -767,10 +792,7 @@ def update_wdict(objects,labels,param='value'):
         wdict['rmcal_menu_choices'] = make_rmcal_menu_choices()
 
     #update scatter comps
-    if state_dict['n_comps'] > 1:
-        wdict['scattermenu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
-    else:
-        wdict['scattermenu_choices'] = ['All']
+    wdict['scattermenu_choices'] = ['Component ' + str(i) for i in range(state_dict['n_comps'])]
 
     #update scatter comps
     if state_dict['n_comps'] > 1:
@@ -1914,6 +1936,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         last = np.argmax(ts2)
         state_dict['timestart'] = ts1[first]
         state_dict['timestop'] = ts2[last]
+        state_dict['peak'] = np.argmax(np.nan_to_num(state_dict['I_tcal']))
         state_dict['buff'] = [b1[first],b2[last]]
         state_dict['intL'] = l1[first]
         state_dict['intR'] = l2[last]
@@ -1942,6 +1965,13 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
         #done with components, move to RM synth
         #state_dict['current_state'] += 1
+
+        #update scatter dict stuff?
+
+        #wdict['x0_guess'] = state_dict['peak']*32.7e-3
+        #wdict['sigma_guess'] = state_dict['FWHM']*32.7e-3
+        #wdict['tau_guess'] = (state_dict['intR'] - state_dict['peak'])*32.7e-3
+        #wdict['amp_guess'] = state_dict['I_tcal'][int(state_dict['peak'])]
 
     if fluxestbutton.clicked:
         #get the non-normalized IQUV so we can estimate total flux in Jy
@@ -2002,7 +2032,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['base_Ucal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Ucal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
         state_dict['base_Vcal_f_unnormalized_errs'] = np.nanstd(state_dict['base_Vcal_unnormalized'],axis=1)/state_dict['base_Ical_unnormalized'].shape[1]
 
-    #update widget dict
+
     update_wdict([logwindow_slider,logibox_slider,
                 buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
                 avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider],
@@ -2020,52 +2050,72 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess,sigma_guess,tau_guess,amp_guess,guess_button):
-
-    #added a button to guess initial params from component info
-    if guess_button.clicked:
-        wdict['x0_guess'] = state_dict['peak']*32.7e-3
-        wdict['sigma_guess'] = state_dict['FWHM']*32.7e-3
-        wdict['tau_guess'] = (state_dict['intR'] - state_dict['peak'])*32.7e-3
-        wdict['amp_guess'] = state_dict['I_tcal'][int(state_dict['peak'])]
+def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps):
 
     #plot components and initial fits
     g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
     fig = plt.figure(figsize=(18,12))
     ax1 = fig.add_subplot(g2[0,:])
-    if 'All' in scattermenu.value and ~np.all(np.isnan(state_dict['I_tcal'])):
-        ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Timeseries',where='post')
-        ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            scat.exp_gauss_1(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess.value, amp_guess.value, sigma_guess.value, tau_guess.value),color='purple',label='Initial Guess')
-        """elif 'All' not in scattermenu.value and state_dict['n_comps'] > 1:
-        Ip = copy.deepcopy(state_dict['Ical'])
-        mask = np.zeros(state_dict['Ical'].shape)
-        for k in range(state_dict['current_comp']):
+
+    #plot the full component
+    if ~np.all(np.isnan(state_dict['I_tcal'])):
+        c = ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Timeseries',where='post',alpha=0.25)
+    
+        #plot the selected components
+        I_tcal_p = copy.deepcopy(state_dict['I_tcal'])
+        time_axis_p = copy.deepcopy(state_dict['time_axis'])
+        mask = np.zeros(state_dict['I_tcal'].shape)
+        for k in range(state_dict['n_comps']):
             if 'Component ' + str(k) not in scattermenu.value:
                 #mask = np.zeros(state_dict['Ical'].shape)
-                mask[:,state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
-        Ip = ma(Ip,mask)"""
+                mask[state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
+        I_tcal_p = ma(I_tcal_p,mask)
+        time_axis_p = ma(time_axis_p,mask)
+        ax1.step(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c[0].get_color(),where='post',alpha=1)
+
+    
+        #plot initial guess
+        initial_fit_full = np.zeros(state_dict['I_tcal'].shape)
+        for k in range(state_dict['n_comps']):
+            
+            ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                scat.exp_gauss_1(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value),color='purple',alpha=0.25)
+
+            initial_fit_full += scat.exp_gauss_1(state_dict['time_axis']*1e-3,x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)
+        
+            #indicate proposed values
+            ax1.axvline(state_dict['comps'][k]['peak']*32.7e-3,color='purple',linestyle='--')
+            ax1.axvspan(state_dict['comps'][k]['intL']*32.7e-3,state_dict['comps'][k]['intR']*32.7e-3,color='purple',alpha=0.1)
+            ax1.text((state_dict['comps'][k]['peak'] + 5)*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
+                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3,
+                                                                                                        b=state_dict['comps'][k]['FWHM']*32.7e-3,
+                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
+                                                                                                        d=I_tcal_p[state_dict['comps'][k]['peak']]),
+                backgroundcolor='thistle',fontsize=18,wrap=True)
+
+        ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                initial_fit_full[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Guess')
+
+        
+        
+        ax1.set_ylim(-1,np.nanmax(state_dict['I_tcal']) + 10)
         ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     ax1.set_xlabel("Time (ms)")
     ax1.set_ylabel("S/N")
     ax1.set_xticks([])
     ax1.legend(loc='upper right')
-    
-
+    #plot residuals
     ax3 = fig.add_subplot(g2[1,:])#,sharex=ax1)
-    if 'All' in scattermenu.value and ~np.all(np.isnan(state_dict['I_tcal'])):
-        ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            scat.exp_gauss_1(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess.value, amp_guess.value, sigma_guess.value, tau_guess.value)-state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Residuals')
-        """elif 'All' not in scattermenu.value and state_dict['n_comps'] > 1:
-        Ip = copy.deepcopy(state_dict['Ical'])
-        mask = np.zeros(state_dict['Ical'].shape)
-        for k in range(state_dict['current_comp']):
-            if 'Component ' + str(k) not in scattermenu.value:
-                #mask = np.zeros(state_dict['Ical'].shape)
-                mask[:,state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
-        Ip = ma(Ip,mask)"""
+
+    if ~np.all(np.isnan(state_dict['I_tcal'])):
+
+        for k in range(state_dict['n_comps']):
+            ax3.plot(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                    scat.exp_gauss_1(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',alpha=0.25)
+        ax3.plot(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,(initial_fit_full-I_tcal_p)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Residuals',alpha=1)
         ax3.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     ax3.set_xlabel("Time (ms)")
@@ -2077,8 +2127,12 @@ def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_gu
 
 
     #update wdict
-    update_wdict([scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess,sigma_guess,tau_guess,amp_guess],
-            ['scattermenu','scatterLbuffer_slider','scatterRbuffer_slider','x0_guess','sigma_guess','tau_guess','amp_guess'])
+    update_wdict([scattermenu,scatterLbuffer_slider,scatterRbuffer_slider],
+            ['scattermenu','scatterLbuffer_slider','scatterRbuffer_slider'])
+    for i in range(len(x0_guess_comps)):
+        update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i]],
+                ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i)])
+
     return
 
 
