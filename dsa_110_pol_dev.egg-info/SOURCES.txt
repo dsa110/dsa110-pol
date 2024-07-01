@@ -59,6 +59,8 @@ interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V3-checkpoint.i
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
 interface/IONEXdata/COD0OPSFIN_20230660000_01D_01H_GIM.INX
 interface/IONEXdata/COD0OPSFIN_20240440000_01D_01H_GIM.INX
+interface/IONEXdata/CODG0210.22I
+interface/IONEXdata/CODG0380.22I
 interface/IONEXdata/CODG0780.22I
 interface/IONEXdata/CODG2430.22I
 interface/IONEXdata/CODG3050.22I

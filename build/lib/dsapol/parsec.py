@@ -558,6 +558,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'Vflux_display':np.nan,
 
         'scattermenu':['Component 0'],
+        'scatfitmenu':['LMFIT Non-Linear Least Squares'],
+        'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares'],
         'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
@@ -593,8 +595,9 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scintmenu':'All',
         'scintmenu_choices':['All'],
         'scint_fit_range':1,
-
-        'gamma_guess':10e6, 
+        'scintfitmenu':['LMFIT Non-Linear Least Squares'],
+        'scintfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares'],
+        'gamma_guess':10, 
         'm_guess':1,
         'c_guess':0,
 
@@ -2093,7 +2096,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps):
 
     #plot components and initial fits
     g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
@@ -2170,8 +2173,8 @@ def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_gu
 
 
     #update wdict
-    update_wdict([scattermenu,scatterLbuffer_slider,scatterRbuffer_slider],
-            ['scattermenu','scatterLbuffer_slider','scatterRbuffer_slider'])
+    update_wdict([scattermenu,scatfitmenu],
+            ['scattermenu','scatfitmenu'])
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i]],
                 ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i)])
@@ -2179,9 +2182,9 @@ def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_gu
     return
 
 
-def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range):
+def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range):
     # Define frequency resolution (Hz)
-    f_res = state_dict['n_f']*state_dict['base_df'] #Hz
+    f_res = state_dict['n_f']*state_dict['base_df']/1E6 #MHz
 
 
     if ~np.all(np.isnan(state_dict['I_fcal'])):
@@ -2307,36 +2310,67 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_
             lags = lags[~np.isnan(lags)]
             # Set up the fit of a Lorentzian function to the ACF
             #gmodel = Model(lambda x, gamma1,m1,c: np.nan_to_num(scint.lorentz(x,gamma1,m1,c)),independent_vars=['x'],nan_policy='omit')
-            gmodel = Model(scint.lorentz,independent_vars=['x'],nan_policy='omit')
-            acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
-            lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+            
+            if scintfitmenu.value == 'LMFIT Non-Linear Least Squares':
+            
+                gmodel = Model(scint.lorentz,independent_vars=['x'],nan_policy='omit')
+                acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+                lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
 
-            # Execute the fit
-            result = gmodel.fit(acf_for_fit, x = lags_for_fit, 
-                                gamma1=Parameter(gamma_guess.value,min=1,max=50e6),
+                # Execute the fit
+                result = gmodel.fit(acf_for_fit, x = lags_for_fit, 
+                                gamma1=Parameter(gamma_guess.value,min=1,max=50),
                                 m1=Parameter(m_guess.value,min=0,max=1),
                                 c1=Parameter(c_guess.value,min=-1,max=1))#gamma1 = 10, m1 = 1, c = 0)
 
-            # Print or output the fit report for display
-            #print(result.fit_report())
+                # Print or output the fit report for display
+                #print(result.fit_report())
 
-            df_scint.loc[str(scintmenu.value)] = [result.params['gamma1'].value,
+                df_scint.loc[str(scintmenu.value)] = [result.params['gamma1'].value,
                                result.params['gamma1'].stderr,
                                result.params['m1'].value,
                                result.params['m1'].stderr,
                                result.params['c'].value,
                                result.params['c'].stderr]
-            if str(scintmenu.value) == 'All':
-                state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
-                state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
-                state_dict['c_best'] = [result.params['c'].value,result.params['c'].stderr]
-                state_dict['scint_residuals'] = state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0])
+                if str(scintmenu.value) == 'All':
+                    state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
+                    state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
+                    state_dict['c_best'] = [result.params['c'].value,result.params['c'].stderr]
+                    state_dict['scint_residuals'] = state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0])
+                else:
+                    i = int(scintmenu.value[-1])
+                    state_dict['comps'][i]['gamma_best'] = [result.params['comps'][i]['gamma1'].value,result.params['comps'][i]['gamma1'].stderr]
+                    state_dict['comps'][i]['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
+                    state_dict['comps'][i]['c_best'] = [result.params['c'].value,result.params['c'].stderr]
+                    state_dict['comps'][i]['scint_residuals'] = state_dict['comps'][i]['autocorr_I'] - scint.lorentz(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['gamma_best'][0],state_dict['comps'][i]['m_best'][0],state_dict['comps'][i]['c_best'][0])
+
+
             else:
-                i = int(scintmenu.value[-1])
-                state_dict['comps'][i]['gamma_best'] = [result.params['comps'][i]['gamma1'].value,result.params['comps'][i]['gamma1'].stderr]
-                state_dict['comps'][i]['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
-                state_dict['comps'][i]['c_best'] = [result.params['c'].value,result.params['c'].stderr]
-                state_dict['comps'][i]['scint_residuals'] = state_dict['comps'][i]['autocorr_I'] - scint.lorentz(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['gamma_best'][0],state_dict['comps'][i]['m_best'][0],state_dict['comps'][i]['c_best'][0])
+
+                acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+                lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+
+                popt,pcov = curve_fit(scint.lorentz,lags_for_fit,acf_for_fit,p0=[gamma_guess.value,m_guess.value,c_guess.value],nan_policy='omit')
+
+                df_scint.loc[str(scintmenu.value)] = [popt[0],
+                               np.sqrt(pcov[0,0]),
+                               popt[1],
+                               np.sqrt(pcov[1,1]),
+                               popt[2],
+                               np.sqrt(pcov[2,2])]
+
+
+                if str(scintmenu.value) == 'All':
+                    state_dict['gamma_best'] = [popt[0],np.sqrt(pcov[0,0])]
+                    state_dict['m_best'] = [popt[1],np.sqrt(pcov[1,1])]
+                    state_dict['c_best'] = [popt[2],np.sqrt(pcov[2,2])]
+                    state_dict['scint_residuals'] = state_dict['autocorr_I'] - scint.lorentz(state_dict['scint_lags'],state_dict['gamma_best'][0],state_dict['m_best'][0],state_dict['c_best'][0])
+                else:
+                    i = int(scintmenu.value[-1])
+                    state_dict['comps'][i]['gamma_best'] = [popt[0],np.sqrt(pcov[0,0])]
+                    state_dict['comps'][i]['m_best'] = [popt[1],np.sqrt(pcov[1,1])]
+                    state_dict['comps'][i]['c_best'] = [popt[2],np.sqrt(pcov[2,2])]                    
+                    state_dict['comps'][i]['scint_residuals'] = state_dict['comps'][i]['autocorr_I'] - scint.lorentz(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['gamma_best'][0],state_dict['comps'][i]['m_best'][0],state_dict['comps'][i]['c_best'][0])
 
     #plot the resulting fit
     if scintmenu.value == 'All' and 'gamma_best' in state_dict.keys():
@@ -2346,7 +2380,7 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_
         if 'gamma_best' in state_dict['comps'][i].keys():
             ax2.plot(state_dict['comps'][i]['scint_lags'],scint.lorentz(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['gamma_best'][0],state_dict['comps'][i]['m_best'][0],state_dict['comps'][i]['c_best'][0]),label='Least-Squares Fit',color='red')
     ax2.legend(loc='upper right')
-    ax2.axvspan(-scint_fit_range.value*1e6,scint_fit_range.value*1e6,color='red',alpha=0.2)
+    ax2.axvspan(-scint_fit_range.value,scint_fit_range.value,color='red',alpha=0.2)
     ax2.set_xticks([])
 
     #plot the residuals
@@ -2364,9 +2398,9 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_
             if 'gamma_best' in state_dict['comps'][i].keys():
                 ax3.plot(state_dict['comps'][i]['scint_lags'],state_dict['comps'][i]['scint_residuals'],label='LSF Residuals',color='red')
             ax3.set_xlim(np.min(state_dict['scint_lags']),np.max(state_dict['scint_lags']))
-    ax3.axvspan(-scint_fit_range.value*1e6,scint_fit_range.value*1e6,color='red',alpha=0.2)
+    ax3.axvspan(-scint_fit_range.value,scint_fit_range.value,color='red',alpha=0.2)
     ax3.axhline(0,linestyle='--',color='black')
-    ax3.set_xlabel("Lag (Hz)")
+    ax3.set_xlabel("Lag (MHz)")
     ax3.set_ylabel(r"$\Delta$")
     ax3.legend(loc='upper right')
 
@@ -2374,8 +2408,8 @@ def scint_screen(calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_
 
 
     #update wdict
-    update_wdict([gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range],
-            ['gamma_guess','m_guess','c_guess','scintmenu','scint_fit_range'])
+    update_wdict([gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range,scintfitmenu],
+            ['gamma_guess','m_guess','c_guess','scintmenu','scint_fit_range','scintfitmenu'])
 
     return
 """
