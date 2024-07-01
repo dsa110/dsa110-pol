@@ -8,6 +8,7 @@ from dsapol import dsapol
 from dsapol import rmtablefuncs 
 from dsapol import dedisp
 from dsapol import filt
+from dsapol import budget
 import numpy as np
 import matplotlib
 from matplotlib import pyplot as plt
@@ -136,6 +137,8 @@ FRB_z = []
 FRB_w = []
 FRB_BEAM = []
 FRB_IDS = []
+FRB_RM = []
+FRB_RMerr = []
 def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
     """
     This function updates the global FRB parameters from the provided file. File is a copy
@@ -194,6 +197,16 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
                     FRB_IDS.append(str(row[11]))
                 else:
                     FRB_IDS.append(-1)
+
+                if row[12] != "":
+                    FRB_RM.append(float(row[12]))
+                else:
+                    FRB_RM.append(np.nan)
+
+                if row[13] != "":
+                    FRB_RMerr.append(float(row[13]))
+                else:
+                    FRB_RMerr.append(np.nan)
     return
 update_FRB_params()
 
@@ -332,6 +345,18 @@ state_dict['Vsnr'] = np.nan
 state_dict['Tclass'] = ""
 state_dict['Lclass'] = ""
 state_dict['Vclass'] = ""
+state_dict['RM_gal'] = np.nan
+state_dict['RM_galerr'] = np.nan
+state_dict['RM_galRA'] = np.nan
+state_dict['RM_galDEC'] = np.nan
+state_dict['RM_ion'] = np.nan
+state_dict['RM_ionerr'] = np.nan
+state_dict['RM_ionRA'] = np.nan
+state_dict['RM_ionDEC'] = np.nan
+state_dict['RM_ionmjd'] = np.nan
+
+
+
 
 df = pd.DataFrame(
     {
@@ -433,6 +458,7 @@ DEC = FRB_DEC[FRB_IDS.index(ids)]
 ibeam = int(FRB_BEAM[FRB_IDS.index(ids)])
 mjd = FRB_mjd[FRB_IDS.index(ids)]
 DMinit = FRB_DM[FRB_IDS.index(ids)]
+zinit = FRB_z[FRB_IDS.index(ids)]
 RM_gal_init,RM_galerr_init = np.nan,np.nan#get_rm(radec=(RA,DEC),filename=repo_path + "/data/faraday2020v2.hdf5")
 RM_ion_init,RM_ionerr_init = np.nan,np.nan#RMcal.get_rm_ion(RA,DEC,mjd)
 
@@ -469,6 +495,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'ibeam_display':ibeam,
          'mjd_display':mjd,
          'DM_init_display':DMinit,
+         'z_display':zinit,
          'showlog':True,
          'polcalloadbutton':False,
 
@@ -594,6 +621,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'RMdisplay':np.nan,
         'RMerrdisplay':np.nan,
         'RMsynthbackground':False,
+        'trialz':-1,
+        'rmcal_input':0,
 
         'showghostPA':True,
         'intLbuffer_slider':0,
@@ -667,6 +696,8 @@ poldf = pd.DataFrame(
 
 def make_rmcal_menu_choices():
     choices = ["No RM Calibration"]
+    if  ~np.isnan(state_dict['RMinput']):
+        choices.append("Previous RM Estimate: " + str(np.around(state_dict['RMinput'],2)) + "+-" + str(np.around(state_dict['RMinputerr'],2)) + r'rad/m^2')
     for k in RMcaldict.keys():
         for j in RMcaldict[k].keys():
             if j in ['coarse','zoom']:
@@ -682,13 +713,18 @@ def make_rmcal_menu_choices():
                     choice = str(k) + ' ' + str(j) + ': ' + str(np.around(RMcaldict[k][j]['RM'],2)) + r'+-' + str(np.around(RMcaldict[k][j]['Error'],2)) + r'rad/m^2'
                     choices.append(choice)
                 else: continue
+    choices.append("Input RM (ENTER VALUE BELOW)")
 
     return choices
 
 
-def RM_from_menu(choice):
+def RM_from_menu(choice,rmcal_input):
     if choice == "No RM Calibration":
         return np.nan,np.nan
+    if 'Input RM' in choice:
+        return rmcal_input.value,np.nan
+    if 'Previous RM Estimate' in choice:
+        return state_dict['RMinput'],state_dict['RMinputerr']
     key1 = (choice[:8]).strip()
     if '[' in choice:
         key2 = (choice[choice.index('[')+1:choice.index(']')]).strip()
@@ -753,6 +789,7 @@ def update_wdict(objects,labels,param='value'):
         else:
             wdict['rmcomp_menu_choices'] = ['All','']
     if 'rmcal_menu' in labels:
+
         #update menu options and dict for All components
         if ~np.isnan(state_dict['RMcalibrated']['RM_tools'][0]):
             RMcaldict['RM-Tools']['coarse']['All Components']['RM'] = state_dict['RMcalibrated']['RM_tools'][0]
@@ -788,6 +825,8 @@ def update_wdict(objects,labels,param='value'):
                 if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RM2'][0]):
                     RMcaldict['2D-Synth']['Component '+str(i)]['RM'] = state_dict['comps'][i]['RMcalibrated']['RM2'][0]
                     RMcaldict['2D-Synth']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM2'][1]
+
+        
 
         wdict['rmcal_menu_choices'] = make_rmcal_menu_choices()
 
@@ -841,7 +880,7 @@ def restore_screen(savesessionbutton,restoresessionbutton):
         return "Cached Session: None"
 
 NOFFDEF = 2000
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,z_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -855,6 +894,9 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
     state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
     state_dict['DM'] = state_dict['DM0'] + state_dict['dDM']
+    state_dict['z'] = FRB_z[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RMinput'] = FRB_RM[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RMinputerr'] = FRB_RMerr[FRB_IDS.index(state_dict['ids'])]
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
     state_dict['buff'] = [buff_L_slider_init.value,buff_R_slider_init.value]
     state_dict['width_native'] = 2**logibox_slider.value
@@ -868,6 +910,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     ibeam_display.data = state_dict['ibeam']
     mjd_display.data = state_dict['mjd']
     DM_init_display.data = state_dict['DM0']
+    z_display.data = state_dict['z']
 
     #see if filterbanks exist
     state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
@@ -1058,8 +1101,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
                     ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
                     param='value')
-    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display],
-                    ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display"],
+    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,z_display],
+                    ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display","z_display"],
                     param='data')
     return im
     
@@ -2093,7 +2136,7 @@ def scatter_screen(scattermenu,scatterLbuffer_slider,scatterRbuffer_slider,x0_gu
                                                                                                         b=state_dict['comps'][k]['FWHM']*32.7e-3,
                                                                                                         c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
                                                                                                         d=I_tcal_p[state_dict['comps'][k]['peak']]),
-                backgroundcolor='thistle',fontsize=18,wrap=True)
+                backgroundcolor='thistle',fontsize=18)
 
         ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                 initial_fit_full[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Guess')
@@ -2348,17 +2391,22 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 param='value')
 
     #update RM displays
-    if getRMgal_button.clicked:
+    if state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC']:#getRMgal_button.clicked:
         state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=repo_path + "/data/faraday2020v2.hdf5")
         state_dict['RM_gal'] = np.around(state_dict['RM_gal'],2)
         state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],2)
+        state_dict['RM_galRA'] = state_dict['RA']
+        state_dict['RM_galDEC'] = state_dict['DEC']
         RM_gal_display.data = state_dict['RM_gal']
         RM_galerr_display.data = state_dict['RM_galerr']
     
-    if getRMion_button.clicked:
+    if state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd']:#getRMion_button.clicked:
         state_dict['RM_ion'],state_dict['RM_ionerr'] = RMcal.get_rm_ion(state_dict['RA'],state_dict['DEC'],state_dict['mjd'])
         state_dict['RM_ion'] = np.around(state_dict['RM_ion'],2)
         state_dict['RM_ionerr'] = np.around(state_dict['RM_ionerr'],2)
+        state_dict['RM_ionRA'] = state_dict['RA']
+        state_dict['RM_ionDEC'] = state_dict['DEC']
+        state_dict['RM_ionmjd'] = state_dict['mjd']
         RM_ion_display.data = state_dict['RM_ion']
         RM_ionerr_display.data = state_dict['RM_ionerr']
 
@@ -2744,7 +2792,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
 
 
-def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
+def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_input):
     
     #update rm cal menu
     update_wdict([rmcal_menu],['rmcal_menu'],param='value')
@@ -2804,14 +2852,81 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay):
         RMcal.plot_RM_2D(state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],int(NOFFDEF/state_dict['n_t']),state_dict['n_t'],state_dict['time_axis'],state_dict['timestart'],state_dict['timestop'],state_dict['RMcalibrated']['RM2'][0],state_dict['RMcalibrated']['RM2'][1],state_dict['RMcalibrated']['trial_RM2'],state_dict['RMcalibrated']['SNRs_full'],Qnoise=np.std(state_dict['Qcal'].mean(0)[:int(NOFFDEF/state_dict['n_t'])]),show_calibrated=show_calibrated,RMcal=state_dict['RMcalibrated']['RMcal'],RMcalerr=state_dict['RMcalibrated']['RMcalerr'],I_tcal_trm=state_dict['I_tcalRM'],Q_tcal_trm=state_dict['Q_tcalRM'],U_tcal_trm=state_dict['U_tcalRM'],V_tcal_trm=state_dict['V_tcalRM'],wind=state_dict['window']*32.7*state_dict['n_t']*1e-3)#,rmbuff=500,cmapname='viridis',wind=5)
 
     update_wdict([RMdisplay,RMerrdisplay],['RMdisplay','RMerrdisplay'],param='data')
-    update_wdict([rmcal_menu],['rmcal_menu'],param='value')    
+    update_wdict([rmcal_menu,rmcal_input],['rmcal_menu','rmcal_input'],param='value')    
     return
 
 
+#sub-screen to compute RM, DM, B field budget
+def DM_Budget_screen(trialz):
+        
+    #if redshift is known, compute DM host
+    if ~np.isnan(state_dict['z']) and ~np.isnan(state_dict['DM']) and trialz.value < 0:
+        ctest = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs') #SkyCoord('22h34m46.93s+70d32m18.40s',frame='icrs',unit=(u.hourangle,u.deg))
+        state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'] = budget.DM_host_limits(state_dict['DM'],state_dict['z'],ctest.galactic.l.value,ctest.galactic.b.value,plot=False)
+        state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],state_dict['z'],ctest.galactic.l.value,ctest.galactic.b.value,plot=True)
+    elif ~np.isnan(state_dict['DM']) and trialz.value >= 0:
+        ctest = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs') #SkyCoord('22h34m46.93s+70d32m18.40s',frame='icrs',unit=(u.hourangle,u.deg))
+        state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'] = budget.DM_host_limits(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=False)
+        state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=True)
+    
+    update_wdict([trialz],['trialz'],param='value')
 
 
+    return
 
 
+def RM_Budget_screen(trialz):
+
+    #if redshift is known, compute RM host
+    if ~np.isnan(state_dict['z']) and ~np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value < 0:
+        state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=False)
+        state_dict['rmdist'],state_dict['RMaxis'] = budget.RM_host_dist(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=True)
+    elif ~np.isnan(state_dict['z']) and np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RMinput']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value < 0:
+        state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=False)
+        state_dict['rmdist'],state_dict['RMaxis']  = budget.RM_host_dist(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=True)
+    
+    elif ~np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value >= 0:
+        state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=False)
+        state_dict['rmdist'],state_dict['RMaxis']  = budget.RM_host_dist(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True)
+    elif np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RMinput']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value >= 0:
+        state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=False)
+        state_dict['rmdist'],state_dict['RMaxis'] = budget.RM_host_dist(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
+                   RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True)
+    
+
+    update_wdict([trialz],['trialz'],param='value')
+
+
+    return
+
+
+def Bfield_Budget_screen():
+
+    #if redshfit, DM, RM are known, compute RM host
+    if ~np.isnan(state_dict['DMhost']) and ~np.isnan(state_dict['RMhost']):
+        state_dict['Bdist'],state_dict['Bhost'],state_dict['Bhost_lower_limit'],state_dict['Bhost_upper_limit'],state_dict['Baxis'] = budget.Bhost_dist(DMhost=state_dict['DMhost'],
+                                                                                                                                                    dmdist=state_dict['dmdist'],DMaxis=state_dict['DMaxis'],
+                                                                                                                                                    RMhost=state_dict['RMhost'],
+                                                                                                                                                    RMhosterr=(state_dict['RMhost_upper_limit']
+                                                                                                                                                            -state_dict['RMhost']),
+                                                                                                                                                    res2=500,plot=True,buff=5)
+
+    return
 
 def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu):
 
