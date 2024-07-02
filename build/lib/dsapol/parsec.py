@@ -94,7 +94,7 @@ import json
 f = open("directories.json","r")
 dirs = json.load(f)
 f.close()
-
+print("test change")
 """
 Factors for RM, pol stuff
 """
@@ -559,7 +559,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
 
         'scattermenu':['Component 0'],
         'scatfitmenu':['LMFIT Non-Linear Least Squares'],
-        'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares'],
+        'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares','Nested Sampling'],
         'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
@@ -1134,6 +1134,9 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
     state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
     state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(2**logn_f_slider.value),(2**logn_f_slider.value)).mean(1)]*4
+    state_dict['freq_min'] = np.nanmin(state_dict['freq_test'][0])
+    state_dict['freq_max'] = np.nanmax(state_dict['freq_test'][0])
+    state_dict['freq_cntr'] = (state_dict['freq_max'] + state_dict['freq_min'])/2
     state_dict['I'] = dsapol.avg_time(state_dict['base_I'],n_t_slider.value)#state_dict['n_t'])
     state_dict['I'] = dsapol.avg_freq(state_dict['I'],2**logn_f_slider.value)#state_dict['n_f'])
     state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],n_t_slider.value)#state_dict['n_t'])
@@ -2096,7 +2099,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,calc_scat_button):
 
     #plot components and initial fits
     g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
@@ -2120,7 +2123,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
         time_axis_p = ma(time_axis_p,mask)
         ax1.step(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c[0].get_color(),where='post',alpha=1)
-
+        state_dict['time_axis_scattering'] = time_axis_p
+        state_dict['I_tcal_scattering'] = I_tcal_p
     
         #plot initial guess
         initial_fit_full = np.zeros(state_dict['I_tcal'].shape)
@@ -2153,7 +2157,29 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
     ax1.set_ylabel("S/N")
     ax1.set_xticks([])
     ax1.legend(loc='upper right')
+
+
+    if calc_scat_button.clicked:
+        """
+        if scatfitmenu.value == 'Nested Sampling':
+
+            #make array of initial values:
+            p0 = []
+            for i in range(len(x0_guess_comps)):
+                p0 += [x0_guess_comps[i].value,amp_guess_comps[i],sigma_guess_comps[i].value,tau_guess_comps[i].value]
+            #get number of live points
+            nlive =int(len(state_dict['I_tcal_scattering']) - np.sum(state_dict['I_tcal_scattering'].mask))
+            
+            nested_sampling(state_dict['I_tcal_scattering'], state_dict['time_axis_scattering'], p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, bandwidth=state_dict['freq_max']-state_dict['freq_min'], center_frequency=state_dict['freq_cntr'], file_duration=state_dict['n_t']*state_dict['tsamp'], debug=False)
+        
+        elif scatfitmenu.value == 'LMFIT Non-Linear Least Squares'
+            pass        
+        
+        
+        else: #,'Scipy Non-Linear Least Squares',
+        """
     #plot residuals
+
     ax3 = fig.add_subplot(g2[1,:])#,sharex=ax1)
 
     if ~np.all(np.isnan(state_dict['I_tcal'])):

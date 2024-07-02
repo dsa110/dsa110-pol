@@ -14,7 +14,6 @@ except (AttributeError, AssertionError):
 #Note, to add later:
 #url
 #author
-
 setup(name='dsa-110_pol-dev',
       version='1.0.0',
       description='DSA-110 Polarization Utilities',
@@ -44,6 +43,7 @@ os.system("touch ../dsapol_logfiles/filter_logfile.txt")
 os.system("touch ../dsapol_logfiles/RMcal_logfile.txt")
 os.system("touch ../dsapol_logfiles/dsapol_logfile.txt")
 os.system("touch ../dsapol_logfiles/archive_logfile.txt")
+os.system("touch ../dsapol_logfiles/scatscint_logfile.txt")
 
 os.system("> ../dsapol_logfiles/beamform_logfile.txt")
 os.system("> ../dsapol_logfiles/dedisp_logfile.txt")
@@ -52,6 +52,7 @@ os.system("> ../dsapol_logfiles/filter_logfile.txt")
 os.system("> ../dsapol_logfiles/RMcal_logfile.txt")
 os.system("> ../dsapol_logfiles/dsapol_logfile.txt")
 os.system("> ../dsapol_logfiles/archive_logfile.txt")
+os.system("> ../dsapol_logfiles/scatscint_logfile.txt")
 
 os.system("mkdir ../dsapol_logfiles/RM_files")
 import numpy as np

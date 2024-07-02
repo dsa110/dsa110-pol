@@ -35,6 +35,7 @@ dsapol/parsec.py
 dsapol/polbeamform.py
 dsapol/polcal.py
 dsapol/rmtablefuncs.py
+dsapol/scatscint.py
 dsapol/__pycache__/dsapol.cpython-38.pyc
 dsapol96/RMcal.py
 dsapol96/directories.json
@@ -57,6 +58,7 @@ interface/tmpout.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V2-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V3-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
+interface/IONEXdata/COD0OPSFIN_20223530000_01D_01H_GIM.INX
 interface/IONEXdata/COD0OPSFIN_20230660000_01D_01H_GIM.INX
 interface/IONEXdata/COD0OPSFIN_20240440000_01D_01H_GIM.INX
 interface/IONEXdata/CODG0210.22I

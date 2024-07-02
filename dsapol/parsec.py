@@ -94,7 +94,7 @@ import json
 f = open("directories.json","r")
 dirs = json.load(f)
 f.close()
-
+print("test change")
 """
 Factors for RM, pol stuff
 """

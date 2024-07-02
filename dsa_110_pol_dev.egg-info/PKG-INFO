@@ -1,4 +1,7 @@
 Metadata-Version: 2.1
-Name: dsa-110-pol-dev
+Name: dsa-110_pol-dev
 Version: 1.0.0
 Summary: DSA-110 Polarization Utilities
+Requires-Dist: numpy
+Requires-Dist: matplotlib
+Requires-Dist: sigpyproc
