@@ -47,7 +47,9 @@ dsapol96/rmtablefuncs.py
 dsapol96/widget.py
 interface/PARSEC_Interface-InteractiveMercury-V2.ipynb
 interface/PARSEC_Interface-InteractiveMercury-V3.ipynb
+interface/PARSEC_Interface-InteractiveMercury-V4.ipynb
 interface/PARSEC_Interface-InteractiveMercury.ipynb
+interface/cache_read.json
 interface/celerybeat-schedule.bak
 interface/celerybeat-schedule.dat
 interface/celerybeat-schedule.dir
@@ -57,6 +59,7 @@ interface/last_cal_metadata.txt
 interface/tmpout.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V2-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V3-checkpoint.ipynb
+interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V4-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-checkpoint.ipynb
 interface/IONEXdata/COD0OPSFIN_20223530000_01D_01H_GIM.INX
 interface/IONEXdata/COD0OPSFIN_20230660000_01D_01H_GIM.INX

@@ -2317,7 +2317,7 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
 
         
         # Define a lag range for fitting the ACF in frequency lag space
-        lagrange_for_fit = scint_fit_range.value*1e6 #100E6
+        lagrange_for_fit = scint_fit_range.value# MHz #*1e6 #100E6
 
         badflag = 0
         if scintmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
@@ -2342,12 +2342,18 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
                 gmodel = Model(scint.lorentz,independent_vars=['x'],nan_policy='omit')
                 acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
                 lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
+                
+                """f = open("tmp.csv","w")
+                cf = csv.writer(f,delimiter=',')
+                cf.writerow(lags_for_fit)
+                cf.writerow(acf_for_fit)
+                f.close()"""
 
                 # Execute the fit
-                result = gmodel.fit(acf_for_fit, x = lags_for_fit, 
-                                gamma1=Parameter(gamma_guess.value,min=1,max=50),
-                                m1=Parameter(m_guess.value,min=0,max=1),
-                                c1=Parameter(c_guess.value,min=-1,max=1))#gamma1 = 10, m1 = 1, c = 0)
+                result = gmodel.fit(acf_for_fit[~np.isnan(acf_for_fit)], x = lags_for_fit[~np.isnan(acf_for_fit)], gamma1=gamma_guess.value,m1=m_guess.value,c=c_guess.value)
+                #                gamma1=Parameter(gamma_guess.value,min=1/1e3,max=50/1e3),
+                #                m1=Parameter(m_guess.value,min=0,max=1),
+                #                c1=Parameter(c_guess.value,min=-1,max=1))#gamma1 = 10, m1 = 1, c = 0)
 
                 # Print or output the fit report for display
                 #print(result.fit_report())
@@ -2376,7 +2382,7 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
                 acf_for_fit = acf[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
                 lags_for_fit = lags[int(len(acf) / 2.) - int(lagrange_for_fit / f_res) : int(len(acf) / 2.) + int(lagrange_for_fit / f_res)]
 
-                popt,pcov = curve_fit(scint.lorentz,lags_for_fit,acf_for_fit,p0=[gamma_guess.value,m_guess.value,c_guess.value],nan_policy='omit')
+                popt,pcov = curve_fit(scint.lorentz,lags_for_fit[~np.isnan(acf_for_fit)],acf_for_fit[~np.isnan(acf_for_fit)],p0=[gamma_guess.value,m_guess.value,c_guess.value])
 
                 df_scint.loc[str(scintmenu.value)] = [popt[0],
                                np.sqrt(pcov[0,0]),
