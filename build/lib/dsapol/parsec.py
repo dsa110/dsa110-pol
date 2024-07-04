@@ -564,8 +564,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
         'scatter_init_all':False,
-        'x0_guess':0.35e-3,
-        'amp_guess':1,
+        'x0_guess':80,
+        'amp_guess':10,
         'sigma_guess':1,
         'tau_guess':1,
         'x0_guess_0':0.35e-3,
@@ -2149,7 +2149,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                                                                         d=I_tcal_p[state_dict['comps'][k]['peak']]),
                 backgroundcolor='thistle',fontsize=18)
         ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, p0_full),
+                scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *p0_full),
                 color='purple',label='Initial Guess')
 
         
@@ -2162,7 +2162,6 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
     ax1.set_xticks([])
     ax1.legend(loc='upper right')
 
-    result = None
     if calc_scat_button.clicked:
        
         if scatfitmenu.value == 'Nested Sampling':
@@ -2172,10 +2171,15 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             
             #run nested sampling
 
-            result = scat.nested_sampling(state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask], 
+            state_dict['scatter_results'] = scat.nested_sampling(state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask], 
                                         outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
                                         p0=p0_full, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp']*1e3,
                                         debug=False, time=state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3)
+    
+            state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)
+            state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0) - state_dict['scatter_params_best']
+            state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)
+
         elif scatfitmenu.value == 'LMFIT Non-Linear Least Squares':
             pass        
         
@@ -2192,9 +2196,28 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             ax3.plot(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                     scat.exp_gauss(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',alpha=0.25)
         ax3.plot(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                (scat.exp_gauss_n(state_dict['time_axis']*1e-3, p0_full)-I_tcal_p)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Residuals',alpha=1)
+                (scat.exp_gauss_n(state_dict['time_axis']*1e-3, *p0_full)-I_tcal_p)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Residuals',alpha=1)
         ax3.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    
+        if (scatfitmenu.value == 'Nested Sampling') and ('scatter_results' in state_dict.keys()):
+            nsamps,npars = state_dict['scatter_results'].samples.shape
+            samps = np.random.choice(np.arange(nsamps),size=nsamps//10,replace=False)
+            for i in samps:#range(nsamps):
+                ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_results'].samples[i,:])),color='red',alpha=0.1)
+                ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_results'].samples[i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.1)
+                
+            ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_params_best'])),color='red',alpha=1,linewidth=4)        
+            ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_params_best']))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=1,linewidth=4)
+
+
+
+
+
     ax3.set_xlabel("Time (ms)")
     ax3.set_ylabel(r"$\Delta$")
     ax3.legend(loc='upper right')
@@ -2209,8 +2232,10 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i]],
                 ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i)])
-
-    return result
+    if 'scatter_results' in state_dict.keys(): 
+        return state_dict['scatter_results']
+    else: 
+        return None
 
 
 def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range,save_scint_button):

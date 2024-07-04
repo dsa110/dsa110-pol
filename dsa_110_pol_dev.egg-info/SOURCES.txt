@@ -55,6 +55,7 @@ interface/celerybeat-schedule.dir
 interface/directories.json
 interface/kill_mercury.sh
 interface/last_cal_metadata.txt
+interface/tmpout.txt
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V2-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V3-checkpoint.ipynb
 interface/.ipynb_checkpoints/PARSEC_Interface-InteractiveMercury-V4-checkpoint.ipynb
