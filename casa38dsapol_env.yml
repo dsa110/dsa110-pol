@@ -238,7 +238,7 @@ dependencies:
     - casatools==6.4.4.31
     - casjobs==0.0.2
     - celery==5.3.6
-    - certifi==2023.7.22
+    - certifi==2022.9.24
     - cfod==2021.6.4
     - channels==4.0.0
     - chardet==5.1.0
@@ -256,7 +256,7 @@ dependencies:
     - corner==2.2.1
     - coverage==6.3.2
     - croniter==2.0.1
-    - cryptography==42.0.7
+    - cryptography==42.0.5
     - cython==0.29.28
     - daphne==4.1.0
     - datacite==1.1.2
@@ -275,11 +275,12 @@ dependencies:
     - docutils==0.17.1
     - dodgy==0.2.1
     - dsa-110-pol-dev==1.0.0
+    - dsa-110-scat-dev==1.0.0
     - dsa110-antpos==v1.4.0-dirty
     - dsa110-calib==3.0.0+109.gfb3689c.dirty
     - dsa110-catalogs==0.2
-    - dsa110-event==0.7.0+11.g18f141d
-    - dsa110-meridian-fs==1.5.7
+    - dsa110-event==0.6.4
+    - dsa110-meridian-fs==v1.5.7-dirty
     - dsa110-nsfrb==0.1.0
     - dsa110-pyutils==3.8.2+4.gb5ad0b5.dirty
     - dsa110-syshealth==0.1-10-ge2b6650-dirty
@@ -353,7 +354,7 @@ dependencies:
     - jsonschema==4.20.0
     - jsonschema-specifications==2023.12.1
     - jupyter-client==7.4.9
-    - jupyter-core==5.7.2
+    - jupyter-core==5.7.1
     - jupyter-events==0.9.0
     - jupyter-server==2.12.4
     - jupyter-server-terminals==0.5.1
@@ -372,7 +373,7 @@ dependencies:
     - lmfit==1.2.2
     - lxml==4.9.1
     - mako==1.2.0
-    - markdown==3.4.3
+    - markdown==3.3.6
     - markdown-it-py==2.1.0
     - markupsafe==2.1.3
     - mastcasjobs==0.0.5
@@ -386,8 +387,8 @@ dependencies:
     - msgpack-python==0.5.6
     - multidict==6.0.2
     - natsort==8.1.0
-    - nbconvert==7.14.1
-    - nbformat==5.9.2
+    - nbconvert==7.16.4
+    - nbformat==5.10.4
     - nbsphinx==0.8.9
     - ndcube==2.0.2
     - ne2001==0.0.1
@@ -401,7 +402,7 @@ dependencies:
     - opt-einsum==3.3.0
     - orderedmultidict==1.0.1
     - overrides==7.4.0
-    - ovro-alert==0.2.dev93+g94fc03a
+    - ovro-alert==0.2.dev149+geac728b.d20240226
     - packaging==23.1
     - panstamps==0.6.2
     - papermill==2.4.0
@@ -414,7 +415,7 @@ dependencies:
     - ppxf==8.2.2
     - progress==1.6
     - progressbar2==4.2.0
-    - prompt-toolkit==3.0.45
+    - prompt-toolkit==3.0.43
     - prospector==1.7.7
     - protobuf==3.19.6
     - psquery-astro==0.6.11

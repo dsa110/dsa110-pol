@@ -10,6 +10,9 @@ cwdpath.txt
 files.txt
 requirements.txt
 setup.py
+tmp_dynesty.pickle
+tmp_result.json
+tmp_resume.pickle
 .github/workflows/workflow.yml
 .ipynb_checkpoints/Calibrator_UpperLimit_Testing-checkpoint.ipynb
 .ipynb_checkpoints/Mark_RM_Testing-V2-checkpoint.ipynb
