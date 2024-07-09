@@ -55,6 +55,7 @@ os.system("> ../dsapol_logfiles/archive_logfile.txt")
 os.system("> ../dsapol_logfiles/scatscint_logfile.txt")
 
 os.system("mkdir ../dsapol_logfiles/RM_files")
+os.system("mkdir ../dsapol_logfiles/scat_files")
 import numpy as np
 #np.save("../dsapol_logfiles/RM_files/input_spectrum.npy",np.zeros((0,0)))
 #np.save("../dsapol_logfiles/RM_files/output_spectrum.npy",np.zeros((2,0)))

@@ -31,7 +31,7 @@ from numpy.ma import masked_array as ma
 from scipy.stats import kstest
 from scipy.optimize import curve_fit
 from syshealth.status_mon import get_rm
-
+from bilby.core import result as bcresult
 from scipy.signal import find_peaks
 from scipy.signal import peak_widths
 import copy
@@ -576,12 +576,15 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'Vflux_display':np.nan,
 
         'scattermenu':['Component 0'],
-        'scatfitmenu':['LMFIT Non-Linear Least Squares'],
+        'scatfitmenu':'Nested Sampling',
         'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares','Nested Sampling'],
         'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
         'scatter_init_all':False,
+        'scatterbackground':False,
+        'scatterweights':False,
+        'scatterresume':False,
         'x0_guess':80,
         'amp_guess':10,
         'sigma_guess':1,
@@ -739,7 +742,7 @@ def make_rmcal_menu_choices():
     return choices
 
 
-def RM_from_menu(choice,rmcal_input):
+def RM_from_menu(choice,rmcal_input=0):
     if choice == "No RM Calibration":
         return np.nan,np.nan
     if 'Input RM' in choice:
@@ -2117,7 +2120,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,calc_scat_button):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights):
 
     state_dict['scatter_fit_comps'] = scatfitmenu.value
 
@@ -2187,6 +2190,13 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000
             timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6
+            if scatterweights.value:
+                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask] 
+                weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
+                sigma_for_fit = 1/weights_for_fit
+                sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+            else:
+                sigma_for_fit = None
 
             #get number of live points
             nlive =len(timeaxis_for_fit)#int(len(state_dict['I_tcal_scattering']) - np.sum(state_dict['I_tcal_scattering'].mask))
@@ -2204,23 +2214,28 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
             #run nested sampling
-            with open(scatscint.logfile,"w") as f:
-                with contextlib.redirect_stdout(f):
-                    with contextlib.redirect_stderr(f):
+            if scatterbackground.value:
+                state_dict['scatter_dname_result'],state_dict['scatter_dname'] = scatscint.run_nested_sampling(timeseries_for_fit,
+                                                                outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
+                                                                p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp'],
+                                                                timeaxis_for_fit=timeaxis_for_fit,
+                                                                low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=True,
+                                                                resume=scatterresume.value)
+            else:
 
-                        state_dict['scatter_results'] = scat.nested_sampling(state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000, 
-                                        outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
-                                        p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp'],
-                                        debug=False, time=state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6,
-                                        lower_bounds=low_bounds,#[np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']],
-                                        upper_bounds=upp_bounds)#[0.7,500e-3,10e-3,10e-3])
-            f.close()
+                state_dict['scatter_results'] = scatscint.run_nested_sampling(timeseries_for_fit,
+                                                                outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
+                                                                p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp'],
+                                                                timeaxis_for_fit=timeaxis_for_fit,
+                                                                low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=False,
+                                                                resume=scatterresume.value)
 
-            state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*1000
-            state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']*1000
-            state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best']*1000 - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
 
-            df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
+                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*1000
+                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']*1000
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best']*1000 - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
+
+                df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best'][4*i + 1]) for i in range(len(scattermenu.value))],
@@ -2251,6 +2266,11 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000
             timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6
+            if scatterweights.value:
+                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]/np.sum(state_dict['weights'][~state_dict['time_axis_scattering'].mask])
+            else:
+                weights_for_fit = None
+
             np.save("/media/ubuntu/ssd/sherman/code/tmp.npy",np.concatenate([timeseries_for_fit,timeaxis_for_fit]))
 
             params = Parameters()
@@ -2261,7 +2281,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 params.add('tau' + str(i),value=tau_guess_comps[i].value/1000,min=state_dict['tsamp'],max=tau_guess_comps[i].value*10/1000,vary=True)
 
 
-            result = gmodel.fit(timeseries_for_fit,params,x=timeaxis_for_fit)
+            result = gmodel.fit(timeseries_for_fit,params,x=timeaxis_for_fit,weights=weights_for_fit)
             state_dict['scatter_params_best'] = np.array([])
             state_dict['scatter_params_best_upperr'] = np.array([])
             state_dict['scatter_params_best_lowerr'] = np.array([])
@@ -2304,6 +2324,12 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000
             timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6
+            if scatterweights.value:
+                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]/np.sum(state_dict['weights'][~state_dict['time_axis_scattering'].mask])
+                sigma_for_fit = 1/weights_for_fit
+                sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+            else:
+                sigma_for_fit = None
 
             p0 = []
             low_bounds = []
@@ -2313,7 +2339,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 low_bounds += [np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']]
                 upp_bounds += [np.nanmax(timeaxis_for_fit),amp_guess_comps[i].value*10/1000,sigma_guess_comps[i].value*10/1000,tau_guess_comps[i].value*10/1000]
 
-            state_dict['scatter_params_best'],pcov = curve_fit(fit_func,timeseries_for_fit,timeaxis_for_fit,p0=p0,bounds=(low_bounds,upp_bounds))
+            state_dict['scatter_params_best'],pcov = curve_fit(fit_func,timeseries_for_fit,timeaxis_for_fit,p0=p0,bounds=(low_bounds,upp_bounds),sigma=sigma_for_fit)
             state_dict['scatter_params_best_upperr'] = []
             state_dict['scatter_params_best_lowerr'] = []
             for i in range(ncomps):
@@ -2338,8 +2364,35 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
 
+    #check if nested sampling is done
+    if refresh_button.clicked:
+        print("Refreshing...")
+        if 'scatter_dname_result' in state_dict.keys():
+            l = glob.glob(dirs['logs'] + "scat_files/" + state_dict['scatter_dname_result'])
+            if len(l) > 0:
+                state_dict['scatter_results'] = bcresult.read_in_result(filename=dirs['logs'] + "scat_files/" + state_dict['scatter_dname_result'])
             
+                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*1000
+                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']*1000
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best']*1000 - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
+
+                df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_lowerr'][4*i]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best'][4*i + 1]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_upperr'][4*i + 1]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_lowerr'][4*i + 1]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best'][4*i + 2]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_upperr'][4*i + 2]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_lowerr'][4*i + 2]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best'][4*i + 3]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_upperr'][4*i + 3]) for i in range(len(scattermenu.value))],
+                                                    [np.around(state_dict['scatter_params_best_lowerr'][4*i + 3]) for i in range(len(scattermenu.value))]])
+
+
+
     
+
     #plot residuals
 
     ax3 = fig.add_subplot(g2[1,:])#,sharex=ax1)
@@ -2378,12 +2431,18 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
     ax3.legend(loc='upper right')
 
 
+    if save_scat_button.clicked:
+        plt.savefig(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scatter.pdf")
+        df_scat.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scatter_params.pdf")
+
+
+
     plt.show()
 
 
     #update wdict
-    update_wdict([scattermenu,scatfitmenu],
-            ['scattermenu','scatfitmenu'])
+    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume],
+            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume'])
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i]],
                 ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i)])
@@ -3057,7 +3116,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
     if RMcalibratebutton.clicked and (rmcal_menu.value != "") and (rmcal_menu.value != "No RM Calibration"):
         
         #convert menu option to RM value in dict
-        RM,err = RM_from_menu(rmcal_menu.value)
+        RM,err = RM_from_menu(rmcal_menu.value,rmcal_input)
         RMdisplay.data,RMerrdisplay.data = np.around(RM),np.around(err)
     
         #add to state dict

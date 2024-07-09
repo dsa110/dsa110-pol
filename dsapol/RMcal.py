@@ -47,7 +47,7 @@ from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 import matplotlib.ticker as ticker
 from concurrent.futures import ProcessPoolExecutor, as_completed, wait
-
+import contextlib
 """
 This file contains wrapper functions for getting Galactic and ionospheric RM estimates and 
 running RM synthesis using the dsapol library
@@ -93,13 +93,16 @@ def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,
     #logger.disabled = True
     for prefix in prefixes:
         try:
-            print("Trying " + prefix + " with new format")
-            RMdict = gt.getRM(ionexPath='./IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,newformat=True)
+            with open(logfile,"w") as f:
+                with contextlib.redirect_stdout(f):
+                    #print("Trying " + prefix + " with new format")
+                    RMdict = gt.getRM(ionexPath='./IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,newformat=True)
+            f.close()
             break
         except:
                 
             try:                    
-                print("Trying " + prefix + " with old format")
+                #print("Trying " + prefix + " with old format")
                 RMdict = gt.getRM(ionexPath='./IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,newformat=False)
                 break
             except:
@@ -107,7 +110,7 @@ def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,
                     logger.disabled = False
                     return np.nan,np.nan
     #logger.disabled = False           
-    print("success! " + prefix)
+    #print("success! " + prefix)
     #get mean and standard dev 
     RMs = RMdict['RM']['st1'].flatten()
     RMion = np.nanmedian(RMs)
