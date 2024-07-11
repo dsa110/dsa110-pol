@@ -559,7 +559,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'showlogcal':False,
 
          'ncomps_num':1, ############### (4) Filter Weights ##################
-         'comprange_slider':[0,1],                  
+         'comprange_slider':[0.25*5120*32.7E-3,0.75*5120*32.7E-3],                  
+         'comprange_slider_max':5120*32.7E-3,
          'avger_w_slider':1,
          'sf_window_weights_slider':3,
          'logibox_slider':0,
@@ -1201,7 +1202,8 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 
     #get timestart, timestop
     (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['I'],state_dict['width_native'],state_dict['tsamp'],n_t=n_t_slider.value,peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
-
+    wdict['comprange_slider_max'] = np.ceil((2*state_dict['window'] + state_dict['timestop'] - state_dict['timestart'])*state_dict['tsamp']*state_dict['n_t']*1e3)
+    wdict['comprange_slider'] = [np.around(0.25*(2*state_dict['window'] + state_dict['timestop'] - state_dict['timestart'])*state_dict['tsamp']*state_dict['n_t']*1e3,2),np.around(0.75*(2*state_dict['window'] + state_dict['timestop'] - state_dict['timestart'])*state_dict['tsamp']*state_dict['n_t']*1e3,2)]
 
     #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
     (state_dict['I_f_unweighted'],state_dict['Q_f_unweighted'],state_dict['U_f_unweighted'],state_dict['V_f_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],
@@ -1846,6 +1848,8 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                                                     state_dict['tsamp'],n_t=state_dict['n_t'],
                                                                                     peak_range=None,pre_calc_tf=False,
                                                                                     buff=state_dict['comps'][state_dict['current_comp']]['buff'])
+    
+
     state_dict['comps'][state_dict['current_comp']]['left_lim'] = np.argmin(np.abs(state_dict['time_axis']*1e-3 - (state_dict['comps'][state_dict['current_comp']]['timestart']*state_dict['n_t']*32.7e-3 - state_dict['window']*state_dict['n_t']*32.7e-3 + comprange_slider.value[0])))
     state_dict['comps'][state_dict['current_comp']]['right_lim'] = np.argmin(np.abs(state_dict['time_axis']*1e-3 - (state_dict['comps'][state_dict['current_comp']]['timestart']*state_dict['n_t']*32.7e-3 - state_dict['window']*state_dict['n_t']*32.7e-3 + comprange_slider.value[1])))
 
