@@ -356,7 +356,7 @@ state_dict['RM_ionerr'] = np.nan
 state_dict['RM_ionRA'] = np.nan
 state_dict['RM_ionDEC'] = np.nan
 state_dict['RM_ionmjd'] = np.nan
-
+state_dict['scatter_init'] = False
 
 
 
@@ -585,6 +585,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scatterbackground':False,
         'scatterweights':False,
         'scatterresume':False,
+        'scatter_nlive':500,
+        'scatter_sliderrange':1,
         'x0_guess':80,
         'amp_guess':10,
         'sigma_guess':1,
@@ -610,7 +612,26 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'sigma_guess_4':1,
         'tau_guess_4':1,
 
-        
+        'x0_range_0':[0.35e-3/2,3*0.35e-3/2],
+        'amp_range_0':[1/2,3/2],
+        'sigma_range_0':[1/2,3/2],
+        'tau_range_0':[1/2,3/2],
+        'x0_range_1':[0.35e-3/2,3*0.35e-3/2],
+        'amp_range_1':[1/2,3/2],
+        'sigma_range_1':[1/2,3/2],
+        'tau_range_1':[1/2,3/2],
+        'x0_range_2':[0.35e-3/2,3*0.35e-3/2],
+        'amp_range_2':[1/2,3/2],
+        'sigma_range_2':[1/2,3/2],
+        'tau_range_2':[1/2,3/2],
+        'x0_range_3':[0.35e-3/2,3*0.35e-3/2],
+        'amp_range_3':[1/2,3/2],
+        'sigma_range_3':[1/2,3/2],
+        'tau_range_3':[1/2,3/2],
+        'x0_range_4':[0.35e-3/2,3*0.35e-3/2],
+        'amp_range_4':[1/2,3/2],
+        'sigma_range_4':[1/2,3/2],
+        'tau_range_4':[1/2,3/2],
 
 
         'scintmenu':'All',
@@ -1931,7 +1952,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
 
 
-
+    #update initial parameters for scattering analysis
+    if not state_dict['scatter_init']:
+        scatter_reset_initvals(state_dict['current_comp'])
 
     #display masked dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
@@ -2120,7 +2143,22 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights):
+def scatter_reset_initvals(comp_num):#,x0_guess,sigma_guess,tau_guess,amp_guess,x0_range,sigma_range,tau_range,amp_range):
+    wdict['x0_guess_' + str(comp_num)]  = np.around(state_dict['comps'][comp_num]['peak']*32.7e-3,2) #ms
+    wdict['amp_guess_' + str(comp_num)] = np.around(state_dict['I_tcal'][state_dict['comps'][comp_num]['peak']],2) 
+    wdict['sigma_guess_' + str(comp_num)] = np.around(state_dict['comps'][comp_num]['FWHM']*32.7e-3/2,2)  #ms
+    wdict['tau_guess_' + str(comp_num)]  = np.around((state_dict['comps'][comp_num]['intR'] - state_dict['comps'][comp_num]['peak'])*32.7e-3,2)  #ms
+
+    wdict['x0_range_' + str(comp_num)] =  [np.around(wdict['x0_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['x0_guess_' + str(comp_num)],2)]
+    wdict['amp_range_' + str(comp_num)] = [np.around(wdict['amp_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['amp_guess_' + str(comp_num)],2)]
+    wdict['sigma_range_' + str(comp_num)]  = [np.around(wdict['sigma_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['sigma_guess_' + str(comp_num)],2)]
+    wdict['tau_range_' + str(comp_num)] = [np.around(wdict['tau_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['tau_guess_' + str(comp_num)],2)]
+    return
+
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange):
+    state_dict['scatter_init'] = True
+    if scatter_init.clicked:
+        state_dict['scatter_init'] = False
 
     state_dict['scatter_fit_comps'] = scatfitmenu.value
 
@@ -2199,7 +2237,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 sigma_for_fit = None
 
             #get number of live points
-            nlive =len(timeaxis_for_fit)#int(len(state_dict['I_tcal_scattering']) - np.sum(state_dict['I_tcal_scattering'].mask))
+            nlive = scatter_nlive.value#len(timeaxis_for_fit)#int(len(state_dict['I_tcal_scattering']) - np.sum(state_dict['I_tcal_scattering'].mask))
             
             #init bounds
             low_bounds = []
@@ -2207,11 +2245,13 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             p0 = []
             for i in range(ncomps):
                 p0 += [x0_guess_comps[i].value/1000,amp_guess_comps[i].value/1000,sigma_guess_comps[i].value/1000,tau_guess_comps[i].value/1000]
-                low_bounds += [np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']]
-                upp_bounds += [np.nanmax(timeaxis_for_fit),amp_guess_comps[i].value*10/1000,sigma_guess_comps[i].value*10/1000,tau_guess_comps[i].value*10/1000]
+                #low_bounds += [np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']]
+                #upp_bounds += [np.nanmax(timeaxis_for_fit),amp_guess_comps[i].value*10/1000,sigma_guess_comps[i].value*10/1000,tau_guess_comps[i].value*10/1000]
+                #low_bounds += [x0_guess_comps[i].value/2/1000,amp_guess_comps[i].value/2/1000,sigma_guess_comps[i].value/2/1000,tau_guess_comps[i].value/2/1000]
+                #upp_bounds += [3*x0_guess_comps[i].value/2/1000,3*amp_guess_comps[i].value/2/1000,3*sigma_guess_comps[i].value/2/1000,3*tau_guess_comps[i].value/2/1000]
 
-
-
+                low_bounds += [x0_range_sliders[i].value[0]/1000,amp_range_sliders[i].value[0]/1000,sigma_range_sliders[i].value[0]/1000,tau_range_sliders[i].value[0]/1000]
+                upp_bounds += [x0_range_sliders[i].value[1]/1000,amp_range_sliders[i].value[1]/1000,sigma_range_sliders[i].value[1]/1000,tau_range_sliders[i].value[1]/1000]
 
             #run nested sampling
             if scatterbackground.value:
@@ -2441,11 +2481,13 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
     #update wdict
-    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume],
-            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume'])
+    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange],
+            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange'])
     for i in range(len(x0_guess_comps)):
-        update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i]],
-                ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i)])
+        update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i],
+                      x0_range_sliders[i],amp_range_sliders[i],sigma_range_sliders[i],tau_range_sliders[i]],
+                ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i),
+                 'x0_range_' + str(i), 'amp_range_' + str(i), 'sigma_range_' + str(i), 'tau_range_' + str(i)])
     if 'scatter_results' in state_dict.keys(): 
         return state_dict['scatter_results']
     else: 
