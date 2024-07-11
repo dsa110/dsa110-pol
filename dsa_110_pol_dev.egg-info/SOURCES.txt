@@ -3,6 +3,7 @@ README.md
 README.txt
 _dynesty.pickle
 casa38dsapol_env.yml
+casa38dsapol_env_nobuilds.yml
 celery.sqlite
 celerybeat-schedule.bak
 celerybeat-schedule.dat
