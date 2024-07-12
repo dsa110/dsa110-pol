@@ -15,9 +15,9 @@ freqs=("1498.75" "1487.03125" "1475.3125" "1463.59375" "1451.875" "1440.15625" "
 
 echo $1 $2 $3 $4 $5 $6 $7
 
-calibdir="/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/" #"/dataz/dsa110/operations/beamformer_weights/generated" #"/dataz/dsa110/operations/beamformer_weights/applied" #"/home/ubuntu/sherman/pol_calibs"
+calibdir="/home/ubuntu/msherman_nsfrb/DSA110-DSAPOL-PROJECT/dsapol_polcal/polcal_bfweights/" #"/media/ubuntu/ssd/sherman/code/pol_self_calibs_FORPAPER/" #"/dataz/dsa110/operations/beamformer_weights/generated" #"/dataz/dsa110/operations/beamformer_weights/applied" #"/home/ubuntu/sherman/pol_calibs"
 #dir="/dataz/dsa110/candidates/$2/Level2/voltages/" #"/media/ubuntu/data/dsa110/T3/$1"
-outdir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/$3_$8"
+outdir="/mnt/FRBdata/$3_$8" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/$3_$8"
 deldir="3C286_delay.yaml" #"/dataz/dsa110/operations/beamformer_weights/applied/beamformer_weights_$4.yaml"
 mkdir ${outdir}
 echo $calibdir $dir $outdir
@@ -35,7 +35,7 @@ minbase="0.0"
 
 for i in ${!corrs[@]}; do
 
-    dir="/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
+    dir="/mnt/polcal_voltages/$3_$8/${corrs[$i]}" #"/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
     fl="${dir}/${trigname}_data.out.sav" #${corrs[$i]}_$3$2.out" #${trigname}_${sbs[$i]}_data.out"
     cal="${calibdir}/beamformer_weights_${sbs[$i]}_${calibdate}.dat"
     echo $fl $cal
@@ -56,7 +56,7 @@ minbase="0.0"
 
 for i in ${!corrs[@]}; do
 
-    dir="/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
+    dir="/mnt/polcal_voltages/$3_$8/${corrs[$i]}" #"/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
     fl="${dir}/${trigname}_data.out.sav" #${corrs[$i]}_$3$2.out" #${trigname}_${sbs[$i]}_data.out"
     cal="${calibdir}/beamformer_weights_${sbs[$i]}_${calibdate}.dat"
     echo $fl $cal
@@ -76,7 +76,7 @@ minbase="0.0"
 
 for i in ${!corrs[@]}; do
 
-    dir="/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
+    dir="/mnt/polcal_voltages/$3_$8/${corrs[$i]}" #"/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
     fl="${dir}/${trigname}_data.out.sav" #${corrs[$i]}_$3$2.out" #${trigname}_${sbs[$i]}_data.out"
     cal="${calibdir}/beamformer_weights_${sbs[$i]}_${calibdate}.dat"
     echo $fl $cal
@@ -98,7 +98,7 @@ minbase="0.0"
 
 for i in ${!corrs[@]}; do
 
-    dir="/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
+    dir="/mnt/polcal_voltages/$3_$8/${corrs[$i]}" #"/media/ubuntu/ssd/sherman/$3_$8/${corrs[$i]}"
     fl="${dir}/${trigname}_data.out.sav" #${corrs[$i]}_$3$2.out" #${trigname}_${sbs[$i]}_data.out"
     cal="${calibdir}/beamformer_weights_${sbs[$i]}_${calibdate}.dat"
     echo $fl $cal

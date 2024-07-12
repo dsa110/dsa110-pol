@@ -56,6 +56,10 @@ os.system("> ../dsapol_logfiles/scatscint_logfile.txt")
 
 os.system("mkdir ../dsapol_logfiles/RM_files")
 os.system("mkdir ../dsapol_logfiles/scat_files")
+
+
+os.system("mkdir ../dsapol_polcal")
+
 import numpy as np
 #np.save("../dsapol_logfiles/RM_files/input_spectrum.npy",np.zeros((0,0)))
 #np.save("../dsapol_logfiles/RM_files/output_spectrum.npy",np.zeros((2,0)))
@@ -69,13 +73,13 @@ cwd = f.read()[:-1] + "/"
 f.close()
 
 dirs = {"cwd":cwd,
-        "polcal":"/media/ubuntu/ssd/sherman/code/",
-        "candidates":"/dataz/dsa110/candidates/",
-        "T3":"/dataz/dsa110/T3/",
-        "polcal_voltages":"/media/ubuntu/ssd/sherman/polcal_voltages/",
-        "data":"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/",
+        "polcal":cwd[:cwd.index("dsa110-pol")] + "dsapol_polcal/",#"/media/ubuntu/ssd/sherman/code/",
+        "candidates":"/mnt/dsa110/candidates/",
+        "T3":"/mnt/dsa110/T3/",#"/dataz/dsa110/T3/",
+        "polcal_voltages":"/mnt/polcal_voltages/",#"/media/ubuntu/ssd/sherman/polcal_voltages/",
+        "data":"/mnt/FRBdata/",#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/",
         "logs":cwd[:cwd.index("dsa110-pol")] + "dsapol_logfiles/",
-        "gen_bfweights":"/dataz/dsa110/operations/beamformer_weights/generated/",
+        "gen_bfweights":"/mnt/dsa110/operations/beamformer_weights/generated/",
         "dsastorageFRBDir":"user@dsa-storage.ovro.pvt:/home/user/data/candidates/candidates/",
         "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/",
         "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/"}

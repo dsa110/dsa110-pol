@@ -4362,9 +4362,8 @@ def get_calibs(gaincal_fn,phasecal_fn,freq_test,use_fit=True):
 
 #find beam for calibrator observation
 #function to get beam of calibrator
-def find_beam(file_suffix,shape=(16,7680,256),path='/home/ubuntu/sherman/scratch_weights_update_2022-06-03/',plot=False,show=False):
+def find_beam(file_suffix,shape=(16,7680,256),path=dirs['data'],plot=False,show=False):
     #file_suffix = ""
-    f=open('/media/ubuntu/ssd/sherman/code/testoutput.txt','a')
     print("Starting find beam process...",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
     d = np.zeros(shape)
     i = 0
@@ -4372,14 +4371,11 @@ def find_beam(file_suffix,shape=(16,7680,256),path='/home/ubuntu/sherman/scratch
                   'corr08', 'corr10', 'corr11', 'corr12', 'corr14',
                   'corr15', 'corr16', 'corr18', 'corr19', 'corr21',
                   'corr22']:
-        print("Path: " + path + corrs + file_suffix + '.out',end="",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
         data = np.loadtxt(path + corrs + file_suffix + '.out').reshape((7680,256))
-        print("load complete",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
         #print(data.sum())
         d[i,:,:] = data
         #print(corrs)
         i += 1
-    f.close()
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -4446,8 +4442,9 @@ def RM_error_fit(x,a=35.16852537, b=-0.08341036):
 
 #Plotting Functions
 
-def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False):
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False,datadir=None):
+    if datadir is None:
+        datadir = dirs['data'] + ids + "_" + nickname + "/"
     outdata = dict()
     outdata["inputs"] = dict()
     outdata["inputs"]["n_t"] = n_t
@@ -4590,8 +4587,9 @@ from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 #interactive functions
-def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False):
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False,datadir=None):
+    if datadir is None:
+        datadir = dirs['data'] + ids + "_" + nickname + "/"
     #function for tuning the following paramters:
     #n_t
     #n_f
@@ -6016,8 +6014,11 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
 
 #plotting functions
-def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title="",figsize=(38,28)):
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title="",figsize=(38,28),datadir=None):
+    if datadir is None:
+        #datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+        datadir=dirs['data'] +ids + "_" + nickname + "/"
+
     #parse results
     RMsynth_snrs, RMtools_snrs = RMsnrs
     if len(RMzoomsnrs) == 3:
@@ -6090,11 +6091,12 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True,figsize=(42,36)):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True,figsize=(42,36),datadir=None):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+    if datadir is None:
+        datadir = dirs['data'] + ids + "_" + nickname + "/"
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0

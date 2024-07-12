@@ -107,7 +107,7 @@ def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,
                 break
             except:
                 if prefix == prefixes[-1]: 
-                    logger.disabled = False
+                    #logger.disabled = False
                     return np.nan,np.nan
     #logger.disabled = False           
     #print("success! " + prefix)

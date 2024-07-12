@@ -8,7 +8,7 @@ dependencies:
   - _openmp_mutex=4.5=1_gnu
   - argon2-cffi=21.3.0=pyhd3eb1b0_0
   - argon2-cffi-bindings=21.2.0=py38h7f8727e_0
-  - arviz=0.13.0=pyhd8ed1ab_0
+    #- arviz=0.13.0=pyhd8ed1ab_0
   - astroid=2.9.0=py38h06a4308_0
   - astropy=5.0.4=py38hce1f21e_0
   - asttokens=2.0.5=pyhd3eb1b0_0
@@ -216,7 +216,7 @@ dependencies:
     - asteval==0.9.31
     - astro-prospector==1.1.0
     - astro-sedpy==0.3.0
-    - astropath==0.3.dev0
+      #- astropath==0.3.dev0
     - astroplan==0.8
     - astropy-healpix==0.7
     - astroquery==0.4.6
@@ -235,7 +235,7 @@ dependencies:
     - blimpy==2.1.4
     - boto3==1.26.83
     - botocore==1.29.165
-    - burstfit==0.2.1-7-g799b5c1-dirty
+      #- burstfit==0.2.1-7-g799b5c1-dirty
     - cached-property==1.5.2
     - cachelib==0.9.0
     - cachetools==5.3.1
@@ -254,9 +254,9 @@ dependencies:
     - click-didyoumean==0.3.0
     - click-plugins==1.1.1
     - click-repl==0.3.0
-    - codecov==2.1.12
+    - codecov==2.1.13
     - coloredlogs==15.0.1
-    - comet==3.2.0rc0
+      #- comet==3.2.0rc0
     - commonmark==0.9.1
     - configobj==5.0.8
     - constantly==15.1.0
@@ -281,17 +281,17 @@ dependencies:
     - docopt==0.6.2
     - docutils==0.17.1
     - dodgy==0.2.1
-    - dsa-110-pol-dev==1.0.0
-    - dsa-110-scat-dev==1.0.0
-    - dsa110-antpos==v1.4.0-dirty
-    - dsa110-calib==3.0.0+109.gfb3689c.dirty
-    - dsa110-catalogs==0.2
-    - dsa110-event==0.6.3
-    - dsa110-meridian-fs==v1.5.7-dirty
-    - dsa110-nsfrb==0.1.0
-    - dsa110-pyutils==3.8.2+4.gb5ad0b5.dirty
-    - dsa110-syshealth==0.1-10-ge2b6650-dirty
-    - dsa110-t3==1.4.8+3.gce6270b
+      #- dsa-110-pol-dev==1.0.0
+      #- dsa-110-scat-dev==1.0.0
+      #- dsa110-antpos==v1.4.0-dirty
+      #- dsa110-calib==3.0.0+109.gfb3689c.dirty
+      #- dsa110-catalogs==0.2
+      #- dsa110-event==0.6.3
+      #- dsa110-meridian-fs==v1.5.7-dirty
+      #- dsa110-nsfrb==0.1.0
+      #- dsa110-pyutils==3.8.2+4.gb5ad0b5.dirty
+      #- dsa110-syshealth==0.1-10-ge2b6650-dirty
+      #- dsa110-t3==1.4.8+3.gce6270b
     - dustmaps==1.0.10
     - emcee==3.1.2
     - ephem==4.1.3
@@ -307,7 +307,7 @@ dependencies:
     - flatbuffers==23.5.26
     - fonttools==4.33.3
     - fqdn==1.5.1
-    - frb==0.1.dev0
+      #- frb==0.1.dev0
     - frozenlist==1.3.0
     - fsps==0.4.1
     - fundamentals==2.3.12
@@ -326,7 +326,7 @@ dependencies:
     - h5py==3.9.0
     - hdf5plugin==4.1.1
     - healpy==1.15.2
-    - hera-librarian==1.2.1.dev2+g057c8b2.d20220428
+      #- hera-librarian==1.2.1.dev2+g057c8b2.d20220428
     - hmf==3.4.2
     - html5lib==1.1
     - httplib2==0.22.0
@@ -372,7 +372,7 @@ dependencies:
     - keras-preprocessing==1.1.2
     - keyring==23.13.1
     - kombu==5.3.5
-    - lalsuite==7.8.1.dev20220925
+      #- lalsuite==7.8.1.dev20220925
     - libclang==16.0.6
     - ligo-gracedb==2.8.0
     - ligo-segments==1.4.0
@@ -409,7 +409,7 @@ dependencies:
     - opt-einsum==3.3.0
     - orderedmultidict==1.0.1
     - overrides==7.4.0
-    - ovro-alert==0.2.dev93+g94fc03a
+      #- ovro-alert==0.2.dev93+g94fc03a
     - packaging==23.1
     - panstamps==0.6.2
     - papermill==2.4.0
@@ -425,8 +425,8 @@ dependencies:
     - prompt-toolkit==3.0.45
     - prospector==1.7.7
     - protobuf==3.19.6
-    - psquery-astro==0.6.11
-    - psrdada==0.1.0
+      #- psquery-astro==0.6.11
+      #- psrdada==0.1.0
     - psrqpy==1.2.3
     - psycopg2-binary==2.9.3
     - py==1.11.0
@@ -466,7 +466,7 @@ dependencies:
     - python3-openid==3.2.0
     - pytz==2022.1
     - pytz-deprecation-shim==0.1.0.post0
-    - pyuvdata==2.2.9.dev23+g40809cff
+    - pyuvdata==2.3.0 #.dev23+g40809cff
     - pyvo==1.4
     - pywavelets==1.3.0
     - pyymw16==2.0.7
@@ -543,7 +543,7 @@ dependencies:
     - uri-template==1.3.0
     - urllib3==1.26.16
     - vine==5.1.0
-    - voevent-parse==1.0.3+7.gfbebba6
+    - voevent-parse==1.0.3 #+7.gfbebba6
     - voila==0.5.5
     - webcolors==1.13
     - websocket-client==1.7.0

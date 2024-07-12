@@ -357,7 +357,8 @@ state_dict['RM_ionRA'] = np.nan
 state_dict['RM_ionDEC'] = np.nan
 state_dict['RM_ionmjd'] = np.nan
 state_dict['scatter_init'] = False
-
+state_dict['RMhost'] = np.nan
+state_dict['DMhost'] = np.nan
 
 
 df = pd.DataFrame(
@@ -467,7 +468,7 @@ df_scat = pd.DataFrame(
 #List of initial widget values updated whenever screen loads
 def get_frbfiles(path=frbpath):
     frbfiles = glob.glob(path + '2*_*')
-    return [frbfiles[i][frbfiles[i].index('us/2')+3:] for i in range(len(frbfiles))]
+    return [frbfiles[i][frbfiles[i].index(frbpath)+len(frbpath):] for i in range(len(frbfiles))]
 
 frbfiles = get_frbfiles()
 ids = frbfiles[0][:frbfiles[0].index('_')]
@@ -2166,15 +2167,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
     state_dict['scatter_fit_comps'] = scatfitmenu.value
 
-    #plot components and initial fits
-    g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
-    fig = plt.figure(figsize=(18,12))
-    ax1 = fig.add_subplot(g2[0,:])
 
     #plot the full component
     if ~np.all(np.isnan(state_dict['I_tcal'])):
-        c = ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Timeseries',where='post',alpha=0.25)
     
         #plot the selected components
         I_tcal_p = copy.deepcopy(state_dict['I_tcal'])
@@ -2186,44 +2181,15 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 mask[state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
         I_tcal_p = ma(I_tcal_p,mask)
         time_axis_p = ma(time_axis_p,mask)
-        ax1.step(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-            I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c[0].get_color(),where='post',alpha=1)
         state_dict['time_axis_scattering'] = time_axis_p
         state_dict['I_tcal_scattering'] = I_tcal_p
     
         #plot initial guess
-        #initial_fit_full = np.zeros(state_dict['I_tcal'].shape)
         p0_full = []
         for comp in scattermenu.value:
             k = int(comp[-1])
             
-            ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                scat.exp_gauss(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value),color='purple',alpha=0.25)
-
-            #initial_fit_full += scat.exp_gauss_1(state_dict['time_axis']*1e-3,x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)
             p0_full += [x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value]
-            #indicate proposed values
-            ax1.axvline(state_dict['comps'][k]['peak']*32.7e-3,color='purple',linestyle='--')
-            ax1.axvspan(state_dict['comps'][k]['intL']*32.7e-3,state_dict['comps'][k]['intR']*32.7e-3,color='purple',alpha=0.1)
-            ax1.text((state_dict['comps'][k]['peak'] + 5)*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
-                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3,
-                                                                                                        b=state_dict['comps'][k]['FWHM']*32.7e-3,
-                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
-                                                                                                        d=I_tcal_p[state_dict['comps'][k]['peak']]),
-                backgroundcolor='thistle',fontsize=18)
-        ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *p0_full),
-                color='purple',label='Initial Guess')
-
-        
-        
-        ax1.set_ylim(-1,np.nanmax(state_dict['I_tcal']) + 10)
-        ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
-            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
-    ax1.set_xlabel("Time (ms)")
-    ax1.set_ylabel("S/N")
-    ax1.set_xticks([])
-    ax1.legend(loc='upper right')
 
     if calc_scat_button.clicked:
        
@@ -2276,8 +2242,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
                 state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*1000
-                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']*1000
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best']*1000 - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
+                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
 
                 df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(len(scattermenu.value))],
@@ -2315,14 +2281,14 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             else:
                 weights_for_fit = None
 
-            np.save("/media/ubuntu/ssd/sherman/code/tmp.npy",np.concatenate([timeseries_for_fit,timeaxis_for_fit]))
 
             params = Parameters()
             for i in range(ncomps):
-                params.add('x0' + str(i),value=x0_guess_comps[i].value/1000,min=np.nanmin(timeaxis_for_fit),max=np.nanmax(timeaxis_for_fit),vary=True)#x0_guess_comps[i].value/10/1000,max=x0_guess_comps[i].value*10/1000,vary=True)
-                params.add('amp' + str(i),value=amp_guess_comps[i].value/1000,min=amp_guess_comps[i].value/10/1000,max=amp_guess_comps[i].value*10/1000,vary=True)
-                params.add('sigma' + str(i),value=sigma_guess_comps[i].value/1000,min=state_dict['tsamp'],max=sigma_guess_comps[i].value*10/1000,vary=True)
-                params.add('tau' + str(i),value=tau_guess_comps[i].value/1000,min=state_dict['tsamp'],max=tau_guess_comps[i].value*10/1000,vary=True)
+                
+                params.add('x0' + str(i),value=x0_guess_comps[i].value/1000,min=x0_range_sliders[i].value[0]/1000,max=x0_range_sliders[i].value[1]/1000,vary=True)#x0_guess_comps[i].value/10/1000,max=x0_guess_comps[i].value*10/1000,vary=True)
+                params.add('amp' + str(i),value=amp_guess_comps[i].value/1000,min=amp_range_sliders[i].value[0]/1000,max=amp_range_sliders[i].value[1]/1000,vary=True)
+                params.add('sigma' + str(i),value=sigma_guess_comps[i].value/1000,min=sigma_range_sliders[i].value[0]/1000,max=sigma_range_sliders[i].value[1]/1000,vary=True)
+                params.add('tau' + str(i),value=tau_guess_comps[i].value/1000,min=tau_range_sliders[i].value[0]/1000,max=tau_range_sliders[i].value[1]/1000,vary=True)
 
 
             result = gmodel.fit(timeseries_for_fit,params,x=timeaxis_for_fit,weights=weights_for_fit)
@@ -2380,9 +2346,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             upp_bounds = []
             for i in range(ncomps):
                 p0 += [x0_guess_comps[i].value/1000,amp_guess_comps[i].value/1000,sigma_guess_comps[i].value/1000,tau_guess_comps[i].value/1000]
-                low_bounds += [np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']]
-                upp_bounds += [np.nanmax(timeaxis_for_fit),amp_guess_comps[i].value*10/1000,sigma_guess_comps[i].value*10/1000,tau_guess_comps[i].value*10/1000]
-
+                low_bounds += [x0_range_sliders[i].value[0]/1000,amp_range_sliders[i].value[0]/1000,sigma_range_sliders[i].value[0]/1000,tau_range_sliders[i].value[0]/1000]
+                upp_bounds += [x0_range_sliders[i].value[1]/1000,amp_range_sliders[i].value[1]/1000,sigma_range_sliders[i].value[1]/1000,tau_range_sliders[i].value[1]/1000]
+            
             state_dict['scatter_params_best'],pcov = curve_fit(fit_func,timeseries_for_fit,timeaxis_for_fit,p0=p0,bounds=(low_bounds,upp_bounds),sigma=sigma_for_fit)
             state_dict['scatter_params_best_upperr'] = []
             state_dict['scatter_params_best_lowerr'] = []
@@ -2390,8 +2356,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 state_dict['scatter_params_best_upperr'] = np.concatenate([state_dict['scatter_params_best_upperr'],[pcov[4*i,4*i],pcov[4*i + 1,4*i + 1], pcov[4*i + 2,4*i + 2],pcov[4*i + 3,4*i + 3]]])
                 state_dict['scatter_params_best_lowerr'] = np.concatenate([state_dict['scatter_params_best_lowerr'],[pcov[4*i,4*i],pcov[4*i + 1,4*i + 1], pcov[4*i + 2,4*i + 2],pcov[4*i + 3,4*i + 3]]])
             state_dict['scatter_params_best'] *= 1000
-            state_dict['scatter_params_best_upperr'] *= 1000
-            state_dict['scatter_params_best_lowerr'] *= 1000
+            state_dict['scatter_params_best_upperr'] = np.sqrt(state_dict['scatter_params_best_upperr']/1000)
+            state_dict['scatter_params_best_lowerr'] = np.sqrt(state_dict['scatter_params_best_upperr']/1000)
 
             df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(ncomps)],
@@ -2435,7 +2401,53 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
 
-    
+    #begin plotting
+
+    #plot components and initial fits
+    g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
+    fig = plt.figure(figsize=(18,12))
+    ax1 = fig.add_subplot(g2[0,:])
+
+    #plot the full component
+    if ~np.all(np.isnan(state_dict['I_tcal'])):
+        c = ax1.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            state_dict['I_tcal'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Timeseries',where='post',alpha=0.25)
+
+        #plot the selected components
+        ax1.step(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+            I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c[0].get_color(),where='post',alpha=1)
+
+        #plot initial guess
+        #initial_fit_full = np.zeros(state_dict['I_tcal'].shape)
+        for comp in scattermenu.value:
+            k = int(comp[-1])
+
+            ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                scat.exp_gauss(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value),color='purple',alpha=0.25)
+
+            #initial_fit_full += scat.exp_gauss_1(state_dict['time_axis']*1e-3,x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)
+            #indicate proposed values
+            ax1.axvline(state_dict['comps'][k]['peak']*32.7e-3,color='purple',linestyle='--')
+            ax1.axvspan(state_dict['comps'][k]['intL']*32.7e-3,state_dict['comps'][k]['intR']*32.7e-3,color='purple',alpha=0.1)
+            ax1.text((state_dict['comps'][k]['peak'] + 5)*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
+                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3,
+                                                                                                        b=state_dict['comps'][k]['FWHM']*32.7e-3,
+                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
+                                                                                                        d=I_tcal_p[state_dict['comps'][k]['peak']]),
+                backgroundcolor='thistle',fontsize=18)
+        ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *p0_full),
+                color='purple',label='Initial Guess')
+
+
+
+        ax1.set_ylim(-1,np.nanmax(state_dict['I_tcal']) + 10)
+        ax1.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+            32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
+    ax1.set_xlabel("Time (ms)")
+    ax1.set_ylabel("S/N")
+    ax1.set_xticks([])
+    ax1.legend(loc='upper right')
 
     #plot residuals
 
@@ -3134,11 +3146,11 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
     #1D plots
 
     if rmcomp_menu.value == 'All':
-        dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['RMcalibrated']['RMsnrs1'],state_dict['RMcalibrated']['RM_tools_snrs']],[state_dict['RMcalibrated']['RMsnrs1zoom'],state_dict['RMcalibrated']['RM_tools_snrszoom'],state_dict['RMcalibrated']['RMsnrs2']],state_dict['RMcalibrated']["RM2"][0],state_dict["RMcalibrated"]["RMerrfit"],state_dict["RMcalibrated"]["trial_RM1"],state_dict["RMcalibrated"]["trial_RM2"],state_dict["RMcalibrated"]["trial_RM_tools"],state_dict["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='All Components',figsize=(38,24))
+        dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['RMcalibrated']['RMsnrs1'],state_dict['RMcalibrated']['RM_tools_snrs']],[state_dict['RMcalibrated']['RMsnrs1zoom'],state_dict['RMcalibrated']['RM_tools_snrszoom'],state_dict['RMcalibrated']['RMsnrs2']],state_dict['RMcalibrated']["RM2"][0],state_dict["RMcalibrated"]["RMerrfit"],state_dict["RMcalibrated"]["trial_RM1"],state_dict["RMcalibrated"]["trial_RM2"],state_dict["RMcalibrated"]["trial_RM_tools"],state_dict["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='All Components',figsize=(38,24),datadir=state_dict['datadir'])
     
     elif rmcomp_menu.value != '':
         i= int(rmcomp_menu.value)
-        dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value,figsize=(38,24))
+        dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value,figsize=(38,24),datadir=state_dict['datadir'])
 
     #update widget dict
     update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D,rmcomp_menu,RMsynthbackground],
