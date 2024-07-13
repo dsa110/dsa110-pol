@@ -587,6 +587,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scatterbackground':False,
         'scatterweights':False,
         'scatterresume':False,
+        'scattersamps':False,
         'scatter_nlive':500,
         'scatter_sliderrange':1,
         'x0_guess':80,
@@ -2160,7 +2161,7 @@ def scatter_reset_initvals(comp_num):#,x0_guess,sigma_guess,tau_guess,amp_guess,
     wdict['tau_range_' + str(comp_num)] = [np.around(wdict['tau_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['tau_guess_' + str(comp_num)],2)]
     return
 
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange,scattersamps):
     state_dict['scatter_init'] = True
     if scatter_init.clicked:
         state_dict['scatter_init'] = False
@@ -2463,7 +2464,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
         ax3.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     
-        if (scatfitmenu.value == 'Nested Sampling') and ('scatter_results' in state_dict.keys()):
+        if (scatfitmenu.value == 'Nested Sampling') and ('scatter_results' in state_dict.keys()) and scattersamps.value:
             nsamps,npars = state_dict['scatter_results'].samples.shape
             samps = np.random.choice(np.arange(nsamps),size=nsamps//10,replace=False)
             for i in samps:#range(nsamps):
@@ -2497,8 +2498,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
     #update wdict
-    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange],
-            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange'])
+    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps],
+            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps'])
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i],
                       x0_range_sliders[i],amp_range_sliders[i],sigma_range_sliders[i],tau_range_sliders[i]],
