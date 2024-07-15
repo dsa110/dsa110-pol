@@ -8,3 +8,6 @@ interface/celery*
 
 #current working dir
 cwdpath.txt
+
+#jupyter notebook
+interface/scatterfittesting.ipynb
