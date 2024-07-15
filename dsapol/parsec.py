@@ -558,6 +558,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'phase_polyfitorder_slider':5,
          'polcaldate_menu':"",
          'showlogcal':False,
+         'polcalprocs':32,
 
          'ncomps_num':1, ############### (4) Filter Weights ##################
          'comprange_slider':[0.25*5120*32.7E-3,0.75*5120*32.7E-3],                  
@@ -579,7 +580,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
 
         'scattermenu':['Component 0'],
         'scatfitmenu':'Nested Sampling',
-        'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares','Nested Sampling'],
+        'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares','Nested Sampling','EMCEE Markov-Chain Monte Carlo'],
         'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
         'scatterRbuffer_slider':0,
@@ -589,6 +590,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scatterresume':False,
         'scattersamps':False,
         'scatter_nlive':500,
+        'scatter_nwalkers':32,
+        'scatter_nsteps':5000,
+        'scatter_nburn':100,
+        'scatter_nthin':15,
         'scatter_sliderrange':1,
         'x0_guess':80,
         'amp_guess':10,
@@ -1287,7 +1292,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
         phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider,savecalsolnbutton,
-                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,saveplotbutton):
+                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,saveplotbutton,polcalprocs):
     
     """
     This function updates the polarization calibration screen
@@ -1344,7 +1349,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         print("start",file=f)
 
         #calibrate at native resolution
-        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=128)
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=int(polcalprocs.value))
         print("done calibrating...",file=f)
 
         #parallactic angle calibration
@@ -1487,12 +1492,12 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
                 edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
                 ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,
                 ratio_peakwidth_slider,ratio_polyfitorder_slider,phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,
-                phase_peakwidth_slider,phase_polyfitorder_slider,sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag],
+                phase_peakwidth_slider,phase_polyfitorder_slider,sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,polcalprocs],
                 ["polcaldate_menu","polcaldate_create_menu","polcaldate_bf_menu","polcaldate_findbeams_menu","obsid3C48_menu","obsid3C286_menu",
                 "edgefreq_slider","breakfreq_slider","sf_window_weight_cals","sf_order_cals","peakheight_slider","peakwidth_slider","polyfitorder_slider",
                 "ratio_edgefreq_slider","ratio_breakfreq_slider","ratio_sf_window_weight_cals","ratio_sf_order_cals","ratio_peakheight_slider",
                 "ratio_peakwidth_slider","ratio_polyfitorder_slider","phase_sf_window_weight_cals","phase_sf_order_cals","phase_peakheight_slider",
-                "phase_peakwidth_slider","phase_polyfitorder_slider","sfflag","polyfitflag","ratio_sfflag","ratio_polyfitflag","phase_sfflag","phase_polyfitflag"],
+                "phase_peakwidth_slider","phase_polyfitorder_slider","sfflag","polyfitflag","ratio_sfflag","ratio_polyfitflag","phase_sfflag","phase_polyfitflag","polcalprocs"],
                 param='value')
     update_wdict([ParA_display],
                 ["ParA_display"],
@@ -2161,7 +2166,7 @@ def scatter_reset_initvals(comp_num):#,x0_guess,sigma_guess,tau_guess,amp_guess,
     wdict['tau_range_' + str(comp_num)] = [np.around(wdict['tau_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['tau_guess_' + str(comp_num)],2)]
     return
 
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange,scattersamps):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin):
     state_dict['scatter_init'] = True
     if scatter_init.clicked:
         state_dict['scatter_init'] = False
@@ -2192,13 +2197,15 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             
             p0_full += [x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value]
 
+    scaler = 1
     if calc_scat_button.clicked:
        
         if scatfitmenu.value == 'Nested Sampling':
             ncomps = len(x0_guess_comps)
+            
 
-            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000
-            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6
+            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
+            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
             if scatterweights.value:
                 weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask] 
                 weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
@@ -2215,20 +2222,20 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             upp_bounds = []
             p0 = []
             for i in range(ncomps):
-                p0 += [x0_guess_comps[i].value/1000,amp_guess_comps[i].value/1000,sigma_guess_comps[i].value/1000,tau_guess_comps[i].value/1000]
+                p0 += [x0_guess_comps[i].value/scaler,amp_guess_comps[i].value/scaler,sigma_guess_comps[i].value/scaler,tau_guess_comps[i].value/scaler]
                 #low_bounds += [np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']]
                 #upp_bounds += [np.nanmax(timeaxis_for_fit),amp_guess_comps[i].value*10/1000,sigma_guess_comps[i].value*10/1000,tau_guess_comps[i].value*10/1000]
                 #low_bounds += [x0_guess_comps[i].value/2/1000,amp_guess_comps[i].value/2/1000,sigma_guess_comps[i].value/2/1000,tau_guess_comps[i].value/2/1000]
                 #upp_bounds += [3*x0_guess_comps[i].value/2/1000,3*amp_guess_comps[i].value/2/1000,3*sigma_guess_comps[i].value/2/1000,3*tau_guess_comps[i].value/2/1000]
 
-                low_bounds += [x0_range_sliders[i].value[0]/1000,amp_range_sliders[i].value[0]/1000,sigma_range_sliders[i].value[0]/1000,tau_range_sliders[i].value[0]/1000]
-                upp_bounds += [x0_range_sliders[i].value[1]/1000,amp_range_sliders[i].value[1]/1000,sigma_range_sliders[i].value[1]/1000,tau_range_sliders[i].value[1]/1000]
+                low_bounds += [x0_range_sliders[i].value[0]/scaler,amp_range_sliders[i].value[0]/scaler,sigma_range_sliders[i].value[0]/scaler,tau_range_sliders[i].value[0]/scaler]
+                upp_bounds += [x0_range_sliders[i].value[1]/scaler,amp_range_sliders[i].value[1]/scaler,sigma_range_sliders[i].value[1]/scaler,tau_range_sliders[i].value[1]/scaler]
 
             #run nested sampling
             if scatterbackground.value:
                 state_dict['scatter_dname_result'],state_dict['scatter_dname'] = scatscint.run_nested_sampling(timeseries_for_fit,
                                                                 outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
-                                                                p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp'],
+                                                                p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp']/1e3/scaler,
                                                                 timeaxis_for_fit=timeaxis_for_fit,
                                                                 low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=True,
                                                                 resume=scatterresume.value)
@@ -2236,28 +2243,102 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
                 state_dict['scatter_results'] = scatscint.run_nested_sampling(timeseries_for_fit,
                                                                 outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
-                                                                p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp'],
+                                                                p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp']/1e3/scaler,
                                                                 timeaxis_for_fit=timeaxis_for_fit,
                                                                 low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=False,
                                                                 resume=scatterresume.value)
 
 
-                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*1000
-                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
+                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*scaler
+                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*scaler - state_dict['scatter_params_best']
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*scaler
 
-                df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
-                                                    [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(len(scattermenu.value))],
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+
+                """
+                
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best'][4*i + 1]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i + 1]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i + 1]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best'][4*i + 2]) for i in range(len(scattermenu.value))],
-                                                    [np.around(state_dict['scatter_params_best_upperr'][4*i + 2]) for i in range(len(scattermenu.value))],
-                                                    [np.around(state_dict['scatter_params_best_lowerr'][4*i + 2]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best'][4*i + 3]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i + 3]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i + 3]) for i in range(len(scattermenu.value))]])
+                """
+        elif scatfitmenu.value == 'EMCEE Markov-Chain Monte Carlo':
+            ncomps = len(x0_guess_comps)
+
+
+            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
+            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
+            if scatterweights.value:
+                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]
+                weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
+                sigma_for_fit = 1/weights_for_fit
+                sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+            else:
+                sigma_for_fit = np.nanstd(state_dict['I_tcal_scattering'][:int(NOFFDEF/state_dict['n_t'])])*np.ones(len(timeaxis_for_fit))
+
+            #init bounds
+            low_bounds = []
+            upp_bounds = []
+            p0 = []
+            for i in range(ncomps):
+                p0 += [x0_guess_comps[i].value/scaler,amp_guess_comps[i].value/scaler,sigma_guess_comps[i].value/scaler,tau_guess_comps[i].value/scaler]
+                #low_bounds += [np.nanmin(timeaxis_for_fit),amp_guess_comps[i].value/10/1000,state_dict['tsamp'],state_dict['tsamp']]
+                #upp_bounds += [np.nanmax(timeaxis_for_fit),amp_guess_comps[i].value*10/1000,sigma_guess_comps[i].value*10/1000,tau_guess_comps[i].value*10/1000]
+                #low_bounds += [x0_guess_comps[i].value/2/1000,amp_guess_comps[i].value/2/1000,sigma_guess_comps[i].value/2/1000,tau_guess_comps[i].value/2/1000]
+                #upp_bounds += [3*x0_guess_comps[i].value/2/1000,3*amp_guess_comps[i].value/2/1000,3*sigma_guess_comps[i].value/2/1000,3*tau_guess_comps[i].value/2/1000]
+
+                low_bounds += [x0_range_sliders[i].value[0]/scaler,amp_range_sliders[i].value[0]/scaler,sigma_range_sliders[i].value[0]/scaler,tau_range_sliders[i].value[0]/scaler]
+                upp_bounds += [x0_range_sliders[i].value[1]/scaler,amp_range_sliders[i].value[1]/scaler,sigma_range_sliders[i].value[1]/scaler,tau_range_sliders[i].value[1]/scaler]
+
+            if scatterbackground.value:
+                state_dict['scatter_MCMC_dname_result'],state_dict['scatter_MCMC_dname'] = scatscint.run_MCMC_sampling(timeseries_for_fit,
+                                                                outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
+                                                                p0=p0, timeaxis_for_fit=timeaxis_for_fit,
+                                                                low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=True,
+                                                                nwalkers=int(scatter_nwalkers.value),nsteps=int(scatter_nsteps.value),discard=int(scatter_nburn.value),thin=int(scatter_nthin.value))
+            else:
+
+                state_dict['scatter_MCMC_samples'],state_dict['scatter_params_best'],state_dict['scatter_params_best_upperr'],state_dict['scatter_params_best_lowerr'] = scatscint.run_MCMC_sampling(timeseries_for_fit,
+                                                                outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
+                                                                p0=p0, timeaxis_for_fit=timeaxis_for_fit,
+                                                                low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=False,
+                                                                nwalkers=int(scatter_nwalkers.value),nsteps=int(scatter_nsteps.value),discard=int(scatter_nburn.value),thin=int(scatter_nthin.value))
+
+                state_dict['scatter_MCMC_samples'] = state_dict['scatter_MCMC_samples']*scaler
+                state_dict['scatter_params_best'] = state_dict['scatter_params_best']*scaler
+                state_dict['scatter_params_best_upperr'] = state_dict['scatter_params_best_upperr']*scaler
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best_lowerr']*scaler
+
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+
+
+
 
         elif scatfitmenu.value == 'LMFIT Non-Linear Least Squares':
             ncomps = len(x0_guess_comps)
@@ -2275,8 +2356,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             
             gmodel = Model(fit_func,independent_vars=['x'])
 
-            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000
-            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6
+            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
+            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
             if scatterweights.value:
                 weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]/np.sum(state_dict['weights'][~state_dict['time_axis_scattering'].mask])
             else:
@@ -2286,10 +2367,10 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             params = Parameters()
             for i in range(ncomps):
                 
-                params.add('x0' + str(i),value=x0_guess_comps[i].value/1000,min=x0_range_sliders[i].value[0]/1000,max=x0_range_sliders[i].value[1]/1000,vary=True)#x0_guess_comps[i].value/10/1000,max=x0_guess_comps[i].value*10/1000,vary=True)
-                params.add('amp' + str(i),value=amp_guess_comps[i].value/1000,min=amp_range_sliders[i].value[0]/1000,max=amp_range_sliders[i].value[1]/1000,vary=True)
-                params.add('sigma' + str(i),value=sigma_guess_comps[i].value/1000,min=sigma_range_sliders[i].value[0]/1000,max=sigma_range_sliders[i].value[1]/1000,vary=True)
-                params.add('tau' + str(i),value=tau_guess_comps[i].value/1000,min=tau_range_sliders[i].value[0]/1000,max=tau_range_sliders[i].value[1]/1000,vary=True)
+                params.add('x0' + str(i),value=x0_guess_comps[i].value/scaler,min=x0_range_sliders[i].value[0]/scaler,max=x0_range_sliders[i].value[1]/scaler,vary=True)#x0_guess_comps[i].value/10/1000,max=x0_guess_comps[i].value*10/1000,vary=True)
+                params.add('amp' + str(i),value=amp_guess_comps[i].value/scaler,min=amp_range_sliders[i].value[0]/scaler,max=amp_range_sliders[i].value[1]/scaler,vary=True)
+                params.add('sigma' + str(i),value=sigma_guess_comps[i].value/scaler,min=sigma_range_sliders[i].value[0]/scaler,max=sigma_range_sliders[i].value[1]/scaler,vary=True)
+                params.add('tau' + str(i),value=tau_guess_comps[i].value/scaler,min=tau_range_sliders[i].value[0]/scaler,max=tau_range_sliders[i].value[1]/scaler,vary=True)
 
 
             result = gmodel.fit(timeseries_for_fit,params,x=timeaxis_for_fit,weights=weights_for_fit)
@@ -2298,12 +2379,27 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             state_dict['scatter_params_best_lowerr'] = np.array([])
 
             for i in range(ncomps):
-                state_dict['scatter_params_best'] = np.concatenate([state_dict['scatter_params_best'],[result.params['x0' + str(i)].value*1000,result.params['amp' + str(i)].value*1000,result.params['sigma' + str(i)].value*1000,result.params['tau' + str(i)].value*1000]])
-                state_dict['scatter_params_best_upperr'] = np.concatenate([state_dict['scatter_params_best_upperr'],[result.params['x0' + str(i)].stderr*1000,result.params['amp' + str(i)].stderr*1000,result.params['sigma' + str(i)].stderr*1000,result.params['tau' + str(i)].stderr*1000]])
-                state_dict['scatter_params_best_lowerr'] = np.concatenate([state_dict['scatter_params_best_lowerr'],[result.params['x0' + str(i)].stderr*1000,result.params['amp' + str(i)].stderr*1000,result.params['sigma' + str(i)].stderr*1000,result.params['tau' + str(i)].stderr*1000]])
+                state_dict['scatter_params_best'] = np.concatenate([state_dict['scatter_params_best'],[result.params['x0' + str(i)].value*scaler,result.params['amp' + str(i)].value*scaler,result.params['sigma' + str(i)].value*scaler,result.params['tau' + str(i)].value*scaler]])
+                state_dict['scatter_params_best_upperr'] = np.concatenate([state_dict['scatter_params_best_upperr'],[result.params['x0' + str(i)].stderr*scaler,result.params['amp' + str(i)].stderr*scaler,result.params['sigma' + str(i)].stderr*scaler,result.params['tau' + str(i)].stderr*scaler]])
+                state_dict['scatter_params_best_lowerr'] = np.concatenate([state_dict['scatter_params_best_lowerr'],[result.params['x0' + str(i)].stderr*scaler,result.params['amp' + str(i)].stderr*scaler,result.params['sigma' + str(i)].stderr*scaler,result.params['tau' + str(i)].stderr*scaler]])
 
 
             # Print or output the fit report for display
+            df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+
+            """
+    
             df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i]) for i in range(ncomps)],
@@ -2316,7 +2412,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     [np.around(state_dict['scatter_params_best'][4*i + 3]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i + 3]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i + 3]) for i in range(ncomps)]])
-
+            """
 
         else:
             ncomps = len(x0_guess_comps)
@@ -2333,8 +2429,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 fit_func = lambda x, x00, amp0, sigma0, tau0, x01, amp1, sigma1, tau1, x02, amp2, sigma2, tau2,x03, amp3, sigma3, tau3,x04, amp4, sigma4, tau4: scat.exp_gauss_n(x,x00,amp0,sigma0,tau0,x01, amp1, sigma1, tau1,x02, amp2, sigma2, tau2, x03, amp3, sigma3, tau3,x04, amp4, sigma4, tau4)
 
 
-            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/1000
-            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e6
+            timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
+            timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
             if scatterweights.value:
                 weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]/np.sum(state_dict['weights'][~state_dict['time_axis_scattering'].mask])
                 sigma_for_fit = 1/weights_for_fit
@@ -2346,9 +2442,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             low_bounds = []
             upp_bounds = []
             for i in range(ncomps):
-                p0 += [x0_guess_comps[i].value/1000,amp_guess_comps[i].value/1000,sigma_guess_comps[i].value/1000,tau_guess_comps[i].value/1000]
-                low_bounds += [x0_range_sliders[i].value[0]/1000,amp_range_sliders[i].value[0]/1000,sigma_range_sliders[i].value[0]/1000,tau_range_sliders[i].value[0]/1000]
-                upp_bounds += [x0_range_sliders[i].value[1]/1000,amp_range_sliders[i].value[1]/1000,sigma_range_sliders[i].value[1]/1000,tau_range_sliders[i].value[1]/1000]
+                p0 += [x0_guess_comps[i].value/scaler,amp_guess_comps[i].value/scaler,sigma_guess_comps[i].value/scaler,tau_guess_comps[i].value/scaler]
+                low_bounds += [x0_range_sliders[i].value[0]/scaler,amp_range_sliders[i].value[0]/scaler,sigma_range_sliders[i].value[0]/scaler,tau_range_sliders[i].value[0]/scaler]
+                upp_bounds += [x0_range_sliders[i].value[1]/scaler,amp_range_sliders[i].value[1]/scaler,sigma_range_sliders[i].value[1]/scaler,tau_range_sliders[i].value[1]/scaler]
             
             state_dict['scatter_params_best'],pcov = curve_fit(fit_func,timeseries_for_fit,timeaxis_for_fit,p0=p0,bounds=(low_bounds,upp_bounds),sigma=sigma_for_fit)
             state_dict['scatter_params_best_upperr'] = []
@@ -2356,10 +2452,26 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             for i in range(ncomps):
                 state_dict['scatter_params_best_upperr'] = np.concatenate([state_dict['scatter_params_best_upperr'],[pcov[4*i,4*i],pcov[4*i + 1,4*i + 1], pcov[4*i + 2,4*i + 2],pcov[4*i + 3,4*i + 3]]])
                 state_dict['scatter_params_best_lowerr'] = np.concatenate([state_dict['scatter_params_best_lowerr'],[pcov[4*i,4*i],pcov[4*i + 1,4*i + 1], pcov[4*i + 2,4*i + 2],pcov[4*i + 3,4*i + 3]]])
-            state_dict['scatter_params_best'] *= 1000
-            state_dict['scatter_params_best_upperr'] = np.sqrt(state_dict['scatter_params_best_upperr']/1000)
-            state_dict['scatter_params_best_lowerr'] = np.sqrt(state_dict['scatter_params_best_upperr']/1000)
+            state_dict['scatter_params_best'] *= scaler
+            state_dict['scatter_params_best_upperr'] = np.sqrt(state_dict['scatter_params_best_upperr'])*scaler
+            state_dict['scatter_params_best_lowerr'] = np.sqrt(state_dict['scatter_params_best_upperr'])*scaler
 
+            df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+
+
+
+            """
             df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i]) for i in range(ncomps)],
@@ -2373,9 +2485,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i + 3]) for i in range(ncomps)],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i + 3]) for i in range(ncomps)]])
 
+            """
 
-
-    #check if nested sampling is done
+    #check if nested sampling/MCMC is done
     if refresh_button.clicked:
         print("Refreshing...")
         if 'scatter_dname_result' in state_dict.keys():
@@ -2387,6 +2499,21 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']*1000
                 state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best']*1000 - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
 
+
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                
+                """
                 df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i]) for i in range(len(scattermenu.value))],
@@ -2400,8 +2527,35 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     [np.around(state_dict['scatter_params_best_upperr'][4*i + 3]) for i in range(len(scattermenu.value))],
                                                     [np.around(state_dict['scatter_params_best_lowerr'][4*i + 3]) for i in range(len(scattermenu.value))]])
 
+                """
+        elif 'scatter_MCMC_dname' in state_dict.keys():
+            l = glob.glob(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_result'])
+            if len(l) > 0:
+                state_dict['scatter_MCMC_samples'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_result'])
+                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_MCMC_samples'],axis=0)
+                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_MCMC_samples'],84,axis=0) - state_dict['scatter_params_best']
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_MCMC_samples'],16,axis=0)
+
+                state_dict['scatter_MCMC_samples'] = state_dict['scatter_MCMC_samples']*scaler
+                state_dict['scatter_params_best'] = state_dict['scatter_params_best']*scaler
+                state_dict['scatter_params_best_upperr'] = state_dict['scatter_params_best_upperr']*scaler
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best_lowerr']*scaler
+
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
 
 
+                
     #begin plotting
 
     #plot components and initial fits
@@ -2463,22 +2617,36 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 (scat.exp_gauss_n(state_dict['time_axis']*1e-3, *p0_full)-I_tcal_p)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',label='Initial Residuals',alpha=1)
         ax3.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
-    
+
+
+
+        ##for Nested sampling/MCMC, plot subset of samples
         if (scatfitmenu.value == 'Nested Sampling') and ('scatter_results' in state_dict.keys()) and scattersamps.value:
             nsamps,npars = state_dict['scatter_results'].samples.shape
             samps = np.random.choice(np.arange(nsamps),size=nsamps//10,replace=False)
             for i in samps:#range(nsamps):
                 ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(1000*state_dict['scatter_results'].samples[i,:])),color='red',alpha=0.1)
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_results'].samples[i,:])),color='red',alpha=0.1)
                 ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(1000*state_dict['scatter_results'].samples[i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.1)
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_results'].samples[i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.1)
         
+        if (scatfitmenu.value == 'EMCEE Markov-Chain Monte Carlo') and ('scatter_MCMC_samples' in state_dict.keys()) and scattersamps.value:
+            nsamps,npars = state_dict['scatter_MCMC_samples'].shape
+            samps = np.random.choice(np.arange(nsamps),size=nsamps//10,replace=False)
+            for i in samps:
+                ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_MCMC_samples'][i,:])),color='red',alpha=0.1)
+                ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_MCMC_samples'][i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.1)
+
+
         if 'scatter_params_best' in state_dict.keys():
             ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                         scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_params_best'])),color='red',alpha=1,linewidth=4,label='Best Fit')        
             ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                         scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_params_best']))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=1,linewidth=4,label='Best Fit')
 
+        
 
 
 
@@ -2498,15 +2666,17 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
     #update wdict
-    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps],
-            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps'])
+    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin],
+            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps','scatter_nwalkers','scatter_nsteps','scatter_nburn','scatter_nthin'])
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i],
                       x0_range_sliders[i],amp_range_sliders[i],sigma_range_sliders[i],tau_range_sliders[i]],
                 ['x0_guess_' + str(i), 'amp_guess_' + str(i), 'sigma_guess_' + str(i), 'tau_guess_' + str(i),
                  'x0_range_' + str(i), 'amp_range_' + str(i), 'sigma_range_' + str(i), 'tau_range_' + str(i)])
-    if 'scatter_results' in state_dict.keys(): 
+    if 'scatter_results' in state_dict.keys() and (scatfitmenu.value == 'Nested Sampling') :
         return state_dict['scatter_results']
+    elif (scatfitmenu.value == 'EMCEE Markov-Chain Monte Carlo') and ('scatter_MCMC_samples' in state_dict.keys()):
+        return state_dict['scatter_MCMC_samples']
     else: 
         return None
 
