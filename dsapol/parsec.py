@@ -2696,20 +2696,20 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             samps = np.random.choice(np.arange(nsamps),size=nsamps//10,replace=False)
             for i in samps:#range(nsamps):
                 ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_results'].samples[i,:])),color='red',alpha=0.1)
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_results'].samples[i,:])),color='red',alpha=0.05)
                 ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_results'].samples[i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.1)
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_results'].samples[i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.05)
         
         if (scatfitmenu.value == 'EMCEE Markov-Chain Monte Carlo') and ('scatter_MCMC_samples' in state_dict.keys()) and scattersamps.value:
             nsamps,npars = state_dict['scatter_MCMC_samples'].shape
             samps = np.random.choice(np.arange(nsamps),size=nsamps//10,replace=False)
             for i in samps:
                 ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_MCMC_samples'][i,:])),color='red',alpha=0.1)
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_MCMC_samples'][i,:])),color='red',alpha=0.05)
                 ax3.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
-                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_MCMC_samples'][i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.1)
+                        scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(scaler*state_dict['scatter_MCMC_samples'][i,:]))-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='red',alpha=0.05)
 
-
+        #plot best fit
         if 'scatter_params_best' in state_dict.keys():
             ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                         scat.exp_gauss_n(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, *list(state_dict['scatter_params_best'])),color='red',alpha=1,linewidth=4,label='Best Fit')        
