@@ -331,6 +331,10 @@ state_dict['I_tcal'] = np.nan*np.ones(5120)
 state_dict['Q_tcal'] = np.nan*np.ones(5120)
 state_dict['U_tcal'] = np.nan*np.ones(5120)
 state_dict['V_tcal'] = np.nan*np.ones(5120)
+state_dict['I_tcal_err'] = np.nan*np.ones(5120)
+state_dict['Q_tcal_err'] = np.nan*np.ones(5120)
+state_dict['U_tcal_err'] = np.nan*np.ones(5120)
+state_dict['V_tcal_err'] = np.nan*np.ones(5120)
 
 state_dict['Tpol'] = np.nan
 state_dict['Tpol_err'] = np.nan
@@ -528,6 +532,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'ddm_num':0,
          'DM_input_display':DMinit,
          'DM_new_display':DMinit,
+         'DM_showerrs':False,
 
          'polcaldate_create_menu':"", ############### (3) Calibration ##################
          'polcaldate_bf_menu':"",
@@ -581,6 +586,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'Qflux_display':np.nan,
          'Uflux_display':np.nan,
          'Vflux_display':np.nan,
+         'filt_showerrs':False,
 
         'scattermenu':['Component 0'],
         'scatfitmenu':'Nested Sampling',
@@ -1051,7 +1057,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
 
             #get time series
-            (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+            (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],state_dict['I_tcal_err'],state_dict['Q_tcal_err'],state_dict['U_tcal_err'],state_dict['V_tcal_err']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
 
             state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
             state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
@@ -1166,7 +1172,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 """
 Dedispersion Tuning state
 """
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton,saveplotbutton):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton,saveplotbutton,DM_showerrs):
     """
     This function updates the dedispersion screen when resolution
     or dm,where='post' step are changed
@@ -1208,7 +1214,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     state_dict['V'] = dedisp.dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
 
     #get time series
-    (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+    (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t'],state_dict['I_t_err'],state_dict['Q_t_err'],state_dict['U_t_err'],state_dict['V_t_err']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
     state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_t']))
 
     #get timestart, timestop
@@ -1226,14 +1232,29 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 
     #display dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
-    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+    c1=a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='I',where='post')
-    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+    c2=a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             state_dict['Q_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='Q',where='post')
-    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+    c3=a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             state_dict['U_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='U',where='post')
-    a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+    c4=a0.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             state_dict['V_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],label='V',where='post')
+    if DM_showerrs.value:
+        a0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                state_dict['I_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                yerr=state_dict['I_t_err'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c1[0].get_color(),alpha=1,linestyle='')
+        a0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                state_dict['Q_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                yerr=state_dict['Q_t_err'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c2[0].get_color(),alpha=1,linestyle='')
+        a0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                state_dict['U_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                yerr=state_dict['U_t_err'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c3[0].get_color(),alpha=1,linestyle='')
+        a0.errorbar(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+                state_dict['V_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
+                yerr=state_dict['V_t_err'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color=c4[0].get_color(),alpha=1,linestyle='')
+    
+
     a0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     a0.set_xticks([])
@@ -1276,8 +1297,8 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 
         #state_dict['current_state'] += 1
     #update widget dict
-    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num],
-                ["n_t_slider","logn_f_slider","logwindow_slider_init","ddm_num"],
+    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_showerrs],
+                ["n_t_slider","logn_f_slider","logwindow_slider_init","ddm_num","DM_showerrs"],
                 param='value')
     
     update_wdict([DM_input_display,DM_new_display],
@@ -1380,7 +1401,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         print("done downsampling...",file=f)
         f.close()
         #get time series
-        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],state_dict['I_tcal_err'],state_dict['Q_tcal_err'],state_dict['U_tcal_err'],state_dict['V_tcal_err']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
 
         state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
         state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
@@ -1791,7 +1812,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
 Filter Weights State
 """
 
-def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider,fluxestbutton, Iflux_display,Qflux_display,Uflux_display,Vflux_display):
+def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,nextcompbutton,donecompbutton,avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider,fluxestbutton, Iflux_display,Qflux_display,Uflux_display,Vflux_display,filt_showerrs):
     
 
     if nextcompbutton.clicked:
@@ -1864,9 +1885,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     state_dict['comps'][state_dict['current_comp']]['left_lim'] = np.argmin(np.abs(state_dict['time_axis']*1e-3 - (state_dict['comps'][state_dict['current_comp']]['timestart']*state_dict['n_t']*32.7e-3 - state_dict['window']*state_dict['n_t']*32.7e-3 + comprange_slider.value[0])))
     state_dict['comps'][state_dict['current_comp']]['right_lim'] = np.argmin(np.abs(state_dict['time_axis']*1e-3 - (state_dict['comps'][state_dict['current_comp']]['timestart']*state_dict['n_t']*32.7e-3 - state_dict['window']*state_dict['n_t']*32.7e-3 + comprange_slider.value[1])))
 
-    (I_tcal,Q_tcal,U_tcal,V_tcal) = dsapol.get_stokes_vs_time(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],
+    (I_tcal,Q_tcal,U_tcal,V_tcal,I_tcal_errs,Q_tcal_errs,U_tcal_errs,V_tcal_errs) = dsapol.get_stokes_vs_time(Ip,Qp,Up,Vp,state_dict['comps'][state_dict['current_comp']]['width_native'],
                                                 state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),
-                                                plot=False,show=False,normalize=True,buff=state_dict['comps'][state_dict['current_comp']]['buff'],window=30)
+                                                plot=False,show=False,normalize=True,buff=state_dict['comps'][state_dict['current_comp']]['buff'],window=30,error=True,badchans=state_dict['badchans'])
 
     state_dict['comps'][state_dict['current_comp']]['weights'] = dsapol.get_weights_1D(I_tcal,Q_tcal,U_tcal,V_tcal,
                                                                                 state_dict['comps'][state_dict['current_comp']]['timestart'],
@@ -1973,16 +1994,34 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
     #display masked dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
-    a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+    c1=a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             I_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='I',where='post')
-    a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+    c2=a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             Q_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='Q',where='post')
-    a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+    c3=a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             U_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='U',where='post')
-    a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+    c4=a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             V_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],label='V',where='post')
     a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
             state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*np.max(I_tcal)/np.max(state_dict['comps'][state_dict['current_comp']]['weights'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]),label='weights',color='purple',linewidth=4,where='post')
+
+    if filt_showerrs.value:
+        a0.errorbar(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+                I_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                yerr=I_tcal_errs[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                color=c1[0].get_color(),alpha=1,linestyle='')
+        a0.errorbar(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+                Q_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                yerr=Q_tcal_errs[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                color=c2[0].get_color(),alpha=1,linestyle='')
+        a0.errorbar(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+                U_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                yerr=U_tcal_errs[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                color=c3[0].get_color(),alpha=1,linestyle='')
+        a0.errorbar(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
+                U_tcal[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                yerr=U_tcal_errs[state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']],
+                color=c4[0].get_color(),alpha=1,linestyle='')
 
     #plot weights from others
     for k in range(state_dict['current_comp']):
@@ -2143,10 +2182,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 
     update_wdict([logwindow_slider,logibox_slider,
                 buff_L_slider,buff_R_slider,ncomps_num,comprange_slider,
-                avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider],
+                avger_w_slider,sf_window_weights_slider,multipeaks,multipeaks_height_slider,filt_showerrs],
                 ["logwindow_slider","logibox_slider",
                 "buff_L_slider","buff_R_slider","ncomps_num","comprange_slider",
-                "avger_w_slider","sf_window_weights_slider","multipeaks","multipeaks_height_slider"],
+                "avger_w_slider","sf_window_weights_slider","multipeaks","multipeaks_height_slider","filt_showerrs"],
                 param='value')
 
     update_wdict([Iflux_display,Qflux_display,Uflux_display,Vflux_display],
@@ -2183,6 +2222,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
     
         #plot the selected components
         I_tcal_p = copy.deepcopy(state_dict['I_tcal'])
+        I_tcal_errs_p = copy.deepcopy(state_dict['I_tcal_err'])
         time_axis_p = copy.deepcopy(state_dict['time_axis'])
         mask = np.zeros(state_dict['I_tcal'].shape)
         for k in range(state_dict['n_comps']):
@@ -2190,10 +2230,12 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 #mask = np.zeros(state_dict['Ical'].shape)
                 mask[state_dict['comps'][k]['left_lim']:state_dict['comps'][k]['right_lim']] = 1
         I_tcal_p = ma(I_tcal_p,mask)
+        I_tcal_errs_p = ma(I_tcal_errs_p,mask)
         time_axis_p = ma(time_axis_p,mask)
         state_dict['time_axis_scattering'] = time_axis_p
         state_dict['I_tcal_scattering'] = I_tcal_p
-    
+        state_dict['I_tcal_err_scattering'] = I_tcal_errs_p
+
         #plot initial guess
         p0_full = []
         for comp in scattermenu.value:
@@ -2211,12 +2253,13 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
             timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
             if scatterweights.value:
-                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask] 
-                weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
-                sigma_for_fit = 1/weights_for_fit
-                sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+                #weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask] 
+                #weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
+                sigma_for_fit = state_dict['I_tcal_err_scattering']
+                #sigma_for_fit = 1/weights_for_fit
+                #sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
             else:
-                sigma_for_fit = np.nanstd(state_dict['I_tcal_scattering'][:int(NOFFDEF/state_dict['n_t'])])*np.ones(len(timeaxis_for_fit))
+                sigma_for_fit = np.nanmean(state_dict['I_tcal_err_scattering'])#np.nanstd(state_dict['I_tcal_scattering'][:int(NOFFDEF/state_dict['n_t'])])*np.ones(len(timeaxis_for_fit))
 
             #get number of live points
             nlive = scatter_nlive.value#len(timeaxis_for_fit)#int(len(state_dict['I_tcal_scattering']) - np.sum(state_dict['I_tcal_scattering'].mask))
@@ -2286,12 +2329,13 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
             timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
             if scatterweights.value:
-                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]
-                weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
-                sigma_for_fit = 1/weights_for_fit
-                sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+                #weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]
+                #weights_for_fit *= (state_dict['I_tcal_scattering'].data[state_dict['peak']]/state_dict['weights'][state_dict['peak']])
+                sigma_for_fit = state_dict['I_tcal_err_scattering']
+                #sigma_for_fit = 1/weights_for_fit
+                #sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
             else:
-                sigma_for_fit = np.nanstd(state_dict['I_tcal_scattering'][:int(NOFFDEF/state_dict['n_t'])])*np.ones(len(timeaxis_for_fit))
+                sigma_for_fit = np.nanmean(state_dict['I_tcal_err_scattering'])#np.nanstd(state_dict['I_tcal_scattering'][:int(NOFFDEF/state_dict['n_t'])])*np.ones(len(timeaxis_for_fit))
 
             #init bounds
             low_bounds = []
@@ -2446,9 +2490,10 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             timeseries_for_fit = state_dict['I_tcal_scattering'].data[~state_dict['I_tcal_scattering'].mask]/scaler
             timeaxis_for_fit = state_dict['time_axis_scattering'].data[~state_dict['time_axis_scattering'].mask]/1e3/scaler
             if scatterweights.value:
-                weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]/np.sum(state_dict['weights'][~state_dict['time_axis_scattering'].mask])
-                sigma_for_fit = 1/weights_for_fit
-                sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+                #weights_for_fit = state_dict['weights'][~state_dict['time_axis_scattering'].mask]/np.sum(state_dict['weights'][~state_dict['time_axis_scattering'].mask])
+                #sigma_for_fit = 1/weights_for_fit
+                #sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
+                sigma_for_fit = state_dict['I_tcal_err_scattering']
             else:
                 sigma_for_fit = None
 
@@ -3386,7 +3431,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
                                                                                                         RM,0,state_dict['freq_test'],
                                                                                                         stokes=True) #total derotation
 
-        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM'],state_dict['I_tcalRM_err'],state_dict['Q_tcalRM_err'],state_dict['U_tcalRM_err'],state_dict['V_tcalRM_err']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
 
 
 
@@ -3416,7 +3461,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
 
         show_calibrated = ~np.isnan(state_dict['RMcalibrated']['RMcal'])
 
-        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30)
+        (state_dict['I_tcalRM'],state_dict['Q_tcalRM'],state_dict['U_tcalRM'],state_dict['V_tcalRM'],state_dict['I_tcalRM_err'],state_dict['Q_tcalRM_err'],state_dict['U_tcalRM_err'],state_dict['V_tcalRM_err']) = dsapol.get_stokes_vs_time(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
 
         RMcal.plot_RM_2D(state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],int(NOFFDEF/state_dict['n_t']),state_dict['n_t'],state_dict['time_axis'],state_dict['timestart'],state_dict['timestop'],state_dict['RMcalibrated']['RM2'][0],state_dict['RMcalibrated']['RM2'][1],state_dict['RMcalibrated']['trial_RM2'],state_dict['RMcalibrated']['SNRs_full'],Qnoise=np.std(state_dict['Qcal'].mean(0)[:int(NOFFDEF/state_dict['n_t'])]),show_calibrated=show_calibrated,RMcal=state_dict['RMcalibrated']['RMcal'],RMcalerr=state_dict['RMcalibrated']['RMcalerr'],I_tcal_trm=state_dict['I_tcalRM'],Q_tcal_trm=state_dict['Q_tcalRM'],U_tcal_trm=state_dict['U_tcalRM'],V_tcal_trm=state_dict['V_tcalRM'],wind=state_dict['window']*32.7*state_dict['n_t']*1e-3)#,rmbuff=500,cmapname='viridis',wind=5)
 

@@ -645,7 +645,7 @@ def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=T
     return (I,fobj,timeaxis,freq_1D,wav_1D)
 
 #Get frequency averaged stokes params vs time; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10):
+def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10,error=False,badchans=[]):
     """
     This function calculates the frequency averaged time series for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -684,12 +684,21 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         Q_t = (np.mean(Q,axis=0) - np.mean(np.mean(Q[:,:n_off],axis=0)))/np.std(np.mean(Q[:,:n_off],axis=0))
         U_t = (np.mean(U,axis=0) - np.mean(np.mean(U[:,:n_off],axis=0)))/np.std(np.mean(U[:,:n_off],axis=0))
         V_t = (np.mean(V,axis=0) - np.mean(np.mean(V[:,:n_off],axis=0)))/np.std(np.mean(V[:,:n_off],axis=0))
+        if error:
+            I_t_err = ((np.nanstd(I,axis=0)/np.sqrt(I.shape[0] - len(badchans))) - np.mean(np.mean(I[:,:n_off],axis=0)))/np.std(np.mean(I[:,:n_off],axis=0))
+            Q_t_err = ((np.nanstd(Q,axis=0)/np.sqrt(Q.shape[0] - len(badchans))) - np.mean(np.mean(Q[:,:n_off],axis=0)))/np.std(np.mean(Q[:,:n_off],axis=0))
+            U_t_err = ((np.nanstd(U,axis=0)/np.sqrt(U.shape[0] - len(badchans))) - np.mean(np.mean(U[:,:n_off],axis=0)))/np.std(np.mean(U[:,:n_off],axis=0))
+            V_t_err = ((np.nanstd(V,axis=0)/np.sqrt(V.shape[0] - len(badchans))) - np.mean(np.mean(V[:,:n_off],axis=0)))/np.std(np.mean(V[:,:n_off],axis=0))
     else:
         I_t = (np.mean(I,axis=0))
         Q_t = (np.mean(Q,axis=0))
         U_t = (np.mean(U,axis=0))
         V_t = (np.mean(V,axis=0))
-
+        if error:
+            I_t_err = ((np.std(I,axis=0)/np.sqrt(I.shape[0] - len(badchans))))
+            Q_t_err = ((np.std(Q,axis=0)/np.sqrt(Q.shape[0] - len(badchans)))) 
+            U_t_err = ((np.std(U,axis=0)/np.sqrt(U.shape[0] - len(badchans))))
+            V_t_err = ((np.std(V,axis=0)/np.sqrt(V.shape[0] - len(badchans))))
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -709,8 +718,10 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
             plt.show()
         plt.close(f)
     
-    
-    return (I_t,Q_t,U_t,V_t)
+    if error:
+        return (I_t,Q_t,U_t,V_t,I_t_err,Q_t_err,U_t_err,V_t_err)
+    else:
+        return (I_t,Q_t,U_t,V_t)
 
 
 #Get optimal SNR weights using binning that maximizes SNR
