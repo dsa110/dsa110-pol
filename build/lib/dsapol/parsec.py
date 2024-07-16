@@ -457,7 +457,11 @@ df_scat = pd.DataFrame(
             r'$\sigma$ lower error (ms)':[],
             r'$\tau$ (ms)':[],
             r'$\tau$ upper error':[],
-            r'$\tau$ lower error':[]
+            r'$\tau$ lower error':[],
+            r'f':[],
+            r'f upper error':[],
+            r'f lower error':[],
+            r'BIC':[]
         },
         index=[]
         )
@@ -2212,7 +2216,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 sigma_for_fit = 1/weights_for_fit
                 sigma_for_fit[weights_for_fit==0] = np.nanmax(sigma_for_fit)*100
             else:
-                sigma_for_fit = None
+                sigma_for_fit = np.nanstd(state_dict['I_tcal_scattering'][:int(NOFFDEF/state_dict['n_t'])])*np.ones(len(timeaxis_for_fit))
 
             #get number of live points
             nlive = scatter_nlive.value#len(timeaxis_for_fit)#int(len(state_dict['I_tcal_scattering']) - np.sum(state_dict['I_tcal_scattering'].mask))
@@ -2233,7 +2237,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             #run nested sampling
             if scatterbackground.value:
-                state_dict['scatter_dname_result'],state_dict['scatter_dname'] = scatscint.run_nested_sampling(timeseries_for_fit,
+                state_dict['scatter_bilby_dname_result'],state_dict['scatter_bilby_dname_result_params'],state_dict['scatter_bilby_dname_BIC'], state_dict['scatter_bilby_dname'] = scatscint.run_nested_sampling(timeseries_for_fit,
                                                                 outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
                                                                 p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp']/1e3/scaler,
                                                                 timeaxis_for_fit=timeaxis_for_fit,
@@ -2241,17 +2245,13 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                                 resume=scatterresume.value)
             else:
 
-                state_dict['scatter_results'] = scatscint.run_nested_sampling(timeseries_for_fit,
+                state_dict['scatter_results'],state_dict['scatter_params_best'],state_dict['scatter_params_best_upperr'],state_dict['scatter_params_best_lowerr'],state_dict['scatter_BIC'] = scatscint.run_nested_sampling(timeseries_for_fit,
                                                                 outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
                                                                 p0=p0, comp_num=len(x0_guess_comps), nlive=nlive, time_resolution=state_dict['tsamp']/1e3/scaler,
                                                                 timeaxis_for_fit=timeaxis_for_fit,
                                                                 low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=False,
                                                                 resume=scatterresume.value)
 
-
-                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*scaler
-                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*scaler - state_dict['scatter_params_best']
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*scaler
 
                 df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
@@ -2264,7 +2264,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    "","","",
+                                                    str(np.around(state_dict['scatter_BIC'],2))]
 
                 """
                 
@@ -2306,23 +2308,30 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 upp_bounds += [x0_range_sliders[i].value[1]/scaler,amp_range_sliders[i].value[1]/scaler,sigma_range_sliders[i].value[1]/scaler,tau_range_sliders[i].value[1]/scaler]
 
             if scatterbackground.value:
-                state_dict['scatter_MCMC_dname_result'],state_dict['scatter_MCMC_dname'] = scatscint.run_MCMC_sampling(timeseries_for_fit,
+                state_dict['scatter_MCMC_dname_samples'],state_dict['scatter_MCMC_dname_result'],state_dict['scatter_MCMC_dname_BIC'],state_dict['scatter_MCMC_dname'] = scatscint.run_MCMC_sampling(timeseries_for_fit,
                                                                 outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
                                                                 p0=p0, timeaxis_for_fit=timeaxis_for_fit,
                                                                 low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=True,
                                                                 nwalkers=int(scatter_nwalkers.value),nsteps=int(scatter_nsteps.value),discard=int(scatter_nburn.value),thin=int(scatter_nthin.value))
             else:
 
-                state_dict['scatter_MCMC_samples'],state_dict['scatter_params_best'],state_dict['scatter_params_best_upperr'],state_dict['scatter_params_best_lowerr'] = scatscint.run_MCMC_sampling(timeseries_for_fit,
+                state_dict['scatter_MCMC_samples'],state_dict['scatter_params_best'],state_dict['scatter_params_best_upperr'],state_dict['scatter_params_best_lowerr'],state_dict['scatter_BIC'] = scatscint.run_MCMC_sampling(timeseries_for_fit,
                                                                 outdir=state_dict['datadir'], label=state_dict['ids'] + "_" + state_dict['nickname'],
                                                                 p0=p0, timeaxis_for_fit=timeaxis_for_fit,
                                                                 low_bounds=low_bounds,upp_bounds=upp_bounds,sigma_for_fit=sigma_for_fit,background=False,
                                                                 nwalkers=int(scatter_nwalkers.value),nsteps=int(scatter_nsteps.value),discard=int(scatter_nburn.value),thin=int(scatter_nthin.value))
 
-                state_dict['scatter_MCMC_samples'] = state_dict['scatter_MCMC_samples']*scaler
-                state_dict['scatter_params_best'] = state_dict['scatter_params_best']*scaler
-                state_dict['scatter_params_best_upperr'] = state_dict['scatter_params_best_upperr']*scaler
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best_lowerr']*scaler
+
+                state_dict['scatter_MCMC_samples_f'] = state_dict['scatter_MCMC_samples'][:,-1]*scaler
+                state_dict['scatter_params_best_f'] = state_dict['scatter_params_best'][-1]*scaler
+                state_dict['scatter_params_best_upperr_f'] = state_dict['scatter_params_best_upperr'][-1]*scaler
+                state_dict['scatter_params_best_lowerr_f'] = state_dict['scatter_params_best_lowerr'][-1]*scaler
+
+
+                state_dict['scatter_MCMC_samples'] = state_dict['scatter_MCMC_samples'][:,:-1]*scaler
+                state_dict['scatter_params_best'] = state_dict['scatter_params_best'][:-1]*scaler
+                state_dict['scatter_params_best_upperr'] = state_dict['scatter_params_best_upperr'][:-1]*scaler
+                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best_lowerr'][:-1]*scaler
 
                 df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
@@ -2335,7 +2344,11 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    str(np.around(state_dict['scatter_params_best_f'],2)),
+                                                    str(np.around(state_dict['scatter_params_best_upperr_f'],2)),
+                                                    str(np.around(state_dict['scatter_params_best_lowerr_f'],2)),
+                                                    str(np.around(state_dict['scatter_BIC'],2))]
 
 
 
@@ -2396,7 +2409,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    "","","",""]
 
             """
     
@@ -2467,7 +2481,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    "","","",""]
 
 
 
@@ -2490,15 +2505,16 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
     #check if nested sampling/MCMC is done
     if refresh_button.clicked:
         print("Refreshing...")
-        if 'scatter_dname_result' in state_dict.keys():
-            l = glob.glob(dirs['logs'] + "scat_files/" + state_dict['scatter_dname_result'])
+        if 'scatter_bilby_dname_result' in state_dict.keys():
+            l = glob.glob(dirs['logs'] + "scat_files/" + state_dict['scatter_bilby_dname_result'])
             if len(l) > 0:
-                state_dict['scatter_results'] = bcresult.read_in_result(filename=dirs['logs'] + "scat_files/" + state_dict['scatter_dname_result'])
+                state_dict['scatter_results'] = bcresult.read_in_result(filename=dirs['logs'] + "scat_files/" + state_dict['scatter_bilby_dname_result'])
+                tmp = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_bilby_dname_result_params'])*scaler
+                state_dict['scatter_params_best'] = tmp[0,:]
+                state_dict['scatter_params_best_upperr'] = tmp[1,:]
+                state_dict['scatter_params_best_lowerr'] = tmp[2,:]
             
-                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_results'].samples,axis=0)*1000
-                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_results'].samples,84,axis=0)*1000 - state_dict['scatter_params_best']*1000
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best']*1000 - np.nanpercentile(state_dict['scatter_results'].samples,16,axis=0)*1000
-
+                state_dict['scatter_BIC'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_bilby_dname_BIC'])
 
                 df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
@@ -2511,7 +2527,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    "","","",
+                                                    str(np.around(state_dict['scatter_BIC'],2))]
                 
                 """
                 df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
@@ -2531,15 +2549,18 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
         elif 'scatter_MCMC_dname' in state_dict.keys():
             l = glob.glob(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_result'])
             if len(l) > 0:
-                state_dict['scatter_MCMC_samples'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_result'])
-                state_dict['scatter_params_best'] = np.nanmedian(state_dict['scatter_MCMC_samples'],axis=0)
-                state_dict['scatter_params_best_upperr'] = np.nanpercentile(state_dict['scatter_MCMC_samples'],84,axis=0) - state_dict['scatter_params_best']
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best'] - np.nanpercentile(state_dict['scatter_MCMC_samples'],16,axis=0)
+                state_dict['scatter_MCMC_samples'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_samples'])[:,:-1]*scaler
+                tmp = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_result'])*scaler
+                state_dict['scatter_params_best'] = tmp[0,:-1]
+                state_dict['scatter_params_best_upperr'] = tmp[1,:-1]
+                state_dict['scatter_params_best_lowerr'] = tmp[2,:-1]
 
-                state_dict['scatter_MCMC_samples'] = state_dict['scatter_MCMC_samples']*scaler
-                state_dict['scatter_params_best'] = state_dict['scatter_params_best']*scaler
-                state_dict['scatter_params_best_upperr'] = state_dict['scatter_params_best_upperr']*scaler
-                state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best_lowerr']*scaler
+                state_dict['scatter_MCMC_samples_f'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_samples'])[:,-1]*scaler
+                state_dict['scatter_params_best_f'] = tmp[0,-1]
+                state_dict['scatter_params_best_upperr_f'] = tmp[1,-1]
+                state_dict['scatter_params_best_lowerr_f'] = tmp[2,-1]
+
+                state_dict['scatter_BIC'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_BIC'])
 
                 df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
@@ -2552,7 +2573,11 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                     ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
                                                     ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))])]
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                                                    str(np.around(state_dict['scatter_params_best_f'],2)),
+                                                    str(np.around(state_dict['scatter_params_best_upperr_f'],2)),
+                                                    str(np.around(state_dict['scatter_params_best_lowerr_f'],2)),
+                                                    str(np.around(state_dict['scatter_BIC'],2))]
 
 
                 
