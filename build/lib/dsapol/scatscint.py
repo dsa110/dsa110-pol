@@ -156,3 +156,11 @@ def run_MCMC_sampling(timeseries_for_fit, outdir, label, p0, timeaxis_for_fit, l
     np.save(outdir + label + "_MCMC_BIC.npy",np.array([BIC]))
 
     return flat_samples,p_median,p_upper,p_lower,BIC
+
+
+def specidx_fit_fn(x,Gamma,F0,nu0=1.4e3):
+    """
+    This function returns the flux assuming spectral index Gamma and flux F0 at 1.4 GHz. x should be given in MHz
+    """
+
+    return F0*((x/nu0)**(-Gamma))

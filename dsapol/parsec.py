@@ -448,6 +448,17 @@ df_scint = pd.DataFrame(
         index=["All"]#copy.deepcopy(corrarray)
     )
 
+df_specidx = pd.DataFrame(
+        {
+            r'$\Gamma$':[np.nan],
+            r'$\Gamma$ Error':[np.nan],
+            r'F0':[np.nan],
+            r'F0 Error':[np.nan]
+        },
+            index = ["All"]
+        )
+            
+
 df_scat = pd.DataFrame(
         {
             r'x0 (ms)':[],
@@ -660,6 +671,13 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'gamma_guess':10, 
         'm_guess':1,
         'c_guess':0,
+        
+        'specidxmenu':'All',
+        'specidxmenu_choices':['All'],
+        'specidxfitmenu':['LMFIT Non-Linear Least Squares'],
+        'specidxfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares'],
+        'specidx_guess':0,
+        'F0_guess':1,
 
 
         'useRMTools':True, ################ (5) RM Synthesis ################
@@ -2990,6 +3008,130 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
     #update wdict
     update_wdict([gamma_guess,m_guess,c_guess,scintmenu,scint_fit_range,scintfitmenu],
             ['gamma_guess','m_guess','c_guess','scintmenu','scint_fit_range','scintfitmenu'])
+
+    return
+
+"""
+Spectral Index Fitting Screen
+"""
+def specidx_screen(specidxfitmenu,calc_specidx_button,specidx_guess,F0_guess,specidxmenu,save_specidx_button):
+
+
+    #plot frequency spectrum and initial guess fit 
+
+    g2 = plt.GridSpec(2,1,hspace=0,height_ratios=[2,1],top=0.7)
+    fig = plt.figure(figsize=(18,12))
+    ax1 = fig.add_subplot(g2[0,:])
+    if specidxmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
+        ax1.plot(state_dict['freq_test'][0],state_dict['I_fcal'],label='Spectrum')
+        ax1.set_title("All Components")
+        ax1.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    elif specidxmenu.value != 'All' and state_dict['n_comps'] > 1:
+        i = int(specidxmenu.value[-1])
+        ax1.plot(state_dict['freq_test'][0],state_dict['comps'][i]['I_fcal'],label='Spectrum')
+        ax1.set_title("Component " + str(i))
+        ax1.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax1.plot(state_dict['freq_test'][0],scatscint.specidx_fit_fn(state_dict['freq_test'][0],specidx_guess.value,F0_guess.value),label='Initial Guess',color='purple')
+    ax1.set_xlabel("Frequency (MHz)")
+    ax1.set_ylabel("S/N")
+
+    if calc_specidx_button.clicked and ((specidxmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal']))) or (specidxmenu.value != 'All' and state_dict['n_comps'] > 1 and ~np.all(np.isnan(state_dict['comps'][i]['I_fcal'])))):
+
+        if (specidxmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal']))):
+            spec_for_fit = state_dict['I_fcal'][~np.isnan(state_dict['I_fcal'])]
+            freq_for_fit = state_dict['freq_test'][0][~np.isnan(state_dict['I_fcal'])]
+        else:
+            i = int(specidxmenu.value[-1])
+            spec_for_fit = state_dict['comps'][i]['I_fcal'][~np.isnan(state_dict['comps'][i]['I_fcal'])]
+            freq_for_fit = state_dict['freq_test'][0][~np.isnan(state_dict['comps'][i]['I_fcal'])]
+
+        #weight the spectrum by the intensity
+        weights_for_fit = np.clip(spec_for_fit,a_min=0,a_max=np.inf)
+        sigma_for_fit = 1/np.clip(spec_for_fit,a_min=0,a_max=np.inf)
+        spec_for_fit = spec_for_fit[~np.isinf(sigma_for_fit)]
+        freq_for_fit = freq_for_fit[~np.isinf(sigma_for_fit)]
+        weights_for_fit = weights_for_fit[~np.isinf(sigma_for_fit)]
+        sigma_for_fit = sigma_for_fit[~np.isinf(sigma_for_fit)]
+        
+
+        if specidxfitmenu.value == 'LMFIT Non-Linear Least Squares':
+
+            #LMFIT least squares fit
+            gmodel = Model(scatscint.specidx_fit_fn,independent_vars=['x'],nan_policy='omit')
+
+            # Execute the fit
+            result = gmodel.fit(spec_for_fit, x = freq_for_fit, Gamma=specidx_guess.value,F0=F0_guess.value,weights=weights_for_fit)
+
+            df_specidx.loc[str(specidxmenu.value)] = [result.params['Gamma'].value,
+                               result.params['Gamma'].stderr,
+                               result.params['F0'].value,
+                               result.params['F0'].stderr]
+                               
+            if str(specidxmenu.value) == 'All':
+                state_dict['specidx_best'] = [result.params['Gamma'].value,result.params['Gamma'].stderr]
+                state_dict['F0_best'] = [result.params['F0'].value,result.params['F0'].stderr]
+                state_dict['specidx_residuals'] = state_dict['I_fcal'] - scatscint.specidx_fit_fn(state_dict['freq_test'][0],state_dict['specidx_best'][0],state_dict['F0_best'][0])  
+            else:
+                i = int(specidxmenu.value[-1])
+                state_dict['comps'][i]['specidx_best'] = [result.params['Gamma'].value,result.params['Gamma'].stderr]
+                state_dict['comps'][i]['F0_best'] = [result.params['F0'].value,result.params['F0'].stderr]
+                state_dict['comps'][i]['specidx_residuals'] = state_dict['comps'][i]['I_fcal'] - scatscint.specidx_fit_fn(state_dict['freq_test'][0],state_dict['comps'][i]['specidx_best'][0],state_dict['comps'][i]['F0_best'][0])
+
+        else: #least squares fitting
+            
+
+            popt,pcov = curve_fit(scatscint.specidx_fit_fn,freq_for_fit,spec_for_fit,p0=[specidx_guess.value,F0_guess.value],sigma=sigma_for_fit)
+
+            df_specidx.loc[str(specidxmenu.value)] = [popt[0],
+                               np.sqrt(pcov[0,0]),
+                               popt[1],
+                               np.sqrt(pcov[1,1])]
+                               
+
+            if str(specidxmenu.value) == 'All':
+                state_dict['specidx_best'] = [popt[0],np.sqrt(pcov[0,0])]
+                state_dict['F0_best'] = [popt[1],np.sqrt(pcov[1,1])]
+                state_dict['specidx_residuals'] = state_dict['I_fcal'] - scatscint.specidx_fit_fn(state_dict['freq_test'][0],state_dict['specidx_best'][0],state_dict['F0_best'][0])
+            else:
+                i = int(specidxmenu.value[-1])
+                state_dict['comps'][i]['specidx_best'] =[popt[0],np.sqrt(pcov[0,0])]
+                state_dict['comps'][i]['F0_best'] =[popt[1],np.sqrt(pcov[1,1])]
+                state_dict['comps'][i]['specidx_residuals'] = state_dict['comps'][i]['I_fcal'] - scatscint.specidx_fit_fn(state_dict['freq_test'][0],state_dict['comps'][i]['specidx_best'][0],state_dict['comps'][i]['F0_best'][0])
+
+
+    #plot residuals
+    ax3 = fig.add_subplot(g2[1,:])#,sharex=ax2)
+    if specidxmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
+        ax3.plot(state_dict['freq_test'][0],state_dict['I_fcal'] - scatscint.specidx_fit_fn(state_dict['freq_test'][0],specidx_guess.value,F0_guess.value),label='Initial Residuals',color='purple')
+        if 'specidx_best' in state_dict.keys():
+            #best fit
+            ax1.plot(state_dict['freq_test'][0],scatscint.specidx_fit_fn(state_dict['freq_test'][0],state_dict['specidx_best'][0],state_dict['F0_best'][0]),label='Best Fit',color='red',linewidth=3)
+            ax3.plot(state_dict['freq_test'][0],state_dict['specidx_residuals'],label='LSF Residuals',color='red')
+        ax3.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    elif specidxmenu.value != 'All' and state_dict['n_comps'] > 1:
+        i = int(specidxmenu.value[-1])
+        if ~np.all(np.isnan(state_dict['comps'][i]['I_fcal'])) and state_dict['n_comps'] > 1:
+            ax3.plot(state_dict['freq_test'][0],state_dict['comps'][i]['I_fcal'] - scatscint.specidx_fit_fn(state_dict['freq_test'][0],specidx_guess.value,F0_guess.value),label='Initial Residuals',color='purple')
+            if 'specidx_best' in state_dict['comps'][i].keys():
+                #best fit
+                ax1.plot(state_dict['freq_test'][0],scatscint.specidx_fit_fn(state_dict['freq_test'][0],state_dict['comps'][i]['specidx_best'][0],state_dict['comps'][i]['F0_best'][0]),label='Best Fit',color='red',linewidth=3)
+                ax3.plot(state_dict['freq_test'][0],state_dict['comps'][i]['specidx_residuals'],label='LSF Residuals',color='red')
+        ax3.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+    ax3.set_xlabel("Frequency (MHz)")
+    ax3.set_ylabel(r"$\Delta$")
+    ax3.legend(loc='upper right',fontsize=18)
+    ax1.legend(loc='upper right',fontsize=18)
+
+    if save_specidx_button.clicked:
+        plt.savefig(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_specidx.pdf")
+        df_specidx.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_specidx_params.pdf")
+
+    plt.show()
+
+
+    #update wdict
+    update_wdict([specidx_guess,F0_guess],
+            ['specidx_guess','F0_guess'])
 
     return
 """
