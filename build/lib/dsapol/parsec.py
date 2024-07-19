@@ -920,6 +920,12 @@ def update_wdict(objects,labels,param='value'):
     else:
         wdict['scintmenu_choices'] = ['All']
 
+    #update specidx comps
+    if state_dict['n_comps'] > 1:
+        wdict['specidxmenu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
+    else:
+        wdict['specidxmenu_choices'] = ['All']
+
     #update polcomps
     if state_dict['n_comps'] > 1: 
         wdict['polcomp_menu_choices'] = ['All'] + ['Component ' + str(i) for i in range(state_dict['n_comps'])]
@@ -1345,6 +1351,12 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     if polcaldate_menu.value != "":
         #update polcal parameters in state dict
         state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = polcal.read_polcal(polcaldate_menu.value)
+        
+        #needd to downsample to base resolution
+        state_dict['gxx'] = np.nanmean(state_dict['gxx'].reshape((len(state_dict['gxx'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+        state_dict['gyy'] = np.nanmean(state_dict['gyy'].reshape((len(state_dict['gyy'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+        state_dict['cal_freq_axis'] = np.nanmean(state_dict['cal_freq_axis'].reshape((len(state_dict['cal_freq_axis'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+
     state_dict['polcalfile'] = polcaldate_menu.value
 
     #look for new calibrator files
@@ -2698,7 +2710,9 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
     if ~np.all(np.isnan(state_dict['I_tcal'])):
 
-        for k in range(state_dict['n_comps']):
+        for comp in scattermenu.value:
+            k = int(comp[-1])
+            #k in range(state_dict['n_comps']):
             ax3.plot(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
                     scat.exp_gauss(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3, x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)-I_tcal_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color='purple',alpha=0.25)
         ax3.plot(time_axis_p[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
