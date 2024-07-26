@@ -492,7 +492,7 @@ def write_fil_data_dsa(arr,fn,fobj):
     b.toFile(fn)
     return
 
-def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,verbose=False):
     """ 
     This function writes the provided Stokes dynamic spectra to 
     filterbank files in the given directory.
@@ -505,25 +505,33 @@ def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
             alpha --> bool, True if desired filterbanks should end with 'I,Q,U,V', False if desired filterbanks should end with '0,1,2,3' (default=False)
     """
     if alpha:
-        sdir = datadir + fn_prefix + "_" + suffix
-        print("Writing Stokes I to " + sdir + "_I.fil")
+        sdir = datadir + fn_prefix + suffix
+        if verbose:
+            print("Writing Stokes I to " + sdir + "_I.fil")
         write_fil_data_dsa(I,sdir + "_I.fil",fobj)
-        print("Writing Stokes Q to " + sdir + "_Q.fil")
+        if verbose:
+            print("Writing Stokes Q to " + sdir + "_Q.fil")
         write_fil_data_dsa(Q,sdir + "_Q.fil",fobj)
-        print("Writing Stokes U to " + sdir + "_U.fil")
+        if verbose:
+            print("Writing Stokes U to " + sdir + "_U.fil")
         write_fil_data_dsa(U,sdir + "_U.fil",fobj)
-        print("Writing Stokes V to " + sdir + "_V.fil")
+        if verbose:
+            print("Writing Stokes V to " + sdir + "_V.fil")
         write_fil_data_dsa(V,sdir + "_V.fil",fobj)
 
     else:
-        sdir = datadir + fn_prefix + "_" + suffix
-        print("Writing Stokes I to " + sdir + "_0.fil")
+        sdir = datadir + fn_prefix + suffix
+        if verbose:
+            print("Writing Stokes I to " + sdir + "_0.fil")
         write_fil_data_dsa(I,sdir + "_0.fil",fobj)
-        print("Writing Stokes Q to " + sdir + "_1.fil")
+        if verbose:
+            print("Writing Stokes Q to " + sdir + "_1.fil")
         write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
-        print("Writing Stokes U to " + sdir + "_2.fil")
+        if verbose:
+            print("Writing Stokes U to " + sdir + "_2.fil")
         write_fil_data_dsa(U,sdir + "_2.fil",fobj)
-        print("Writing Stokes V to " + sdir + "_3.fil")
+        if verbose:
+            print("Writing Stokes V to " + sdir + "_3.fil")
         write_fil_data_dsa(V,sdir + "_3.fil",fobj)
     return
 
@@ -3360,7 +3368,7 @@ def get_calmatrix_from_ratio_phasediff(ratio,phase_diff,gyy_mag=1,gyy_phase=0):#
     return [gxx,gyy]
 
 #Takes data products for target and returns calibrated Stokes parameters
-def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False,maxProcesses=100,idx=np.nan):
+def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False,maxProcesses=100,idx=np.nan,bad_chans=[],verbose=False):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3381,12 +3389,15 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
         #print("2D Calibration")
         gxx_cal = np.transpose(np.tile(gxx,(I_obs.shape[1],1)))
         gyy_cal = np.transpose(np.tile(gyy,(I_obs.shape[1],1)))
-        print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+        if verbose:
+            print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
     else:
-        print("1D Calibration")
+        if verbose:
+            print("1D Calibration")
         gxx_cal = gxx
         gyy_cal = gyy
-        print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+        if verbose:
+            print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
 
 
     if multithread:
@@ -3405,7 +3416,7 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
             U_obs_i = U_obs[:,i*chunk_size:(i+1)*chunk_size]
             V_obs_i = V_obs[:,i*chunk_size:(i+1)*chunk_size]
 
-            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i,bad_chans,verbose))
 
         if I_obs.shape[1]%maxProcesses != 0:
             i = maxProcesses
@@ -3414,7 +3425,7 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
             U_obs_i = U_obs[:,maxProcesses*chunk_size:]
             V_obs_i = V_obs[:,maxProcesses*chunk_size:]
 
-            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i,bad_chans,verbose))
 
         for future in as_completed(task_list):
             I_true_i,Q_true_i,U_true_i,V_true_i,i = future.result()
@@ -3440,6 +3451,17 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
         xy_obs = U_obs + 1j*V_obs
         xy_cal = xy_obs / (gxx_cal*np.conj(gyy_cal))#* np.exp(-1j * (np.angle(gxx_cal)-np.angle(gyy_cal)))
         U_true, V_true = xy_cal.real, xy_cal.imag
+
+    #re-mask data
+    
+    mask = np.zeros(I_true.shape)
+    if len(bad_chans) > 0:
+        mask[bad_chans,:] = 1
+    I_true = ma.masked_array(I_true,mask)
+    Q_true = ma.masked_array(Q_true,mask)
+    U_true = ma.masked_array(U_true,mask)
+    V_true = ma.masked_array(V_true,mask)
+
     if ~np.isnan(idx):
         return (I_true,Q_true,U_true,V_true,idx)
     return (I_true,Q_true,U_true,V_true)

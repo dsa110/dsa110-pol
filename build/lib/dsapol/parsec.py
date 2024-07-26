@@ -96,7 +96,6 @@ import json
 f = open("directories.json","r")
 dirs = json.load(f)
 f.close()
-print("test change")
 """
 Factors for RM, pol stuff
 """
@@ -212,7 +211,34 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
     return
 update_FRB_params()
 
+def update_FRB_DM_params(FRB_name,DM,fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
+    """
+    This function updates the global FRB parameters from the provided file. File is a copy
+    of the 'tablecsv' tab in the DSA110 FRB spreadsheet.
+    """
+    alldata = []
+    with open(repo_path + 'data/' + fname,"r") as csvfile:
+        reader = csv.reader(csvfile,delimiter=',')
+        for row in reader:
+            if row[0] == FRB_name:
+                if row[4] != "":
+                    row[4] = DM
+                elif row[3] != "":
+                    row[3] = DM
+                else:
+                    row[4] = row[3] = DM
+            alldata.append(row)
+    csvfile.close()
 
+    with open(repo_path + 'data/' + fname,"w") as csvfile:
+        writer = csv.writer(csvfile,delimiter=',')
+        for row in alldata:
+            writer.writerow(row)
+    csvfile.close()
+    
+
+    update_FRB_params()
+    return
 
 
 """
@@ -403,6 +429,7 @@ df_polcal = pd.DataFrame(
         index=[]#copy.deepcopy(corrarray)
     )
 polcal_dict = dict()
+polcal_dict['maxProcesses'] = 32
 polcal_dict['polcal_avail_3C48'],polcal_dict['polcal_avail_3C286'],polcal_dict['polcal_avail_bf_3C48'],polcal_dict['polcal_avail_bf_3C286'] = [],[],[],[]
 #populate w/ calibrator files
 vtimes3C48_init,vfiles3C48_init = polcal.get_voltages("3C48")
@@ -710,7 +737,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'intRbuffer_slider':0,
         'polcomp_menu':'All',
         'polcomp_menu_choices':['All'],
-        'notesinput':""
+        'notesinput':"",
+        'overwritefils':False
 }
 
 
@@ -1196,7 +1224,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 """
 Dedispersion Tuning state
 """
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton,saveplotbutton,DM_showerrs):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton,saveplotbutton,DM_showerrs,updateDMbutton):
     """
     This function updates the dedispersion screen when resolution
     or dm,where='post' step are changed
@@ -1294,7 +1322,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     if saveplotbutton.clicked:
         try:
             plt.savefig(state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_DMplot_PARSEC.pdf")
-            print("Saved Figure to h23:" + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_DMplot_PARSEC.pdf")
+            print("Saved Figure to h24:" + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_DMplot_PARSEC.pdf")
         except Exception as ex:
             print("Save Failed: " + str(ex))
     plt.show()
@@ -1320,6 +1348,22 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
 
 
         #state_dict['current_state'] += 1
+    
+    if updateDMbutton.clicked:
+        #update the DM value in csv file
+        update_FRB_DM_params(state_dict['nickname'],state_dict['DM'])
+        
+        #make a copy of the current filterbanks
+        for i in range(4):
+            os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_" + str(i) + ".fil " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_DM_" + str(state_dict['DM']) + "_" + str(i) + ".fil ")
+
+        #make new dedispersed filterbanks
+        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM'])
+        print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
+
+
+
+
     #update widget dict
     update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_showerrs],
                 ["n_t_slider","logn_f_slider","logwindow_slider_init","ddm_num","DM_showerrs"],
@@ -1341,7 +1385,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
         phase_sf_window_weight_cals,phase_sf_order_cals,phase_peakheight_slider,phase_peakwidth_slider,phase_polyfitorder_slider,savecalsolnbutton,
-                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,saveplotbutton,polcalprocs):
+                                                         sfflag,polyfitflag,ratio_sfflag,ratio_polyfitflag,phase_sfflag,phase_polyfitflag,saveplotbutton,polcalprocs,savepolcalfilbutton):
     
     """
     This function updates the polarization calibration screen
@@ -1383,6 +1427,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
     #update calibrator date
     polcal_dict['polcal_create_file'] = polcaldate_create_menu.value
+    polcal_dict['maxProcesses'] = int(polcalprocs.value)
 
     #update find beam data
     polcal_dict['polcal_findbeams_file'] = polcaldate_findbeams_menu.value 
@@ -1404,7 +1449,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         print("start",file=f)
 
         #calibrate at native resolution
-        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=int(polcalprocs.value))
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=int(polcalprocs.value),bad_chans=state_dict['badchans'])
         print("done calibrating...",file=f)
 
         #parallactic angle calibration
@@ -1469,6 +1514,15 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         state_dict['base_V_fcalRM_unweighted'] = copy.deepcopy(state_dict['base_V_fcal_unweighted'])"""
 
         #state_dict['current_state'] += 1
+    if savepolcalfilbutton.clicked:
+        if len(glob.glob(state_dict['datadir'] + '/badchans.npy'))>0:
+            fixchansfile = state_dict['datadir'] + '/badchans.npy'
+            fixchansfile_overwrite = False
+        else:
+            fixchansfile = ""
+            fixchansfile_overwrite = True
+
+        polcal.make_polcal_filterbanks(state_dict['datadir'],state_dict['datadir'],state_dict['ids'],state_dict['polcalfile'],state_dict['suff'],state_dict['suff']+"_polcal",20480,int(NOFFDEF)+12800,True,maxProcesses=polcal_dict['maxProcesses'],fixchans=True,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite,verbose=False,background=True)
 
     #if copy button clicked, copy voltages from T3
     if polcopybutton.clicked:
@@ -1593,8 +1647,8 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
         try:
             plt.savefig(polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
             plt.savefig(polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
-            print("Saved Figure to h23:" + polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
-            print("Saved Figure to h23:" + polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
+            print("Saved Figure to h24:" + polcal.output_path + "3C48_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
+            print("Saved Figure to h24:" + polcal.output_path + "3C286_" + polcal_dict['polcal_findbeams_file'] + "/" + str(polcal_dict['polcal_findbeams_file']) + "_polcal_beamselection_PARSEC.pdf")
         except Exception as ex:
             print("Save Failed: " + str(ex))
     plt.show()
@@ -1810,7 +1864,7 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
         if saveplotbutton.clicked:
             try:
                 plt.savefig(polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
-                print("Saved Figure to h23: " + polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+                print("Saved Figure to h24: " + polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
             except Exception as ex:
                 print("Save Failed: " + str(ex))
         plt.show()
@@ -2160,7 +2214,7 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
             state_dict['base_V_unnormalized'] = V
       
         #calibrate
-        state_dict['base_Ical_unnormalized'],state_dict['base_Qcal_unnormalized'],state_dict['base_Ucal_unnormalized'],state_dict['base_Vcal_unnormalized'] = dsapol.calibrate(state_dict['base_I_unnormalized'],state_dict['base_Q_unnormalized'],state_dict['base_U_unnormalized'],state_dict['base_V_unnormalized'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=128)
+        state_dict['base_Ical_unnormalized'],state_dict['base_Qcal_unnormalized'],state_dict['base_Ucal_unnormalized'],state_dict['base_Vcal_unnormalized'] = dsapol.calibrate(state_dict['base_I_unnormalized'],state_dict['base_Q_unnormalized'],state_dict['base_U_unnormalized'],state_dict['base_V_unnormalized'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=128,bad_chans=state_dict['badchans'])
 
         state_dict['base_Ical_unnormalized_errs'] = np.nanstd(state_dict['base_Ical_unnormalized'],axis=0)/state_dict['base_Ical_unnormalized'].shape[0]
         state_dict['base_Qcal_unnormalized_errs'] = np.nanstd(state_dict['base_Qcal_unnormalized'],axis=0)/state_dict['base_Qcal_unnormalized'].shape[0]
@@ -2760,7 +2814,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
     if save_scat_button.clicked:
         plt.savefig(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scatter.pdf")
-        df_scat.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scatter_params.pdf")
+        df_scat.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scatter_params.csv")
 
 
 
@@ -3014,7 +3068,7 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
 
     if save_scint_button.clicked:
         plt.savefig(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scintillation.pdf")
-        df_scint.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scintillation_params.pdf")
+        df_scint.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_scintillation_params.csv")
 
     plt.show()
 
@@ -3138,7 +3192,7 @@ def specidx_screen(specidxfitmenu,calc_specidx_button,specidx_guess,F0_guess,spe
 
     if save_specidx_button.clicked:
         plt.savefig(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_specidx.pdf")
-        df_specidx.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_specidx_params.pdf")
+        df_specidx.to_csv(state_dict['datadir'] + "/" + state_dict['ids'] + "_" + state_dict['nickname'] + "_specidx_params.csv")
 
     plt.show()
 
@@ -4270,7 +4324,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     return fig,fig_time,fig_freq
 
 
-def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutton,notesinput):
+def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutton,notesinput,overwritefils):
 
     """
     screen for RM table and archiving data
@@ -4285,11 +4339,27 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
         state_dict['Level3Dir'] = level3_path + state_dict['ids'] + "/Level3/"
         RMtable_archive_df.write(state_dict['Level3Dir'] + state_dict['ids'] + "_RMTable.fits",overwrite=True) 
         polspec_archive_df.write_FITS(state_dict['Level3Dir'] + state_dict['ids'] + "_PolSpectra.fits",overwrite=True) 
-        print("Saved RMtable and PolSpectra to h23:" + state_dict['Level3Dir'])
+        print("Saved RMtable and PolSpectra to h24:" + state_dict['Level3Dir'])
         if 'base_Ical' in state_dict.keys():
-            dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
+            fs = glob.glob(state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_polcal*fil")
+            if len(fs) > 0 and not overwritefils.value:
+                os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_polcal*fil " + state_dict['Level3Dir'])
     
-            print("Saved Pol Calibrated Filterbanks to h23:" + state_dict['Level3Dir'])
+            else:
+            
+                #load data at base resolution
+                if len(glob.glob(state_dict['datadir'] + '/badchans.npy'))>0:
+                    fixchansfile = state_dict['datadir'] + '/badchans.npy'
+                    fixchansfile_overwrite = False
+                else:
+                    fixchansfile = ""
+                    fixchansfile_overwrite = True
+
+                polcal.make_polcal_filterbanks(state_dict['datadir'],[state_dict['Level3Dir'],state_dict['datadir']],state_dict['ids'],state_dict['polcalfile'],state_dict['suff'],state_dict['suff']+"_polcal",20480,int(NOFFDEF)+12800,True,maxProcesses=polcal_dict['maxProcesses'],fixchans=True,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite,verbose=False,background=True)
+            
+            #dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
+    
+            print("Saving Pol Calibrated Filterbanks to h24:" + state_dict['Level3Dir'])
     
     #move pol cal voltages to dsastorage
     if archivepolcalbutton.clicked:
@@ -4477,7 +4547,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                 wr.writerow(r)
 
 
-    update_wdict([notesinput],["notesinput"],param="value")
+    update_wdict([notesinput,overwritefils],["notesinput","overwritefils"],param="value")
     return
 
 

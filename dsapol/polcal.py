@@ -44,6 +44,7 @@ from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 from astropy.coordinates import EarthLocation
 import astropy.units as u
+from concurrent.futures import ProcessPoolExecutor
 """
 This file contains functions related to creating polarization calibration Jones matrix parameters. 
 This includes wrappers around Vikram's bash scripts for generating voltage files using the 
@@ -674,3 +675,40 @@ def read_polcal(polcaldate,path=default_path):
                 freq_axis = np.array(row[1:],dtype="float")
 
     return gxx,gyy,freq_axis
+
+
+def make_polcal_filterbanks(datadir,outputdirs,ids,polcalfile,init_suffix,new_suffix,nsamps,n_off,sub_offpulse_mean,maxProcesses,fixchans,fixchansfile,fixchansfile_overwrite,verbose,background):
+    """
+    This function reads a filterbank file, applies pol calbration, and re-saves it, all at native resolution.
+    This is needed because I cannot save filterbanks at low resolution
+    """
+
+    #create executor
+    if background:
+
+        executor = ProcessPoolExecutor(5)
+        executor.submit(make_polcal_filterbanks,datadir,outputdirs,ids,polcalfile,init_suffix,new_suffix,nsamps,n_off,sub_offpulse_mean,maxProcesses,fixchans,fixchansfile,fixchansfile_overwrite,verbose,False)
+
+    else:
+        #read data
+        (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(datadir,ids + init_suffix,nsamps,start=0,n_t=1,n_f=1,n_off=n_off,sub_offpulse_mean=sub_offpulse_mean,fixchans=fixchans,verbose=verbose,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
+
+        #calibrate
+        gxx,gyy,cal_freq_axis = read_polcal(polcalfile)
+        Ical,Qcal,Ucal,Vcal = dsapol.calibrate(I,Q,U,V,(gxx,gyy),stokes=True,multithread=True,maxProcesses=maxProcesses,bad_chans=badchans,verbose=verbose)
+
+        #save
+        if type(outputdirs) == str:
+            dsapol.put_stokes_2D(Ical.astype(np.float32),Qcal.astype(np.float32),Ucal.astype(np.float32),Vcal.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs,ids,suffix=new_suffix,alpha=True,verbose=verbose)
+        else:
+            dsapol.put_stokes_2D(Ical.astype(np.float32),Qcal.astype(np.float32),Ucal.astype(np.float32),Vcal.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs[0],ids,suffix=new_suffix,alpha=True,verbose=verbose)
+            for i in range(1,len(outputdirs)):
+                os.system("cp " + outputdirs[0] + "*" + ids + new_suffix + "*.fil " + outputdirs[i])
+
+        
+
+    return
+
+
+
+

@@ -84,6 +84,8 @@ dirs = {"cwd":cwd,
         "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/",
         "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/"}
 
+os.environ['TESTVAR'] = "TESTVALUE"
+
 print(dirs)
 f = open(dirs["polcal"] + "directories.json","w")
 json.dump(dirs,f)
