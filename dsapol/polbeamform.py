@@ -46,7 +46,7 @@ def get_fils(ids,nickname,path=output_dir):
     """
     return glob.glob(path + ids + "_" + nickname + "/*.fil")
 
-def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir):
+def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir,background=True):
     """
     This function takes FRB parameters and the beamformer weights to run the 
     offline beamforming script. Outputs polarized filterbanks to the path provided.
@@ -55,8 +55,9 @@ def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir):
     """
     #return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/for_testing.bash 2>&1 > /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/beamforming_logfile.txt &")
     clear_logfile()
+    if background: b = " 2>&1 > " + logfile + " &"
+    else: b = ""
     return os.system(dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
-            + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + 
-            " 2>&1 > " + logfile + " &")
+            + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + b) #" 2>&1 > " + logfile + " &")
 
 

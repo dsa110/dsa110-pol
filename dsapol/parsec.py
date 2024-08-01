@@ -1,4 +1,5 @@
 from rmtable import rmtable
+from IPython.display import display,update_display
 import contextlib
 #from dsaT3.filplot_funcs import proc_cand_fil
 from dsapol import customfilplotfuncs as cfpf
@@ -571,6 +572,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'DM_input_display':DMinit,
          'DM_new_display':DMinit,
          'DM_showerrs':False,
+         'updateDM':False,
+         #'DMINITIALIZED':False,
 
          'polcaldate_create_menu':"", ############### (3) Calibration ##################
          'polcaldate_bf_menu':"",
@@ -882,16 +885,18 @@ def update_wdict(objects,labels,param='value'):
             wdict[labels[i]] = objects[i].value
         elif param == 'data':
             wdict[labels[i]] = objects[i].data
-    
-    if 'DM_init_display' in labels:
+    """
+    if 'DM_init_display' in labels and not wdict['DMINITIALIZED']:
         wdict['DM_input_display'] = wdict['DM_init_display']
         wdict['DM_new_display'] = wdict['DM_init_display'] + wdict['ddm_num']
+        wdict['DMINITIALIZED'] = True
     if 'DM_input_display' in labels: 
-        wdict['DM_input_display'] = wdict['DM_init_display']
-        objects[labels.index('DM_input_display')].data = wdict['DM_init_display']
+        #wdict['DM_input_display'] = wdict['DM_init_display']
+        objects[labels.index('DM_input_display')].data = wdict['DM_input_display']
     if 'DM_new_display' in labels:
         wdict['DM_new_display'] = wdict['DM_input_display'] + wdict['ddm_num']
         objects[labels.index('DM_new_display')].data = wdict['DM_input_display'] + wdict['ddm_num']
+    """
     if 'rmcomp_menu' in labels:
         if state_dict['n_comps'] > 1:
             wdict['rmcomp_menu_choices'] = [str(i) for i in range(state_dict['n_comps'])] + ['All','']
@@ -1041,7 +1046,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
     #if button is clicked, load FRB data and go to next screen
     if loadbutton.clicked:# and (not polcalloadbutton.value):
-
+        #wdict['DMINITIALIZED'] = False
         #load data at base resolution
         if polcalloadbutton.value and (polcals_available > 0):
             fixchansfile = state_dict['datadir'] + '/badchans.npy'
@@ -1056,7 +1061,11 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             if polcalloadbutton.value: 
                 print("Pre-Calibrated Data Not Available, Loading Uncalibrated Stokes Parameters")
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + state_dict['suff'],5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=sub_offpulse_mean,fixchans=True,verbose=False,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
-        
+
+        #update DM initialization
+        wdict['DM_input_display'] = state_dict['DM0']#wdict['DM_init_display']
+        wdict['DM_new_display'] = wdict['DM_init_display'] + wdict['ddm_num']
+
         #mask bad channels if not masked already
         """if len(badchans) > 0:
             m = np.zeros(I.shape)
@@ -1224,20 +1233,65 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 """
 Dedispersion Tuning state
 """
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_input_display,DM_new_display,DMdonebutton,saveplotbutton,DM_showerrs,updateDMbutton):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdonebutton,saveplotbutton,DM_showerrs):
     """
     This function updates the dedispersion screen when resolution
     or dm,where='post' step are changed
     """
+    #if DMdonebutton.clicked:# and (state_dict['dDM'] != 0):
+    """
+    if DMdonebutton.clicked:
+      
+        if state_dict['dDM'] != 0:
+            print("Dedispersing base spectra to" + str(state_dict['dDM']) + "...")
+            #dedisperse base dyn spectrum
+            state_dict['base_I'] = dedisp.dedisperse(state_dict['base_I'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_Q'] = dedisp.dedisperse(state_dict['base_Q'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_U'] = dedisp.dedisperse(state_dict['base_U'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            state_dict['base_V'] = dedisp.dedisperse(state_dict['base_V'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+            
+            #reset dm offset
+            print("Resetting DM offset...")
+            wdict['ddm_num'] = 0
+            state_dict['dDM'] = 0
+            wdict['DM_input_display'] = state_dict['DM']
+            wdict['DM_new_display'] = state_dict['DM']
+            #DM_input_display.data = wdict['DM_input_display'] 
+     
+        if state_dict['DM0'] != state_dict['DM']:
+            if updateDM.value:
+                #update the DM value in csv file
+                update_FRB_DM_params(state_dict['nickname'],state_dict['DM'])
 
+                #make a copy of the current filterbanks
+                for i in range(4):
+                    os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_" + str(i) + ".fil " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_DM_" + str(state_dict['DM']) + "_" + str(i) + ".fil ")
+
+                #make new dedispersed filterbanks
+                status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM'])
+                print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
+    """
+
+    #dedisperse
+    if ddm_num.value != state_dict['dDM']:
+        #print("Dedispersing base spectra to" + str(ddm_num.value - state_dict['dDM']) + "...")
+        #dedisperse base dyn spectrum
+        state_dict['base_I'] = dedisp.dedisperse(state_dict['base_I'],ddm_num.value - state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+        state_dict['base_Q'] = dedisp.dedisperse(state_dict['base_Q'],ddm_num.value - state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+        state_dict['base_U'] = dedisp.dedisperse(state_dict['base_U'],ddm_num.value - state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
+        state_dict['base_V'] = dedisp.dedisperse(state_dict['base_V'],ddm_num.value - state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
 
     #update DM step size
     state_dict['dDM'] = ddm_num.value
-    ddm_num.step = dedisp.get_min_DM_step(n_t_slider.value*state_dict['base_n_t'])
+    #ddm_num.numeric.step = dedisp.get_min_DM_step(n_t_slider.value*state_dict['base_n_t'])
 
     #update new DM
-    DM_new_display.data = DM_input_display.data + ddm_num.value
-    state_dict['DM'] = DM_new_display.data
+    #DM_new_display.data = DM_input_display.data + ddm_num.value
+    state_dict['DM'] = wdict['DM_input_display'] + state_dict['dDM']#new_display.data
+    wdict['DM_new_display'] = state_dict['DM']
+
+
+
 
     #update time, freq resolution
     state_dict['window'] = 2**logwindow_slider_init.value
@@ -1258,12 +1312,14 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     state_dict['V'] = dsapol.avg_time(state_dict['base_V'],n_t_slider.value)#state_dict['n_t'])
     state_dict['V'] = dsapol.avg_freq(state_dict['V'],2**logn_f_slider.value)#state_dict['n_f'])
 
-
+    """
     #dedisperse
+    print("post-base",state_dict['dDM'],ddm_num.value)
     state_dict['I'] = dedisp.dedisperse(state_dict['I'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
     state_dict['Q'] = dedisp.dedisperse(state_dict['Q'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
     state_dict['U'] = dedisp.dedisperse(state_dict['U'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
     state_dict['V'] = dedisp.dedisperse(state_dict['V'],state_dict['dDM'],(32.7e-3)*state_dict['n_t'],state_dict['freq_test'][0])
+    """
 
     #get time series
     (state_dict['I_t'],state_dict['Q_t'],state_dict['U_t'],state_dict['V_t'],state_dict['I_t_err'],state_dict['Q_t_err'],state_dict['U_t_err'],state_dict['V_t_err']) = dsapol.get_stokes_vs_time(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
@@ -1328,52 +1384,29 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_inpu
     plt.show()
 
 
-    if DMdonebutton.clicked:# and (state_dict['dDM'] != 0):
-        
-        if state_dict['dDM'] != 0:
-            #dedisperse base dyn spectrum
-            state_dict['base_I'] = dedisp.dedisperse(state_dict['base_I'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-            state_dict['base_Q'] = dedisp.dedisperse(state_dict['base_Q'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-            state_dict['base_U'] = dedisp.dedisperse(state_dict['base_U'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-            state_dict['base_V'] = dedisp.dedisperse(state_dict['base_V'],state_dict['dDM'],(32.7e-3)*state_dict['base_n_t'],state_dict['base_freq_test'][0])
-        
+    if DMdonebutton.clicked:
+        if state_dict['DM0'] != state_dict['DM']:
+            #update the DM value in csv file
+            update_FRB_DM_params(state_dict['nickname'],state_dict['DM'])
 
+            #make a copy of the current filterbanks
+            for i in range(4):
+                os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_" + str(i) + ".fil " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_DM_" + str(state_dict['DM']) + "_" + str(i) + ".fil ")
 
-        """#get UNWEIGHTED spectrum at max resolution-- at this point, haven't gotten ideal filter weights yet
-        (state_dict['base_I_f_unweighted'],state_dict['base_Q_f_unweighted'],state_dict['base_U_f_unweighted'],state_dict['base_V_f_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
-                                                        state_dict['base_n_f'],state_dict['n_t'],state_dict['freq_test'],
-                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
-                                                        normalize=True,buff=state_dict['buff'],weighted=False,
-                                                        fobj=state_dict['fobj'])"""
-
-
-        #state_dict['current_state'] += 1
-    
-    if updateDMbutton.clicked:
-        #update the DM value in csv file
-        update_FRB_DM_params(state_dict['nickname'],state_dict['DM'])
-        
-        #make a copy of the current filterbanks
-        for i in range(4):
-            os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_" + str(i) + ".fil " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_DM_" + str(state_dict['DM']) + "_" + str(i) + ".fil ")
-
-        #make new dedispersed filterbanks
-        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM'])
-        print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
-
-
-
+            #make new dedispersed filterbanks
+            status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM'])
+            print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
     #update widget dict
-    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DM_showerrs],
-                ["n_t_slider","logn_f_slider","logwindow_slider_init","ddm_num","DM_showerrs"],
+    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,DM_showerrs,ddm_num],
+                ["n_t_slider","logn_f_slider","logwindow_slider_init","DM_showerrs","ddm_num"],
                 param='value')
     
-    update_wdict([DM_input_display,DM_new_display],
-                ["DM_input_display","DM_new_display"],
-                param='data')
+    #update_wdict([DM_input_display,DM_new_display],
+    #            ["DM_input_display","DM_new_display"],
+    #            param='data')
 
-    return
+    return #ddm_num
 
 
 """
