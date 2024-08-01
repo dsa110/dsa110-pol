@@ -1177,9 +1177,17 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         im = Image.open(pngname[0])
     else:
         #create the image, first find fil file
-        filname = glob.glob("/dataz/dsa110/candidates/" + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
+        filname = glob.glob(dirs['candidates'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
         if len(filname) == 0:
             #couldn't find file on h23, try to copy from dsastorage
+            
+            #first try general dir
+            os.system("scp " + dirs['dsastorageFRBDir'] + "/" + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil" + state_dict['datadir'])
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+        if len(filname) == 0:
+            #try dsastorage backups
+            
             if state_dict['ibeam'] < 64:
                 corr = "corr01"
             elif 64 < state_dict['ibeam'] < 128:
@@ -1189,8 +1197,11 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             else: #192 < state_dict['ibeam'] < 256:
                 corr = "corr13"
             
-            os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil .")
-            filname = glob.glob(state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+
+
+            os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil "+ state_dict['datadir'])
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
         if len(filname) == 0:
             im = mr.Markdown("## No candidate plot for " + str(state_dict['ids']) + "_"+ str(state_dict['nickname']))
 
@@ -1218,7 +1229,6 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
                                 imjd=state_dict['mjd'],
                                 injected=False,
                                 fast_classify=False)
-            os.system("rm " + filname[0])
             im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
     
     #update widget dict

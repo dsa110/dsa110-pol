@@ -191,7 +191,7 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
     freqmin = freqmax + dataft.header['nchans']*dataft.header['foff']
     freqs = np.linspace(freqmin, freqmax, nfreq)
     tarr = np.linspace(tmin, tmax, ntime)
-    fig, axs = plt.subplots(2, 2, figsize=(18,12))#, constrained_layout=True)
+    fig, axs = plt.subplots(2, 2, figsize=(24,12))#, constrained_layout=True)
 
     #dynamic spectrum
     extentft=[tmin,tmax,freqmin,freqmax]
@@ -215,7 +215,7 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
     axs[1][0].set_xlabel('Time (ms)')
     axs[1][0].set_ylabel(r'Power ($\sigma$)')
     axs[1][0].set_xlim(xminplot,xmaxplot)
-    axs[1][0].text(0.51*(xminplot+xmaxplot), 0.5*(max(datats)+np.median(datats)),
+    axs[1][0].text(0.501*(xminplot+xmaxplot), 0.5*(max(datats)+np.median(datats)),
             'Heimdall S/N : %0.1f\nHeimdall DM : %d\
             \nHeimdall ibox : %d\nibeam : %d' % (heimsnr,dm,ibox,ibeam),
             fontsize=24, verticalalignment='center')
