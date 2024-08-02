@@ -743,6 +743,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'zrange':1e-3,
         'cosmo_selection':'Planck18',
         'cosmo_selection_choices':budget.COSMOLOGY_OPTIONS,
+        'galaxy_selection':[],
+        'galaxy_selection_choices':[],
 
         'showghostPA':True,
         'intLbuffer_slider':0,
@@ -3743,6 +3745,11 @@ def galquery_Budget_screen(catalog_selection,galtype_selection,queryradius,runqu
                                                     catalogs=catalog_selection.value,types=galtype_selection.value,cosmology=cosmo_selection.value,
                                                     redshift=trialz.value,redshift_range=zrange.value if limitzrange.value else None)
 
+
+        #update galaxy options
+        wdict['galaxy_selection_choices'] = list(state_dict['qdat']['MAIN_ID'])
+        wdict['galaxy_selection'] = []
+
     #plotting
     budget.plot_galaxies(state_dict['RA'],state_dict['DEC'],queryradius.value,cosmology=cosmo_selection.value,redshift=trialz.value,qdat=state_dict['qdat'])
     update_wdict([catalog_selection,galtype_selection,queryradius,limitzrange,zrange,trialz,cosmo_selection],
@@ -3751,7 +3758,7 @@ def galquery_Budget_screen(catalog_selection,galtype_selection,queryradius,runqu
     return state_dict['qdat']
 
 #sub-screen to compute RM, DM, B field budget
-def DM_Budget_screen(trialz):
+def DM_Budget_screen(trialz,galaxy_selection):
         
     #if redshift is known, compute DM host
     if ~np.isnan(state_dict['z']) and ~np.isnan(state_dict['DM']) and trialz.value < 0:
@@ -3763,7 +3770,7 @@ def DM_Budget_screen(trialz):
         state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'] = budget.DM_host_limits(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=False)
         state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=True)
     
-    update_wdict([trialz],['trialz'],param='value')
+    update_wdict([trialz,galaxy_selection],['trialz','galaxy_selection'],param='value')
 
 
     return
