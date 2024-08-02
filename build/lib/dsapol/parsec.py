@@ -390,7 +390,7 @@ state_dict['RM_ionmjd'] = np.nan
 state_dict['scatter_init'] = False
 state_dict['RMhost'] = np.nan
 state_dict['DMhost'] = np.nan
-
+state_dict['qdat'] = None
 
 df = pd.DataFrame(
     {
@@ -734,6 +734,15 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'RMsynthbackground':False,
         'trialz':-1,
         'rmcal_input':0,
+        'catalog_selection':[],
+        'catalog_selection_choices':budget.SIMBAD_CATALOG_OPTIONS,
+        'galtype_selection':[],
+        'galtype_selection_choices':budget.SIMBAD_GALAXY_OPTIONS,
+        'queryradius':1,
+        'limitzrange':False,
+        'zrange':1e-3,
+        'cosmo_selection':'Planck18',
+        'cosmo_selection_choices':budget.COSMOLOGY_OPTIONS,
 
         'showghostPA':True,
         'intLbuffer_slider':0,
@@ -1046,6 +1055,8 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
     #if button is clicked, load FRB data and go to next screen
     if loadbutton.clicked:# and (not polcalloadbutton.value):
+        if np.isnan(state_dict['z']):wdict['trialz'] = -1
+        else: wdict['trialz'] = state_dict['z']
         #wdict['DMINITIALIZED'] = False
         #load data at base resolution
         if polcalloadbutton.value and (polcals_available > 0):
@@ -3722,6 +3733,22 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
     update_wdict([rmcal_menu,rmcal_input],['rmcal_menu','rmcal_input'],param='value')    
     return
 
+
+#sub-screen to query SIMBAD catalog for intervening galaxies
+def galquery_Budget_screen(catalog_selection,galtype_selection,queryradius,runquery,limitzrange,zrange,trialz,cosmo_selection):
+
+    #run query
+    if runquery.clicked:
+        state_dict['qdat'] = budget.get_SIMBAD_gals(state_dict['RA'],state_dict['DEC'],queryradius.value,
+                                                    catalogs=catalog_selection.value,types=galtype_selection.value,cosmology=cosmo_selection.value,
+                                                    redshift=trialz.value,redshift_range=zrange.value if limitzrange.value else None)
+
+    #plotting
+    budget.plot_galaxies(state_dict['RA'],state_dict['DEC'],queryradius.value,cosmology=cosmo_selection.value,redshift=trialz.value,qdat=state_dict['qdat'])
+    update_wdict([catalog_selection,galtype_selection,queryradius,limitzrange,zrange,trialz,cosmo_selection],
+            ['catalog_selection','galtype_selection','queryradius','limitzrange','zrange','trialz','cosmo_selection'],param='value')
+
+    return state_dict['qdat']
 
 #sub-screen to compute RM, DM, B field budget
 def DM_Budget_screen(trialz):

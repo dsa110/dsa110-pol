@@ -1,12 +1,15 @@
 import numpy as np
 from matplotlib import pyplot as plt
+from matplotlib.patches import Ellipse
 import pyne2001
 from astropy.time import Time
 from astropy.coordinates import SkyCoord
+from astropy.cosmology import WMAP1,WMAP3,WMAP5,WMAP7,WMAP9,Planck13,Planck15,Planck18,default_cosmology
 import astropy.units as u
 import copy
 from scipy.signal import peak_widths
-
+from astroquery.simbad import Simbad
+from dsapol.RMcal import logfile
 """
 This contains helper functions for computing the DM and RM budget. For examples see DMhost_Estimation_Script_2024-04-11.ipynb
 """
@@ -679,8 +682,177 @@ def Bhost_dist(DMhost,dmdist,DMaxis,RMhost,RMhosterr,res=10000,res2=500,siglevel
         
     return Bdist,B_exp,low,upp,Baxis
 
+SIMBAD_CATALOG_OPTIONS = [
+        'DELS', #DESI Legacy Imaging Survey = DECaLS + BASS + MzLS
+        'NGC', #New General Catalog
+        'GAIA', #Gaia
+        'LEDA', #LEDA, HyperLEDA
+        'PS1',#PANSTARRS
+        'SDSS',#SLOAN
+        'WISE',#WISE
+        '2MASS',#2MASS
+        ]
+SIMBAD_GALAXY_OPTIONS = [
+        'Galaxy',
+        'Interacting Galaxies',
+        'Pair of Galaxies',
+        'Group of Galaxies',
+        'Compact Group of Galaxies',
+        'Cluster of Galaxies',
+        'Proto Cluster of Galaxies',
+        'Supercluster of Galaxies'
+        ]
+COSMOLOGY_OPTIONS = [
+        'Planck18',
+        'Planck15',
+        'Planck13',
+        'WMAP9',
+        'WMAP7',
+        'WMAP5',
+        'WMAP3',
+        'WMAP1'
+        ]
+COSMOLOGIES = {'Planck18':Planck18,'Planck15':Planck15,'Planck13':Planck13,
+                'WMAP9':WMAP9,'WMAP7':WMAP7,'WMAP5':WMAP5,'WMAP3':WMAP3,'WMAP1':WMAP1}
+def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",redshift=-1,redshift_range=None):
+    """
+    This function uses astroquery to query SIMBAD and identify
+    galaxies within a specific radius near an FRB. Options to isolate to
+    the following surveys:
+        DESI
+        NGC
+        GAIA
+        LEDA
+        PS1
+        SDSS
+        WISE
+        2MASS
+    """
+
+    #check catalog inputs
+    if len(catalogs)==0:
+        catstring = ""
+    else:
+        catstring = " & cat in ("
+        for i in catalogs:
+            catstring += "\'"+i+"\',"
+        catstring = catstring[:-1] + ")"
+
+    #check object types
+    if len(types)==0:
+        typestring = "otypes in (\'Galaxy\',\'IG\',\'PaG\',\'GrG\',\'PCG\',\'SCG\')"
+    else:
+        typestring = "otypes in ("
+        for i in types:
+            typestring += "\'"+i+"\',"
+        typestring = typestring[:-1] + ")"
+
+    #check redshift
+    if redshift==-1:
+        redstring = ""
+    elif redshift_range is None:
+        redstring = " & redshift<{z}".format(z=redshift)
+    else:
+        redstring = " & (redshift<{zup} & redshift>{zlow})".format(zup=redshift+redshift_range,zlow=redshift-redshift_range)
 
 
+    #create custom simbad
+    customSimbad = Simbad()
+    customSimbad.get_votable_fields()
+    customSimbad.add_votable_fields('dimensions')
+    customSimbad.add_votable_fields('distance')
+    customSimbad.add_votable_fields('otype')
+    customSimbad.add_votable_fields('velocity')
+    customSimbad.add_votable_fields('morphtype')
+    #create query that targets (1) galaxies and groups of galaxies (2) within specified radius (3) has redshift in specified range (4) in catalogs specified
+    query_string = "region(CIRCLE,icrs,{ra} {s}{dec},{radius}) & rvtype=\'z\' & {ts}{cs}{zs}".format(ra=ra,s="+" if dec>0 else "-",dec=np.abs(dec),radius=radius,ts=typestring,cs=catstring,zs=redstring) 
+    lf = open(logfile,"a")
+    print(query_string,file=lf)
+
+    #send query
+    qdat=customSimbad.query_criteria(query_string)
+    if qdat is not None:
+        #make column for offset
+        c = SkyCoord([qdat['RA'][i] +qdat['DEC'][i] for i in range(len(qdat))],frame='icrs',unit=(u.hourangle,u.deg))
+        qdat.add_column(SkyCoord(ra=ra*u.deg,dec=dec*u.deg,frame='icrs').separation(c).to(u.deg).value,name='OFFSET',index=3)
+        qdat['OFFSET'].unit = u.deg
+
+        #make column for impact parameter
+        qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']).data*qdat['OFFSET'].data*np.pi/180,name='IMPACT',index=4)
+        qdat['IMPACT'].unit = u.Mpc
+
+
+        print("Found " + str(len(qdat)) + " sources",file=lf)
+    else:
+        print("No sources found",file=lf)
+    lf.close()
+    return qdat
+
+def plot_galaxies(ra,dec,radius,cosmology,redshift=-1,qdat=None,figsize=(18,4)):
+    """
+    Takes a dataframe of galaxies and plots them around the FRB
+    """
+    
+
+
+    f,(ax,ax3) = plt.subplots(1,2,gridspec_kw={'width_ratios':[2,1]},figsize=figsize)
+
+    ax.plot(ra,dec,"*",markersize=10,color='red')
+    if qdat is not None:
+        for i in range(len(qdat)):
+            c = SkyCoord(qdat['RA'][i]+" "+qdat['DEC'][i],frame='icrs',unit=(u.hourangle,u.deg))
+            ax.plot(c.ra.value,c.dec.value,"x",markersize=20,color='blue')
+            #print(c.ra.value,c.dec.value,qdat['RA'][i]+" "+qdat['DEC'][i],qdat['GALDIM_MAJAXIS'][i]/60,qdat['GALDIM_MINAXIS'][i]/60)
+                
+            if ~(qdat['GALDIM_MAJAXIS'].mask[i]) and ~(qdat['GALDIM_MAJAXIS'].mask[i]) and ~(qdat['GALDIM_ANGLE'].mask[i]):
+                #make patch
+                gal = Ellipse((c.ra.value,c.dec.value),
+                        width=qdat['GALDIM_MAJAXIS'][i]/60,
+                        height=qdat['GALDIM_MINAXIS'][i]/60,
+                        angle=qdat['GALDIM_ANGLE'][i],
+                        alpha=0.5,color='blue',linewidth=4,facecolor='blue',fill=True)
+                ax.add_patch(gal)
+    #print(ra,dec)
+    rad = Ellipse((ra,dec),width=radius*2/60,height=radius*2/60,alpha=1,color='red',fill=False,linewidth=2)
+    ax.add_patch(rad)
+    ax.set_xlim(ra-radius*1.5/60,ra+radius*1.5/60)
+    ax.set_ylim(dec-radius*1.5/60,dec+radius*1.5/60)
+    ax.set_xlabel(r'RA$(^{\circ})$')
+    ax.set_ylabel(r'DEC$(^{\circ})$')
+
+
+    #plot redshift vs offset
+    if redshift!=-1:
+        #ax2.plot(0,redshift,"*",markersize=10,color='red')
+        #ax2.plot([0,-radius/60,radius/60,0],[0,redshift,redshift,0],color='red',linewidth=2)
+    
+        ax3.plot(0,redshift,"*",markersize=10,color='red')
+        ax3.plot([0,-(radius*np.pi/180/60)*COSMOLOGIES[cosmology].comoving_distance(redshift).value,(radius*np.pi/180/60)*COSMOLOGIES[cosmology].comoving_distance(redshift).value,0],[0,redshift,redshift,0],color='red',linewidth=2)
+
+    #ax2.set_ylim(0,1.5*np.abs(redshift))
+    ax3.set_ylim(0,1.5*np.abs(redshift))
+    if qdat is not None:
+        for i in range(len(qdat)):
+            if ~qdat['RA'].mask[i] and ~qdat['DEC'].mask[i] and ~qdat['RVZ_RADVEL'].mask[i]:
+                c = SkyCoord(qdat['RA'][i]+qdat['DEC'][i],frame='icrs',unit=(u.hourangle,u.deg))
+                #offset = np.sqrt((c.ra.value-ra)**2 + (c.dec.value-dec)**2)
+                sign = ((c.ra.value-ra)/np.abs(c.ra.value-ra))*((c.dec.value-dec)/np.abs(c.dec.value-dec))
+                z = qdat['RVZ_RADVEL'][i]
+                #ax2.plot(sign*offset,z,'x',markersize=20,color='blue')
+                #ax2.plot([0,sign*offset],[z,z],color='blue',linewidth=3)
+
+                ax3.plot(sign*qdat['IMPACT'][i],z,'x',markersize=20,color='blue')
+                ax3.plot([0,sign*qdat['IMPACT'][i]],[z,z],color='blue',linewidth=3)
+    #ax2.set_xlabel(r'Offset ($^{\circ}$)')
+    #ax2.set_ylabel("Redshift z")
+    #ax2.set_xlim(-radius*1.5/60,radius*1.5/60)
+
+    ax3.axvline(0,color='red',linewidth=2,linestyle='--')
+    ax3.set_xlabel(r'$b_\perp$ (Mpc)')
+    ax3.set_ylabel("Redshift z")
+    ax3.set_xlim(-(radius*1.5/60)*(np.pi/180)*COSMOLOGIES[cosmology].comoving_distance(redshift).value,(radius*1.5/60)*(np.pi/180)*COSMOLOGIES[cosmology].comoving_distance(redshift).value)
+
+    plt.show()
 
 
 
