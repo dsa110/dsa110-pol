@@ -24,16 +24,16 @@ For each script we provide the required command-line arguments; rudimentary pars
 	- `[calname]`: VLA name of the calibrator (e.g. 3C48, 3C286)
 	- `[isot]`: Date and time of beamformer weights to be applied in ISOT format (e.g. 2024-08-04T01:04:32)
 	- `[beam]`: Beam in which source was detected (between 1-256)
-        - `[mjd]`: Mean Julian Date of observation
+	- `[mjd]`: Mean Julian Date of observation
 	- `[DM]`: Dispersion measure, set to 0 for continuum sources
-        - `[date]`: date of observation in format `YYYY-MM-DD` (e.g. 2024-08-04)
+	- `[date]`: date of observation in format `YYYY-MM-DD` (e.g. 2024-08-04)
 - `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesized beam
 	- `[N/A]`: not used, just use `NA`
 	- `[candname]`: 12-digit candidate name assigned to the FRB candidate (e.g. 220307aaae)
 	- `[nickname]`: nickname assigned to the FRB candidate for ease of identification (e.g. alex)
 	- `[isot]`: Date and time of beamformer weights to be applied in ISOT format (e.g. 2024-08-04T01:04:32)
 	- `[beam]`: Beam in which source was detected (between 1-256)
-        - `[mjd]`: Mean Julian Date of observation
+	- `[mjd]`: Mean Julian Date of observation
 	- `[DM]`: Dispersion measure in pc/cc
 
 ## Usage
