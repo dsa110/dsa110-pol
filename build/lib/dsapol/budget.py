@@ -6,6 +6,8 @@ from astropy.time import Time
 from astropy.coordinates import SkyCoord
 from astropy.cosmology import WMAP1,WMAP3,WMAP5,WMAP7,WMAP9,Planck13,Planck15,Planck18,default_cosmology
 import astropy.units as u
+from astropy.modeling import physical_models
+from astropy.constants import m_p,m_e
 import copy
 from scipy.signal import peak_widths
 from astroquery.simbad import Simbad
@@ -94,7 +96,7 @@ def PIGM_zp1(delta, z ,alpha=3, beta=3):
 
 
 #convolution method to derive DMhost
-def DM_host_limits(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST,siglevel=DEF_SIGLEVEL):
+def DM_host_limits(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST,siglevel=DEF_SIGLEVEL,intervener_DMs=[],intervener_DM_errs=[],intervener_zs=[]):
     """
     This function derives the host DM given an FRB's observed DM, redshift, and
     galactic position. It convolves the distributions of DM_obs, DM_MW (from NE2001), DM_IGM,
@@ -159,6 +161,20 @@ def DM_host_limits(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOE
     P3[DM_axis < 0] = 0
     #P4 = np.convolve(P3,Phalo[::-1],mode="same")
     #P4[DM_axis < 0] = 0
+
+    #intervener DMs
+    Pints = []
+    for i in range(len(intervener_DMs)):
+        if ~np.isnan(intervener_DM_errs[i]) and intervener_DM_errs[i] != 0:
+            Pint = gaus(DM_axis*(1+intervener_zs[i]),intervener_DMs[i],intervener_DM_errs[i])
+        else:
+            Pint = np.zeros(len(DM_axis))
+            Pint[np.argmin(np.abs(DM_axis*(1+intervener_zs[i])-intervener_DMs[i]))] = 1
+        Pint[DM_axis*(1+intervener_zs[i])<0] = 0
+        Pint[DM_axis*(1+intervener_zs[i])>DMobs] = 0
+        Pints.append(Pint)
+        P3 = np.convolve(P3,Pint[::-1],mode='same')
+        P3[DM_axis<0] = 0
     Phost = copy.deepcopy(P3)
     Phost = Phost/np.sum(Phost*(DM_axis[1]*(1+ztest)-DM_axis[0]*(1+ztest)))
 
@@ -166,11 +182,13 @@ def DM_host_limits(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOE
         plt.plot(DM_axis,Pobs/np.nanmax(Pobs),label=r'$DM_{obs}$')
         plt.plot(DM_axis,Pmw/np.nanmax(Pmw),label=r'$DM_{MW}$')
         plt.plot(DM_axis,Pigm/np.nanmax(Pigm),label=r'$DM_{IGM}$')
+        for i in range(len(intervener_DMs)):
+            plt.plot(DM_axis*(1+intervener_zs[i]),Pints[i]/np.nanmax(Pints[i]),label=r'$DM_{{int,{i}}}/(1+z_{{int,{i}}})$'.format(i=i))
         plt.plot(DM_axis,Pmwhalo/np.nanmax(Pmwhalo),label=r'$DM_{MW,halo}$')
         plt.plot(DM_axis,Phost/np.nanmax(Phost),label=r'$DM_{host}$',linewidth=4)
         plt.plot(DM_axis*(1+ztest),Phost/np.nanmax(Phost),label=r'$DM_{host}(1+z)$',linewidth=4)
-        plt.xlim(-DMobs*2,DMobs*2)
-        plt.legend(loc='upper left')
+        plt.xlim(0,DMobs*2)
+        plt.legend(loc='upper right')
         plt.xlabel("DM")
         plt.ylabel("PDF")
         plt.show()
@@ -201,7 +219,7 @@ def DM_host_limits(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOE
 
 
 #convolution method to derive DMhost distribution
-def DM_host_dist(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST,siglevel=DEF_SIGLEVEL):
+def DM_host_dist(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST,siglevel=DEF_SIGLEVEL,intervener_DMs=[],intervener_DM_errs=[],intervener_zs=[]):
     """
     This function derives the host DM PDF given an FRB's observed DM, redshift, and
     galactic position. It convolves the distributions of DM_obs, DM_MW (from NE2001), DM_IGM,
@@ -267,6 +285,19 @@ def DM_host_dist(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST
     P2[DM_axis < 0] = 0
     P3 = np.convolve(P2,Pigm[::-1],mode="same")
     P3[DM_axis < 0] = 0
+    #intervener DMs
+    Pints = []
+    for i in range(len(intervener_DMs)):
+        if ~np.isnan(intervener_DM_errs[i]) and intervener_DM_errs[i] != 0:
+            Pint = gaus(DM_axis*(1+intervener_zs[i]),intervener_DMs[i],intervener_DM_errs[i])
+        else:
+            Pint = np.zeros(len(DM_axis))
+            Pint[np.argmin(np.abs(DM_axis*(1+intervener_zs[i])-intervener_DMs[i]))] = 1
+        Pint[DM_axis*(1+intervener_zs[i])<0] = 0
+        Pint[DM_axis*(1+intervener_zs[i])>DMobs] = 0
+        Pints.append(Pint)
+        P3 = np.convolve(P3,Pint[::-1],mode='same')
+        P3[DM_axis<0] = 0
     #P4 = np.convolve(P3,Phalo[::-1],mode="same")
     #P4[DM_axis < 0] = 0
     Phost = copy.deepcopy(P3)
@@ -301,6 +332,8 @@ def DM_host_dist(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST
         plt.plot(DM_axis,Pobs/np.nanmax(Pobs),label=r'$DM_{obs}$')
         plt.plot(DM_axis,Pmw/np.nanmax(Pmw),label=r'$DM_{MW}$')
         plt.plot(DM_axis,Pigm/np.nanmax(Pigm),label=r'$DM_{IGM}$')
+        for i in range(len(intervener_DMs)):
+            plt.plot(DM_axis*(1+intervener_zs[i]),Pints[i]/np.nanmax(Pints[i]),label=r'$DM_{{int,{i}}}/(1+z_{{int,{i}}})$'.format(i=i))
         plt.plot(DM_axis,Pmwhalo/np.nanmax(Pmwhalo),label=r'$DM_{MW,halo}$')
         plt.plot(DM_axis,Phost/np.nanmax(Phost),label=r'$DM_{host}$/(1+z)',linewidth=4)
         plt.plot(DM_axis*(1+ztest),Phost/np.nanmax(Phost),label=r'$DM_{host}$',linewidth=4)
@@ -308,8 +341,8 @@ def DM_host_dist(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST
         plt.axvspan(low,upp,color='purple',alpha=0.1)
         plt.text(Phost_exp+10,1,'$DM_{{host}}={a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}\\,pc/cm^3$'.format(a=Phost_exp,b=upp-Phost_exp,c=Phost_exp-low),
                 backgroundcolor='thistle',fontsize=18)
-        plt.xlim(-DMobs*2,DMobs*2)
-        plt.legend(loc='upper left')
+        plt.xlim(0,DMobs*2)
+        plt.legend(loc='upper right')
         plt.xlabel("DM")
         plt.ylabel("PDF")
         plt.show()
@@ -443,7 +476,7 @@ def DM_IGM_dist(DMobs,frb_z,frb_gl,frb_gb,res=10000,plot=False,DMhalo=DMHALOEST,
 def RM_host_limits(RMobs,RMobserr,
                    RMmw,RMmwerr,
                    RMion,RMionerr,ztest,res=10000,RMmin=-5000,RMmax=5000,
-                  plot=False):
+                  plot=False,intervener_RMs=[],intervener_RM_errs=[],intervener_zs=[]):
     """
     This function derives the host RM given an FRB's observed RM and redshift. 
     It convolves the distributions of RM_obs, RM_MW (from Hutschenreutrer+2021), 
@@ -484,6 +517,17 @@ def RM_host_limits(RMobs,RMobserr,
     P1 = np.convolve(Pobs,Pmw[::-1],mode="same")
     P2 = np.convolve(P1,Pion[::-1],mode="same")
 
+    #interveners
+    Pints = []
+    for i in range(len(intervener_RMs)):
+        if ~np.isnan(intervener_RM_errs[i]) and intervener_RM_errs[i] != 0:
+            Pint = gaus(RM_axis*((1+intervener_zs[i])**2),intervener_RMs[i],intervener_RM_errs[i])
+        else:
+            Pint = np.zeros(len(RM_axis))
+            Pint[np.argmin(np.abs(RM_axis*((1+intervener_zs[i])**2)-intervener_RMs[i]))] = 1
+        Pints.append(Pint)
+        P2 = np.convolve(P2,Pint[::-1],mode='same')
+
 
     Phost = copy.deepcopy(P2)
     Phost_z = Phost/np.sum(Phost*(RM_axis[1]-RM_axis[0]))
@@ -496,6 +540,8 @@ def RM_host_limits(RMobs,RMobserr,
         plt.plot(RM_axis,Pobs/np.nanmax(Pobs),label=r'$RM_{obs}$')
         plt.plot(RM_axis,Pmw/np.nanmax(Pmw),label=r'$RM_{MW}$')
         plt.plot(RM_axis,Pion/np.nanmax(Pion),label=r'$RM_{ION}$')
+        for i in range(len(intervener_RMs)):
+            plt.plot(RM_axis*((1+intervener_zs[i])**2),Pints[i]/np.nanmax(Pints[i]),label=r'$RM_{{int,{i}}}/(1+z_{{int,{i}}})$'.format(i=i))
         plt.plot(RM_axis,Phost/np.nanmax(Phost),label=r'$RM_{host}$',linewidth=4)
         plt.plot(RM_axis*((1+ztest)**2),Phost/np.nanmax(Phost),label=r'$RM_{host}(1+z)^2$',linewidth=4)
         plt.xlim(-RMobs*2,RMobs*2)
@@ -530,7 +576,7 @@ def RM_host_limits(RMobs,RMobserr,
 def RM_host_dist(RMobs,RMobserr,
                    RMmw,RMmwerr,
                    RMion,RMionerr,ztest,res=10000,RMmin=-5000,RMmax=5000,
-                  plot=False):
+                  plot=False,intervener_RMs=[],intervener_RM_errs=[],intervener_zs=[]):
     """
     This function derives the host RM given an FRB's observed RM and redshift. 
     It convolves the distributions of RM_obs, RM_MW (from Hutschenreutrer+2021), 
@@ -570,6 +616,16 @@ def RM_host_dist(RMobs,RMobserr,
     P1 = np.convolve(Pobs,Pmw[::-1],mode="same")
     P2 = np.convolve(P1,Pion[::-1],mode="same")
 
+    #interveners
+    Pints = []
+    for i in range(len(intervener_RMs)):
+        if ~np.isnan(intervener_RM_errs[i]) and intervener_RM_errs[i] != 0:
+            Pint = gaus(RM_axis*((1+intervener_zs[i])**2),intervener_RMs[i],intervener_RM_errs[i])
+        else:
+            Pint = np.zeros(len(RM_axis))
+            Pint[np.argmin(np.abs(RM_axis*((1+intervener_zs[i])**2)-intervener_RMs[i]))] = 1
+        Pints.append(Pint)
+        P2 = np.convolve(P2,Pint[::-1],mode='same')
 
     Phost = copy.deepcopy(P2)
     Phost_z = Phost/np.sum(Phost*(RM_axis[1]-RM_axis[0]))
@@ -601,6 +657,8 @@ def RM_host_dist(RMobs,RMobserr,
         plt.plot(RM_axis,Pobs/np.nanmax(Pobs),label=r'$RM_{obs}$')
         plt.plot(RM_axis,Pmw/np.nanmax(Pmw),label=r'$RM_{MW}$')
         plt.plot(RM_axis,Pion/np.nanmax(Pion),label=r'$RM_{ION}$')
+        for i in range(len(intervener_RMs)):
+            plt.plot(RM_axis*((1+intervener_zs[i])**2),Pints[i]/np.nanmax(Pints[i]),label=r'$RM_{{int,{i}}}/(1+z_{{int,{i}}})^2$'.format(i=i))
         plt.plot(RM_axis,Phost/np.nanmax(Phost),label=r'$RM_{host}/(1+z)^2$',linewidth=4)
         plt.plot(RM_axis*((1+ztest)**2),Phost/np.nanmax(Phost),label=r'$RM_{host}$',linewidth=4)
         plt.axvline(Phost_exp,color="purple")
@@ -693,14 +751,14 @@ SIMBAD_CATALOG_OPTIONS = [
         '2MASS',#2MASS
         ]
 SIMBAD_GALAXY_OPTIONS = [
-        'Galaxy',
-        'Interacting Galaxies',
-        'Pair of Galaxies',
-        'Group of Galaxies',
-        'Compact Group of Galaxies',
-        'Cluster of Galaxies',
-        'Proto Cluster of Galaxies',
-        'Supercluster of Galaxies'
+        '(G),Galaxy',
+        '(IG),Interacting Galaxies',
+        '(PaG),Pair of Galaxies',
+        '(GrG),Group of Galaxies',
+        '(CGG),Compact Group of Galaxies',
+        '(ClG),Cluster of Galaxies',
+        '(PCG),Proto Cluster of Galaxies',
+        '(SCG),Supercluster of Galaxies'
         ]
 COSMOLOGY_OPTIONS = [
         'Planck18',
@@ -740,12 +798,17 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
 
     #check object types
     if len(types)==0:
-        typestring = "otypes in (\'Galaxy\',\'IG\',\'PaG\',\'GrG\',\'PCG\',\'SCG\')"
-    else:
-        typestring = "otypes in ("
-        for i in types:
-            typestring += "\'"+i+"\',"
-        typestring = typestring[:-1] + ")"
+        types =copy.deepcopy(SIMBAD_GALAXY_OPTIONS)
+
+    types = [types[i][1:types[i].index(")")] for i in range(len(types))]
+    typestring = "otypes in ("
+    for i in types:
+        typestring += "\'"+i+"\',"
+        if i == 'GrG': typestring += "\'Gr?\',"
+        elif i == 'ClG': typestring += "\'C?G\',"
+        elif i == 'PCG': typestring += "\'PCG?\',"
+        elif i == 'SCG': typestring += "\'SC?\',"
+    typestring = typestring[:-1] + ")"
 
     #check redshift
     if redshift==-1:
@@ -780,6 +843,53 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         #make column for impact parameter
         qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']).data*qdat['OFFSET'].data*np.pi/180,name='IMPACT',index=4)
         qdat['IMPACT'].unit = u.Mpc
+        qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']+qdat['RVZ_ERROR']).data*qdat['OFFSET'].data*np.pi/180 - qdat['IMPACT'],name='IMPACT_POSERR',index=5)
+        qdat['IMPACT_POSERR'].unit = u.Mpc
+        qdat.add_column(qdat['IMPACT'] - COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']-qdat['RVZ_ERROR']).data*qdat['OFFSET'].data*np.pi/180,name='IMPACT_NEGERR',index=6)
+        qdat['IMPACT_NEGERR'].unit = u.Mpc
+
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='DM_EST',index=7)
+        qdat['DM_EST'].unit = u.pc/u.cm**3
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='DM_EST_ERROR',index=8)
+        qdat['DM_EST_ERROR'].unit = u.pc/u.cm**3
+
+        
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='M_INPUT',index=7)
+        qdat['M_INPUT'].unit = u.Msun
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='M_INPUT_ERROR',index=8)
+        qdat['M_INPUT_ERROR'].unit = u.Msun
+
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_EST',index=9)
+        qdat['R_EST'].unit = u.Mpc
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_EST_ERROR',index=10)
+        qdat['R_EST_ERROR'].unit = u.Mpc
+
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_ANGLE_EST',index=11)
+        qdat['R_ANGLE_EST'].unit = u.arcmin
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_ANGLE_EST_ERROR',index=12)
+        qdat['R_ANGLE_EST_ERROR'].unit = u.arcmin
+
+        qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']).data,name='COMOVING_DIST_EST',index=13)
+        qdat['COMOVING_DIST_EST'].unit = u.Mpc
+        qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']+qdat['RVZ_ERROR']).data-qdat['COMOVING_DIST_EST'].data,name='COMOVING_DIST_EST_POSERR',index=14)
+        qdat['COMOVING_DIST_EST_POSERR'].unit = u.Mpc
+        qdat.add_column(qdat['COMOVING_DIST_EST'].data-COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']-qdat['RVZ_ERROR']).data,name='COMOVING_DIST_EST_NEGERR',index=15)
+        qdat['COMOVING_DIST_EST_NEGERR'].unit = u.Mpc
+
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='B_LOS_EST',index=16)
+        qdat['B_LOS_EST'].unit = u.uG
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='B_LOS_EST_ERROR',index=17)
+        qdat['B_LOS_EST_ERROR'].unit = u.uG
+
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='B0_LOS_EST',index=18)
+        qdat['B0_LOS_EST'].unit = u.uG
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='B0_LOS_EST_ERROR',index=19)
+        qdat['B0_LOS_EST_ERROR'].unit = u.uG
+
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='RM_EST',index=20)
+        qdat['RM_EST'].unit = u.rad/u.m**2
+        qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='RM_EST_ERROR',index=21)
+        qdat['RM_EST_ERROR'].unit = u.rad/u.m**2
 
 
         print("Found " + str(len(qdat)) + " sources",file=lf)
@@ -788,7 +898,7 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
     lf.close()
     return qdat
 
-def plot_galaxies(ra,dec,radius,cosmology,redshift=-1,qdat=None,figsize=(18,4)):
+def plot_galaxies(ra,dec,radius,cosmology,redshift=-1,qdat=None,figsize=(18,12)):
     """
     Takes a dataframe of galaxies and plots them around the FRB
     """
@@ -806,11 +916,18 @@ def plot_galaxies(ra,dec,radius,cosmology,redshift=-1,qdat=None,figsize=(18,4)):
                 
             if ~(qdat['GALDIM_MAJAXIS'].mask[i]) and ~(qdat['GALDIM_MAJAXIS'].mask[i]) and ~(qdat['GALDIM_ANGLE'].mask[i]):
                 #make patch
-                gal = Ellipse((c.ra.value,c.dec.value),
+                if np.isnan(qdat['R_ANGLE_EST'][i]):
+                    gal = Ellipse((c.ra.value,c.dec.value),
                         width=qdat['GALDIM_MAJAXIS'][i]/60,
                         height=qdat['GALDIM_MINAXIS'][i]/60,
                         angle=qdat['GALDIM_ANGLE'][i],
                         alpha=0.5,color='blue',linewidth=4,facecolor='blue',fill=True)
+                else:
+                    gal = Ellipse((c.ra.value,c.dec.value),
+                        width=qdat['R_ANGLE_EST'][i]/60,
+                        height=qdat['R_ANGLE_EST'][i]/60,
+                        angle=0,
+                        alpha=0.5,color='red',linewidth=4,facecolor='red',fill=True)
                 ax.add_patch(gal)
     #print(ra,dec)
     rad = Ellipse((ra,dec),width=radius*2/60,height=radius*2/60,alpha=1,color='red',fill=False,linewidth=2)
@@ -855,4 +972,146 @@ def plot_galaxies(ra,dec,radius,cosmology,redshift=-1,qdat=None,figsize=(18,4)):
     plt.show()
 
 
+def DM_int_vals(qdat_row,mass_low,mass_high,cosmology,mass_type):
+    """
+    This function uses NFW profile to get DM and error from mass
+    ,redshift, impact parameter, and angular size
+    """
 
+    #make NFW profile
+    try:
+        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row['RVZ_RADVEL']-qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    except:
+        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    #get impact parameter
+    b = (qdat_row['IMPACT']-qdat_row['IMPACT_NEGERR'])*u.Mpc
+
+    #get density 
+    rho = nfw.evaluate(b,mass=nfw.mass,concentration=nfw.concentration,redshift=nfw.redshift) #Msun/kpc^3
+
+    #convert to number density
+    ne = rho.to(u.kg/u.cm**3)/(m_p.to(u.kg))#1/cm^3
+
+    #estimate path length from virial radius and impact parameter
+    l = np.sqrt(nfw.r_virial.to(u.pc)**2 + b.to(u.pc)**2)
+
+    #DM
+    dm1 = (ne*l).value
+    rvir1 = nfw.r_virial.to(u.Mpc).value
+
+    #make NFW profile
+    try:
+        nfw = physical_models.NFW(mass=mass_high*u.Msun,redshift=qdat_row['RVZ_RADVEL']+qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    except:
+        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    #get impact parameter
+    b = (qdat_row['IMPACT']+qdat_row['IMPACT_POSERR'])*u.Mpc
+
+    #get density 
+    rho = nfw.evaluate(b,mass=nfw.mass,concentration=nfw.concentration,redshift=nfw.redshift) #Msun/kpc^3
+
+    #convert to number density
+    ne = rho.to(u.kg/u.cm**3)/(m_p.to(u.kg))#1/cm^3
+
+    #estimate path length from virial radius and impact parameter
+    l = np.sqrt(nfw.r_virial.to(u.pc)**2 + b.to(u.pc)**2)
+
+    #DM
+    dm2 = (ne*l).value
+    rvir2 = nfw.r_virial.to(u.Mpc).value
+
+    dm = (dm1 + dm2)/2
+    dm_err = np.abs(dm1 - dm2)/2
+
+    rvir = (rvir1 + rvir2)/2
+    rvir_err = np.abs(rvir1 - rvir2)/2
+    return dm,dm_err,rvir,rvir_err
+
+B_REF_MW = 6*u.G
+R_REF_MW = 8*u.kpc
+B0_MW = 48*u.G
+R0_MW = 1*u.kpc
+RVIR_MW = 200*u.kpc
+
+def RM_int_vals(qdat_row,bfield_low,bfield_high,cosmology,mass_type,bfield_types):
+    """
+    This function uses NFW profile and B field estiamtes to get RM and error
+    """
+    
+    #make NFW profile
+    try:
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']-qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL']-qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    except:
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']-qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+
+    #get impact parameter and virial radius
+    b = (qdat_row['IMPACT']-qdat_row['IMPACT_NEGERR'])*u.Mpc
+    rvir = nfw.r_virial.to(u.Mpc)
+
+    #estimate reference radius
+    R0 = RVIR_MW*(R0_MW/rvir.to(u.kpc)) #kpc
+
+    #if given scale factors, need to get B at impact param
+    if bfield_types[0] == 'x':
+        bf0_low = bfield_low*B0_MW #uG
+        bf_low = bf0_low*R0/b.to(u.kpc) #uG
+    else: #if given uG need to get B at r0
+        bf_low = bfield_low*u.uG
+        bf0_low = bf_low*b.to(u.kpc)/R0 #uG
+
+    #get density 
+    rho = nfw.evaluate(b,mass=nfw.mass,concentration=nfw.concentration,redshift=nfw.redshift) #Msun/kpc^3
+
+    #convert to number density
+    ne = rho.to(u.kg/u.cm**3)/(m_p.to(u.kg))#1/cm^3
+
+    #estimate path length from virial radius and impact parameter
+    l = np.sqrt(nfw.r_virial.to(u.pc)**2 + b.to(u.pc)**2)
+
+    #convert to RM
+    RM_low = (0.81*((u.rad/u.m**2)*(u.cm**3/u.pc)/u.uG)*bf_low*ne*l).value #rad/m^2
+
+    #make NFW profile
+    try:
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']+qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL']+qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    except:
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']+qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+
+    #get impact parameter and virial radius
+    b = (qdat_row['IMPACT']+qdat_row['IMPACT_POSERR'])*u.Mpc
+    rvir = nfw.r_virial.to(u.Mpc)
+
+    #estimate reference radius
+    R0 = RVIR_MW*(R0_MW/rvir.to(u.kpc)) #kpc
+
+    #if given scale factors, need to get B at impact param
+    if bfield_types[1] == 'x':
+        bf0_high = bfield_high*B0_MW #uG
+        bf_high = bf0_high*R0/b.to(u.kpc) #uG
+    else: #if given uG need to get B at r0
+        bf_high = bfield_high*u.uG
+        bf0_high = bf_high*b.to(u.kpc)/R0 #uG
+
+    #get density 
+    rho = nfw.evaluate(b,mass=nfw.mass,concentration=nfw.concentration,redshift=nfw.redshift) #Msun/kpc^3
+
+    #convert to number density
+    ne = rho.to(u.kg/u.cm**3)/(m_p.to(u.kg))#1/cm^3
+
+    #estimate path length from virial radius and impact parameter
+    l = np.sqrt(nfw.r_virial.to(u.pc)**2 + b.to(u.pc)**2)
+    
+    #convert to RM
+    RM_high = (0.81*((u.rad/u.m**2)*(u.cm**3/u.pc)/u.uG)*bf_high*ne*l).value #rad/m^2
+
+    
+    bf = (bf_low.value + bf_high.value)/2
+    bf_err = np.abs(bf_low.value - bf_high.value)/2
+
+    bf0 = (bf0_low.value + bf0_high.value)/2
+    bf0_err = np.abs(bf0_low.value - bf0_high.value)/2
+
+    rm = (RM_high + RM_low)/2
+    rm_err = np.abs(RM_high - RM_low)/2
+
+    return rm,rm_err,bf,bf_err,bf0,bf0_err
