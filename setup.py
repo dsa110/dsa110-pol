@@ -67,25 +67,32 @@ import numpy as np
 #np.save("../dsapol_logfiles/RM_files/trial_rm.npy",np.zeros(0))
 
 print("Finding working directories")
+"""
 os.system("pwd > cwdpath.txt")
 f = open("cwdpath.txt","r")
 cwd = f.read()[:-1] + "/"
 f.close()
+"""
+cwd = os.environ["DSAPOLDIR"]
+print("path to dsapol: ",cwd)
 
 dirs = {"cwd":cwd,
         "polcal":cwd[:cwd.index("dsa110-pol")] + "dsapol_polcal/",#"/media/ubuntu/ssd/sherman/code/",
-        "candidates":"/mnt/dsa110/candidates/",
-        "T3":"/mnt/dsa110/T3/",#"/dataz/dsa110/T3/",
-        "polcal_voltages":"/mnt/polcal_voltages/",#"/media/ubuntu/ssd/sherman/polcal_voltages/",
-        "data":"/mnt/FRBdata/",#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/",
+        "candidates":os.environ["DSA110DIR"] + "candidates/", #"/mnt/dsa110/candidates/",
+        "T3":os.environ["DSA110DIR"] + "T3/", #"/mnt/dsa110/T3/",#"/dataz/dsa110/T3/",
+        "polcal_voltages":os.environ["DSACALDIR"], #"/mnt/polcal_voltages/",#"/media/ubuntu/ssd/sherman/polcal_voltages/",
+        "data":os.environ["DSAFRBDIR"], #"/mnt/FRBdata/",#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/",
         "logs":cwd[:cwd.index("dsa110-pol")] + "dsapol_logfiles/",
-        "gen_bfweights":"/mnt/dsa110/operations/beamformer_weights/generated/",
+        "gen_bfweights":os.environ["DSA110DIR"] + "operations/beamformer_weights/generated/", #"/mnt/dsa110/operations/beamformer_weights/generated/",
         "dsastorageFRBDir":"user@dsa-storage.ovro.pvt:/home/user/data/candidates/candidates/",
         "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/",
         "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/"}
 
-os.environ['TESTVAR'] = "TESTVALUE"
 
+f = open(cwd + "directories.json","w")
+json.dump(dirs,f)
+f.close()
+"""
 print(dirs)
 f = open(dirs["polcal"] + "directories.json","w")
 json.dump(dirs,f)
@@ -98,3 +105,4 @@ f.close()
 f = open("scripts/directories.json","w")
 json.dump(dirs,f)
 f.close()
+"""

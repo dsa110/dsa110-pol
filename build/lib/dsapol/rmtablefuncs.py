@@ -4,7 +4,8 @@ from astropy.coordinates import SkyCoord
 import astropy.units as u
 import polspectra
 import json
-f = open("directories.json","r")
+import os
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 

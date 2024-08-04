@@ -54,7 +54,6 @@ interface/PARSEC_Interface-InteractiveMercury.ipynb
 interface/celerybeat-schedule.bak
 interface/celerybeat-schedule.dat
 interface/celerybeat-schedule.dir
-interface/directories.json
 interface/kill_mercury.sh
 interface/last_cal_metadata.txt
 interface/tmpout.txt
@@ -81,7 +80,6 @@ scripts/RMSNR_all_FRBs.py
 scripts/RM_all_FRBs.py
 scripts/RM_synthesis.py
 scripts/cal_pol.py
-scripts/directories.json
 scripts/find_beams.py
 scripts/plot_pol.py
 scripts/process_all_FRBs.py

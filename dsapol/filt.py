@@ -8,13 +8,14 @@ from scipy.ndimage import convolve1d
 from scipy.signal import peak_widths
 from scipy.stats import chi
 from scipy.stats import norm
+import os
 
 
 """
 This file contains helpers for filtering and computing signal-to-noise
 """
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 logfile = dirs["logs"] + "filter_logfile.txt"

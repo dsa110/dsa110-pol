@@ -94,7 +94,7 @@ plt.rcParams.update({
                     'legend.frameon': False,
                     'legend.loc': 'lower right'})
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 """
@@ -202,7 +202,7 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
                 if row[11] != "":
                     FRB_IDS.append(str(row[11]))
                 else:
-                    FRB_IDS.append(-1)
+                    FRB_IDS.append("")
 
                 if row[12] != "":
                     FRB_RM.append(float(row[12]))
@@ -233,6 +233,9 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
                     FRB_RMionerr.append(float(row[17]))
                 else:
                     FRB_RMionerr.append(np.nan)
+                #if no directory exists, make one
+                if len(glob.glob(dirs['data']+FRB_IDS[-1] + "_" + FRBs[-1])) == 0:
+                    os.system("mkdir " + dirs['data']+FRB_IDS[-1] + "_" + FRBs[-1])
     return
 update_FRB_params()
 

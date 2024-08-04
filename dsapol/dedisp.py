@@ -1,11 +1,12 @@
 import numpy as np
+import os
 
 
 """
 Functions for brute force dedispersion
 """
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 logfile = dirs["logs"] + "dedisp_logfile.txt"

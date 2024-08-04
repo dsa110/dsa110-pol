@@ -59,7 +59,7 @@ OVRO_lon = -118.2951 #deg
 OVRO_height = 1216 #m, Big Pine
 
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 logfile = dirs["logs"] + "RMcal_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/RMcal_logfile.txt"

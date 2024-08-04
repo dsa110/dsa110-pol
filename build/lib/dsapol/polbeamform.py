@@ -10,7 +10,7 @@ beamforming code. Functions act as python wrappers around shell scripts that wil
 
 #default directory to store filterbanks
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 output_dir = dirs["data"]#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"
@@ -55,9 +55,13 @@ def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir,backgro
     """
     #return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/for_testing.bash 2>&1 > /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/beamforming_logfile.txt &")
     clear_logfile()
-    if background: b = " 2>&1 > " + logfile + " &"
-    else: b = ""
-    return os.system(dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
+    if background: 
+        n = "nohup "
+        b = " > "+ logfile + " 2>&1 &"
+    else: 
+        n = ""
+        b = ""
+    return os.system(n + dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
             + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + b) #" 2>&1 > " + logfile + " &")
 
 

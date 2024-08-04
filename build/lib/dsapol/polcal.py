@@ -52,7 +52,7 @@ most recent calibrator observations, forming beams when known, and smoothing/ave
 with previous solutions.
 """
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 
@@ -135,7 +135,7 @@ def copy_voltages(filenames,caldate,calname,path=data_path,new_path=voltage_copy
     for f in filenames:
         #print(f)
         if 'header' not in f:
-            os.system(repo_path + "offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
+            os.system("nohup " + repo_path + "offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " > " + logfile + " 2>&1 &")
         #print("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/move_cal_voltages.bash " + calname + " " + f[len(calname):len(calname)+3] + " " + caldate + " " + new_path + " " + path + " 2>&1 > " + logfile + " &")
 
     #return output directory
@@ -216,7 +216,7 @@ def copy_bfweights(bfweights,path=bfweights_path,new_path=bfweights_output_path)
     """
     for fname in bfweights:
         print("copying " + path + fname + " to " + new_path)
-        #os.system("cp " + path + fname + " " + new_path)
+        os.system("cp " + path + fname + " " + new_path)
     return
 
 
@@ -276,8 +276,8 @@ def beamform_polcal(vfiles,bffiles,calname,caldate,path=output_path):
 
     #for each observation, make voltage files
     for k in cal_id_dict.keys():
-        print("./offline_beamforming/run_beamformer_offline_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " " + str(caldate) + " 2>&1 > " + logfile + " &")
-        #os.system("./offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " 2>&1 > " + logfile + " &")
+        print("./offline_beamforming/run_beamformer_offline_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " " + str(caldate) + " > " + logfile + " 2>&1 &")
+        os.system("nohup ./offline_beamforming/run_beamformer_offline_bfweightsupdate_cals_sb.bash " + str(k) + " " + str(cal_id_dict[f[:len(calname)+3]]['mjd']) + " " + calname + " " +  bftstamp + " " + str(caldate) + " > " + logfile + " 2>&1 &")
 
     #make a copy of jsons so we have access to the mjd
     for f in vfiles:
@@ -337,9 +337,9 @@ def make_cal_filterbanks(calname,caldate,calid,bfweights,ibeam,mjd,path=output_p
     """
 
     clear_logfile()
-    return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash NA "
+    return os.system("nohup /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/run_beamformer_visibs_bfweightsupdate_cals_sb.bash NA "
             + str(calid) + " " + str(calname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " 0 " + str(caldate) +
-            " 2>&1 > " + logfile + " &")
+            " > " + logfile + " 2>&1 &")
 
 
 

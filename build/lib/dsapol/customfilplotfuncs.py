@@ -6,7 +6,7 @@ from sigpyproc.Header import Header
 import matplotlib
 #matplotlib.use("TkAgg")
 from matplotlib import pyplot as plt
-
+import os
 
 """
 Plotting parameters
@@ -31,7 +31,7 @@ plt.rcParams.update({
                     'legend.frameon': False,
                     'legend.loc': 'lower right'})
 import json
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 

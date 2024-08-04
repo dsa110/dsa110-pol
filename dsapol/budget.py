@@ -12,6 +12,12 @@ import copy
 from scipy.signal import peak_widths
 from astroquery.simbad import Simbad
 from dsapol.RMcal import logfile
+import os
+import json
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
+dirs = json.load(f)
+f.close()
+
 """
 This contains helper functions for computing the DM and RM budget. For examples see DMhost_Estimation_Script_2024-04-11.ipynb
 """

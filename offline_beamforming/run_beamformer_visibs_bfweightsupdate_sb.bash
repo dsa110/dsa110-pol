@@ -15,9 +15,15 @@ freqs=("1498.75" "1487.03125" "1475.3125" "1463.59375" "1451.875" "1440.15625" "
 
 echo $1 $2 $3 $4 $5 $6 $7
 
-calibdir="/mnt/dsa110/operations/beamformer_weights/applied" #"220912A_bfweights" #"/dataz/dsa110/operations/beamformer_weights/applied" #"/home/ubuntu/sherman/pol_calibs"
-dir="/mnt/dsa110/candidates/$2/Level2/voltages/" #"/media/ubuntu/ssd/sherman/221018aaaj_220912A" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/221018aaaj_CR20220912A_test" #"/dataz/dsa110/candidates/$2/Level2/voltages/" #"/media/ubuntu/data/dsa110/T3/$1"
-outdir="/mnt/FRBdata/$2_$3" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/$2_$3"
+#calibdir="/mnt/dsa110/operations/beamformer_weights/applied" #"220912A_bfweights" #"/dataz/dsa110/operations/beamformer_weights/applied" #"/home/ubuntu/sherman/pol_calibs"
+#dir="/mnt/dsa110/candidates/$2/Level2/voltages/" #"/media/ubuntu/ssd/sherman/221018aaaj_220912A" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/221018aaaj_CR20220912A_test" #"/dataz/dsa110/candidates/$2/Level2/voltages/" #"/media/ubuntu/data/dsa110/T3/$1"
+#outdir="/mnt/FRBdata/$2_$3" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/$2_$3"
+
+calibdir="${DSA110DIR}operations/beamformer_weights/applied"
+dir="${DSA110DIR}candidates/$2/Level2/voltages/"
+outdir="${DSAFRBDIR}$2_$3"
+
+
 mkdir ${outdir}
 echo $calibdir $dir $outdir
 calibdate="$4" #"$4T00:00:00"

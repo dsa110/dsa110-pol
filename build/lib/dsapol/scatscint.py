@@ -9,7 +9,7 @@ import contextlib
 import emcee
 import bilby
 
-f = open("directories.json","r")
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
 
