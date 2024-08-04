@@ -416,6 +416,9 @@ state_dict['RMhost'] = np.nan
 state_dict['DMhost'] = np.nan
 state_dict['qdat'] = None
 
+
+state_dict['intervener_names_RM'] = []
+state_dict['intervener_names_DM'] = []
 state_dict['intervener_RMs']=[]
 state_dict['intervener_RM_errs']=[]
 state_dict['intervener_RMzs']=[]
@@ -542,17 +545,32 @@ df_scat = pd.DataFrame(
         )
 
 
-df_intervener = pd.DataFrame(
+df_RM_budget = pd.DataFrame(
         {
-            r'M_{\rm vir} ($M_{\odot}$)':[],
-            r'b_\perp (Mpc)':[],
-            r'PosError (Mpc)':[],
-            r'NegError (Mpc)':[],
-            r'DM (pc/cm$^3$)':[],
-            r'Error (pc/cm$^3$)':[]
+            'RMobs':[""],
+            'RMmw':[""],
+            'RMion':[""],
+            'RMint':[""],
+            'RMhost':[""],
+            'RMhost/(1+zhost)^2':[""],
             },
-            index=[]
+            index=['Budget']
         )
+
+
+df_DM_budget = pd.DataFrame(
+        {
+            'DMobs':[""],
+            'DMmw':[""],
+            'DMhalo':[""],
+            'DMigm':[""],
+            'DMint':[""],
+            'DMhost':[""],
+            'DMhost/(1+zhost)':[""],
+            },
+            index=['Budget']
+        )
+
 
 #List of initial widget values updated whenever screen loads
 def get_frbfiles(path=frbpath):
@@ -776,10 +794,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'RMsynthbackground':False,
         'trialz':-1,
         'rmcal_input':0,
-        'catalog_selection':[],
-        'catalog_selection_choices':budget.SIMBAD_CATALOG_OPTIONS,
-        'galtype_selection':[],
-        'galtype_selection_choices':budget.SIMBAD_GALAXY_OPTIONS,
+        'catalog_selection':['All'],
+        'catalog_selection_choices':list(budget.SIMBAD_CATALOG_OPTIONS)+['All'],
+        'galtype_selection':['All'],
+        'galtype_selection_choices':list(budget.SIMBAD_GALAXY_OPTIONS)+['All'],
         'queryradius':1,
         'limitzrange':False,
         'zrange':1e-3,
@@ -791,6 +809,11 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'galaxy_bfields':'',
         'mass_type':'500m',
         'mass_type_choices':['virial','200m','500m','200c','500c'],
+        'Bfield_range':100,
+        'Bfield_res': 0.2,
+        'Bfield_display':np.nan,
+        'Bfield_pos_err_display':np.nan,
+        'Bfield_neg_err_display':np.nan,
 
         'showghostPA':True,
         'intLbuffer_slider':0,
@@ -3798,7 +3821,8 @@ def galquery_Budget_screen(catalog_selection,galtype_selection,queryradius,runqu
     #run query
     if runquery.clicked:
         state_dict['qdat'] = budget.get_SIMBAD_gals(state_dict['RA'],state_dict['DEC'],queryradius.value,
-                                                    catalogs=catalog_selection.value,types=galtype_selection.value,cosmology=cosmo_selection.value,
+                                                    catalogs=[] if 'All' in catalog_selection.value else catalog_selection.value,
+                                                    types=[] if 'All' in galtype_selection.value else galtype_selection.value,cosmology=cosmo_selection.value,
                                                     redshift=trialz.value,redshift_range=zrange.value if limitzrange.value else None)
 
 
@@ -3823,6 +3847,7 @@ def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runque
     state_dict['intervener_DMs'] = []
     state_dict['intervener_DM_errs'] = []
     state_dict['intervener_zs'] = []
+    state_dict['intervener_names_DM'] = []
     if state_dict['qdat'] is not None and len(galaxy_selection.value)>0 and len(galaxy_masses.value)>0:
         galaxy_masses_list = np.array(galaxy_masses.value.split(','),dtype=str)
         for i in range(len(galaxy_masses_list)):
@@ -3830,14 +3855,16 @@ def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runque
             if '--' in galaxy_masses_list[i]:
                 mass_low,mass_high = np.array(galaxy_masses_list[i].split('--'),dtype=float)
             else:
-                mass_low = mass_high = float(galaxy_masses_list[i])
+                mass_low = 0.9* float(galaxy_masses_list[i])
+                mass_high = 1.1*float(galaxy_masses_list[i])
             int_DM,int_DM_err,int_rvir,int_rvir_err = budget.DM_int_vals(state_dict['qdat'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])],
                                                         mass_low,mass_high,cosmo_selection.value,mass_type.value)
             state_dict['intervener_DMs'].append(int_DM)
             state_dict['intervener_DM_errs'].append(int_DM_err)
             state_dict['intervener_zs'].append(state_dict['qdat']['RVZ_RADVEL'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])])
+            state_dict['intervener_names_DM'].append(state_dict['qdat']['MAIN_ID'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])])
             state_dict['qdat']['M_INPUT'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = (mass_low+mass_high)/2
-            state_dict['qdat']['M_INPUT_ERROR'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = (mass_high-mass_low)/2
+            state_dict['qdat']['M_INPUT_ERROR'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = (mass_high-mass_low)/2 
             state_dict['qdat']['R_EST'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = int_rvir
             state_dict['qdat']['R_EST_ERROR'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = int_rvir_err
             state_dict['qdat']['R_ANGLE_EST'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = (int_rvir/state_dict['qdat']['COMOVING_DIST_EST'][i])*(180*60/np.pi)
@@ -3847,6 +3874,7 @@ def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runque
     state_dict['intervener_RMs'] = []
     state_dict['intervener_RM_errs'] = []
     state_dict['intervener_RMzs'] = []
+    state_dict['intervener_names_RM'] = []
     if state_dict['qdat'] is not None and len(galaxy_selection.value)>0 and len(galaxy_bfields.value)>0 and len(galaxy_masses.value)>0:
         galaxy_bfields_list = np.array(galaxy_bfields.value.split(','),dtype=str)
         for i in range(len(galaxy_bfields_list)):
@@ -3872,17 +3900,19 @@ def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runque
                     bfield_types.append('x')
             else:
                 if 'uG' in galaxy_bfields_list[i]:
-                    bfield_low = bfield_high = float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('uG')])
+                    bfield_low = 0.9*float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('uG')])
+                    bfield_high = 1.1*float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('uG')])
                     bfield_types = ['uG','uG']
                 else:
-                    bfield_low = bfield_high = float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('x')]) #budget.MWlike_Bfield(float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('x')]),state_dict['qdat']['IMPACT'][i])
+                    bfield_low = 0.9*float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('x')]) #budget.MWlike_Bfield(float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('x')]),state_dict['qdat']['IMPACT'][i])
+                    bfield_high = 1.1*float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('x')]) #budget.MWlike_Bfield(float(galaxy_bfields_list[i][:galaxy_bfields_list[i].index('x')]),state_dict['qdat']['IMPACT'][i])
                     bfield_types = ['x','x']
 
             int_RM,int_RM_err,int_B,int_B_err,int_B0,int_B0_err = budget.RM_int_vals(state_dict['qdat'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])],bfield_low,bfield_high,cosmo_selection.value,mass_type.value,bfield_types)
             state_dict['intervener_RMs'].append(int_RM)
             state_dict['intervener_RM_errs'].append(int_RM_err)
             state_dict['intervener_RMzs'].append(state_dict['qdat']['RVZ_RADVEL'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])])
-
+            state_dict['intervener_names_RM'].append(state_dict['qdat']['MAIN_ID'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])])
             state_dict['qdat']['RM_EST'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = int_RM
             state_dict['qdat']['RM_EST_ERROR'][list(state_dict['qdat']['MAIN_ID']).index(galaxy_selection.value[i])] = int_RM_err
 
@@ -3894,7 +3924,7 @@ def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runque
 
 
     #plotting
-    budget.plot_galaxies(state_dict['RA'],state_dict['DEC'],queryradius.value,cosmology=cosmo_selection.value,redshift=trialz.value,qdat=state_dict['qdat'])
+    budget.plot_galaxies(state_dict['RA'],state_dict['DEC'],queryradius.value,cosmology=cosmo_selection.value,redshift=trialz.value,qdat=state_dict['qdat'],save=True,savedir=state_dict['datadir'])
 
     update_wdict([catalog_selection,galtype_selection,queryradius,limitzrange,zrange,trialz,cosmo_selection,galaxy_masses,galaxy_selection,mass_type],
             ['catalog_selection','galtype_selection','queryradius','limitzrange','zrange','trialz','cosmo_selection','galaxy_masses','galaxy_selection','mass_type'],param='value')
@@ -3907,18 +3937,29 @@ def DM_Budget_screen(trialz):
     #if redshift is known, compute DM host
     if ~np.isnan(state_dict['z']) and ~np.isnan(state_dict['DM']) and trialz.value < 0:
         ctest = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs') #SkyCoord('22h34m46.93s+70d32m18.40s',frame='icrs',unit=(u.hourangle,u.deg))
-        state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'] = budget.DM_host_limits(state_dict['DM'],state_dict['z'],ctest.galactic.l.value,ctest.galactic.b.value,plot=False,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'])
-        state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],state_dict['z'],ctest.galactic.l.value,ctest.galactic.b.value,plot=True,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'])
+        state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'],state_dict["dmbudgetdict"] = budget.DM_host_limits(state_dict['DM'],state_dict['z'],ctest.galactic.l.value,ctest.galactic.b.value,plot=False,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'])
+        state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],state_dict['z'],ctest.galactic.l.value,ctest.galactic.b.value,plot=True,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'],save=True,savedir=state_dict['datadir'])
     elif ~np.isnan(state_dict['DM']) and trialz.value >= 0:
         ctest = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs') #SkyCoord('22h34m46.93s+70d32m18.40s',frame='icrs',unit=(u.hourangle,u.deg))
-        state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'] = budget.DM_host_limits(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=False,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'])
-        state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=True,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'])
+        state_dict['DMhost'],state_dict['DMhost_lower_limit'],state_dict['DMhost_upper_limit'],state_dict["dmbudgetdict"] = budget.DM_host_limits(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=False,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'])
+        state_dict['dmdist'],state_dict['DMaxis'] = budget.DM_host_dist(state_dict['DM'],trialz.value,ctest.galactic.l.value,ctest.galactic.b.value,plot=True,intervener_DMs=state_dict['intervener_DMs'],intervener_DM_errs=state_dict['intervener_DM_errs'],intervener_zs=state_dict['intervener_zs'],save=True,savedir=state_dict['datadir'])
     
     update_wdict([trialz],
             ['trialz'],param='value')
 
 
-    return
+    #update table
+    df_DM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['DM'],2),b=0.1),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['MW'],2),b=np.around(state_dict['dmbudgetdict']['MWerr'],2)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['halo'],2),b=np.around(state_dict['dmbudgetdict']['haloerr'],2)),
+                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['dmbudgetdict']["IGM"],2),b=np.around(state_dict['dmbudgetdict']["IGMupperr"],2),c=np.around(state_dict['dmbudgetdict']["IGMlowerr"],2)),
+                                  "\n".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],2),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,2)) for n in range(len(state_dict['intervener_names_DM']))]),
+                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost'],2),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost']),2),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit']),2)),
+                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost']/(1+trialz.value),2),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost'])/(1+trialz.value),2),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit'])/(1+trialz.value),2))
+                                 ]
+
+    return df_DM_budget
+           
 
 
 def RM_Budget_screen(trialz):
@@ -3930,38 +3971,55 @@ def RM_Budget_screen(trialz):
                    RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=False,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
         state_dict['rmdist'],state_dict['RMaxis'] = budget.RM_host_dist(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
-                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'],save=True,savedir=state_dict['datadir'])
+        rmobs = state_dict['RMcalibrated']['RMcal']
+        rmobserr = state_dict['RMcalibrated']['RMcalerr']
     elif ~np.isnan(state_dict['z']) and np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RMinput']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value < 0:
         state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
                    RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=False,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
         state_dict['rmdist'],state_dict['RMaxis']  = budget.RM_host_dist(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
-                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
-    
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=state_dict['z'],plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'],save=True,savedir=state_dict['datadir'])
+        rmobs = state_dict['RMinput']
+        rmobserr = state_dict['RMinputerr'] 
     elif ~np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value >= 0:
         state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
                    RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=False,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
         state_dict['rmdist'],state_dict['RMaxis']  = budget.RM_host_dist(RMobs=state_dict['RMcalibrated']['RMcal'],RMobserr=state_dict['RMcalibrated']['RMcalerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
-                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'],save=True,savedir=state_dict['datadir'])
+        rmobs = state_dict['RMcalibrated']['RMcal']
+        rmobserr = state_dict['RMcalibrated']['RMcalerr']
     elif np.isnan(state_dict['RMcalibrated']['RMcal']) and ~np.isnan(state_dict['RMinput']) and ~np.isnan(state_dict['RM_gal']) and ~np.isnan(state_dict['RM_ion']) and trialz.value >= 0:
         state_dict['RMhost'],state_dict['RMhost_lower_limit'],state_dict['RMhost_upper_limit'] = budget.RM_host_limits(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
                    RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=False,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
         state_dict['rmdist'],state_dict['RMaxis'] = budget.RM_host_dist(RMobs=state_dict['RMinput'],RMobserr=state_dict['RMinputerr'],
                    RMmw=state_dict['RM_gal'],RMmwerr=state_dict['RM_galerr'],
-                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'])
-    
+                   RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'],save=True,savedir=state_dict['datadir'])
+        rmobs = state_dict['RMinput']
+        rmobserr = state_dict['RMinputerr']
 
     update_wdict([trialz],['trialz'],param='value')
 
 
-    return
+    #update table
+    df_RM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(rmobs,2),b=np.around(rmobserr,2)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_gal'],2),b=np.around(state_dict['RM_galerr'],2)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_ion'],2),b=np.around(state_dict['RM_ionerr'],2)),
+                                  "\n".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],2),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,2)) for n in range(len(state_dict['intervener_names_RM']))]),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost'],2),b=np.around(state_dict['RMhost_upper_limit']-state_dict['RMhost'],2)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost']/((1+trialz.value)**2),2),b=np.around((state_dict['RMhost_upper_limit']-state_dict['RMhost'])/((1+trialz.value)**2),2))
+                                 ]
+
+    return df_RM_budget
 
 
-def Bfield_Budget_screen(getBfieldbutton):
+
+
+def Bfield_Budget_screen(getBfieldbutton,Bfield_range,Bfield_res):
 
     #if redshfit, DM, RM are known, compute RM host
     if getBfieldbutton.clicked:
@@ -3971,8 +4029,14 @@ def Bfield_Budget_screen(getBfieldbutton):
                                                                                                                                                     RMhost=state_dict['RMhost'],
                                                                                                                                                     RMhosterr=(state_dict['RMhost_upper_limit']
                                                                                                                                                             -state_dict['RMhost']),
-                                                                                                                                                    res2=500,plot=True,buff=5)
+                                                                                                                                                    res2=int(Bfield_range.value//Bfield_res.value),plot=True,buff=Bfield_range.value,save=True,savedir=state_dict['datadir'])
+            wdict['Bfield_display'] = np.around(state_dict['Bhost'],2)
+            wdict['Bfield_pos_err_display'] = np.around(state_dict['Bhost_upper_limit']-state_dict['Bhost'],2)
+            wdict['Bfield_neg_err_display'] = np.around(state_dict['Bhost']-state_dict['Bhost_lower_limit'],2)
 
+    update_wdict([Bfield_range,Bfield_res],['Bfield_range','Bfield_res'],param='value')
+    #update_wdict([Bfield_display,Bfield_pos_err_display,Bfield_neg_err_display],
+    #        ["Bfield_display","Bfield_pos_err_display","Bfield_neg_err_display"],param='data')
     return
 
 def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu):
