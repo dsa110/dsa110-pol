@@ -13,6 +13,8 @@ used with caution. This is particularly applicable to calibration functions; fun
 interfacing with filterbank data should be portable to any system. The DSA-110 polarization pipeline
 which was built with this module is describe in detail in Sherman et al. 2024a (https://doi.org/10.3847/1538-4357/ad275e).
 
+## Requirements
+
 The following modules are required:
 
 - numpy
@@ -34,6 +36,14 @@ Alternatively, a copy of the conda environment used for development can be activ
 conda activate dsa-110-pol/casa38dsapol
 ```
 
+## Quick Start
+
+Clone `dsa110-pol` locally with:
+
+```
+git clone git@github.com:dsa110/dsa110-pol.git
+```
+
 Add the following lines to your .bashrc file to initialize environment variables:
 
 ```
@@ -43,7 +53,41 @@ export DSAFRBDIR="PATH-TO-FRB-FILTERBANKS"/FRBdata/
 export DSACALDIR="PATH-TO-POLARIZATION-CALIBRATOR-VOLTAGES"/polcal_voltages/
 ```
 
-Replacing with the paths specific to your machine.
+Replacing with the paths specific to your machine. Next install `dsa110-pol` with `pip`:
+
+```
+cd dsa110-pol
+pip install .
+```
+
+This should have created the following directories within folder that encloses `dsa110-pol`:
+
+- `dsapol_logfiles`
+	- `scat_files`
+	- `RM_files`
+- `dsapol_tables`
+- `dsapol_polcal`
+
+along with logfiles for use by the `PARSEC` interface. `dsapol_tables` and `dsapol_polcal` must be populated with DSA-110-specific,
+proprietary data in order to use the polarization calibration functions and `PARSEC` directly. Please submit an issue requesting 
+these files with details on your intended use of this data.
+
+From a Python script, `dsapol` can be imported using:
+
+```
+$python
+>>>from dsapol import dsapol
+```
+
+to use the user-facing functions. The other modules (as described below) are primarily for use by the `PARSEC` interface. `PARSEC` can be accessed
+from https://code.deepsynoptic.org/, or, if the required data files are present, by running the following:
+
+```
+$cd interface
+$mercury run PARSEC_Interface-InteractiveMercury-V4.ipynb
+```
+
+## Modules
 
 The following sub-modules are included:
 - `dsapol`: Modules for polarization analysis with scripts and with the `PARSEC` interface.

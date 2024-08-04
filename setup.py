@@ -58,6 +58,7 @@ os.system("mkdir ../dsapol_logfiles/RM_files")
 os.system("mkdir ../dsapol_logfiles/scat_files")
 
 os.system("mkdir ../dsapol_polcal")
+os.system("mkdir ../dsapol_polcal/polcal_bfweights")
 
 os.system("mkdir interface/.current_state")
 
