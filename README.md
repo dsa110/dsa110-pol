@@ -63,4 +63,4 @@ The following sub-modules are included:
 	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at low resolution for 256 synthesized beams
 	- `run_beamformer_visibs_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at high resolution at given synthesized beam
 	- `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesized beam
-- `
+- `interface`: jupyter notebooks for 
