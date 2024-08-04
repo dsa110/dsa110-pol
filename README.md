@@ -63,4 +63,10 @@ The following sub-modules are included:
 	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at low resolution for 256 synthesized beams
 	- `run_beamformer_visibs_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at high resolution at given synthesized beam
 	- `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesized beam
-- `interface`: jupyter notebooks for 
+- `interface`: High-level juypter notebook for `PARSEC` interface implemented with `mercury` (https://github.com/mljar/mercury)
+	- `PARSEC_Interface-InteractiveMercury-V4.ipynb`: `PARSEC` notebook containing formatting of all screens defined in `dsapol/parsec.py`
+	- `kill_mercury.sh`: kills all sub-processes spawned by `mercury`
+	- `last_cal_metadata`: info about averaging used to make most recent pol calibration solution
+	- `IONEXdata`: atmospheric data from the NASA Earthdata database for ionospheric RM estimation with `RMExtract` (https://github.com/lofar-astron/RMextract)
+- `data`: Additional data required for `PARSEC` and routine FRB analysis
+	- `DSA110-FRBs-PARSEC_TABLE.csv`: Table of DSA-110 FRB 
