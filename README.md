@@ -91,27 +91,27 @@ $mercury run PARSEC_Interface-InteractiveMercury-V4.ipynb
 
 The following sub-modules are included:
 - `dsapol`: Modules for polarization analysis with scripts and with the `PARSEC` interface.
-	- `dsapol`: Base functions for polarization calibration, Faraday Rotation Measure synthesis, plotting, and polarization fraction analysis
-	- `parsec`: Mid-level "screen" functions for the `PARSEC` analysis interface
-	- `polcal`: Wrapper functions for polarization calibration for use by the `PARSEC` interface
-	- `polbeamform`: Wrapper functions for offline beamforming of baseband voltage data
-	- `customfilplotfuncs`: Custom implementation of `dsa110-T3/dsaT3/filplot_funcs` (https://github.com/dsa110/dsa110-T3) for making candidate plots from visibility data
-	- `dedisp`: Incoherent dedispersion implementation for use by the `PARSEC` interface
-	- `filt`: Wrapper functions for computing matched filtered signal-to-noise for use by the `PARSEC` interface 
-	- `RMcal`: Wrapper functions for Faraday Rotation Measure (RM) Synthesis for use by the `PARSEC` interface
-	- `scatscint`: Wrapper functions for `dsa110-scat` (https://github.com/dsa110/dsa110-scat) scattering and scintillation analysis for use by the `PARSEC` interface
-	- `rmtablefuncs`: Wrapper functions to read/write data to/from `RMTable` (https://github.com/CIRADA-Tools/RMTable) and `PolSpectra` (https://github.com/CIRADA-Tools/PolSpectra) formats (defined by Van Eck et al. 2023 (https://doi.org/10.3847/1538-4365/acda24)
-	- `budget`: Functions to identify RM and DM components and host magnetic field strengths
+	- `dsapol`
+	- `parsec`
+	- `polcal`
+	- `polbeamform`
+	- `customfilplotfuncs`
+	- `dedisp`
+	- `filt`
+	- `RMcal`
+	- `scatscint`
+	- `rmtablefuncs`
+	- `budget`
 - `dsapol96`: TO DO: IMPLEMENT UPDATED MODULE FOR 96-ANTENNA ARRAY
 - `offline_beamforming`: `bash` scripts used to beamform baseband voltage data using the `toolkit` cuda kernel developed by Vikram Ravi et al.
-	- `move_cal_voltages.bash`: Moves baseband voltage data from T3 sub-system to the local file system
-	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at low resolution for 256 synthesized beams
-	- `run_beamformer_visibs_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at high resolution at given synthesized beam
-	- `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesized beam
+	- `move_cal_voltages.bash`
+	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`
+	- `run_beamformer_visibs_bfweightsupdate_cals_sb.bash`
+	- `run_beamformer_visibs_bfweightsupdate_sb.bash`
 - `interface`: High-level juypter notebook for `PARSEC` interface implemented with `mercury` (https://github.com/mljar/mercury)
-	- `PARSEC_Interface-InteractiveMercury-V4.ipynb`: `PARSEC` notebook containing formatting of all screens defined in `dsapol/parsec.py`
-	- `kill_mercury.sh`: kills all sub-processes spawned by `mercury`
-	- `last_cal_metadata`: info about averaging used to make most recent pol calibration solution
-	- `IONEXdata`: atmospheric data from the NASA Earthdata database for ionospheric RM estimation with `RMExtract` (https://github.com/lofar-astron/RMextract)
+	- `PARSEC_Interface-InteractiveMercury-V4.ipynb`
+	- `kill_mercury.sh`
+	- `last_cal_metadata`
+	- `IONEXdata`
 - `scripts`, `tests`: DEPRECATED, TO DO: REPLACE WITH UPDATED UNIT TESTS
 
