@@ -60,6 +60,8 @@ os.system("mkdir ../dsapol_logfiles/scat_files")
 os.system("mkdir ../dsapol_polcal")
 
 os.system("mkdir interface/.current_state")
+
+os.system("mkdir ../dsapol_tables")
 import numpy as np
 #np.save("../dsapol_logfiles/RM_files/input_spectrum.npy",np.zeros((0,0)))
 #np.save("../dsapol_logfiles/RM_files/output_spectrum.npy",np.zeros((2,0)))
@@ -84,6 +86,7 @@ dirs = {"cwd":cwd,
         "data":os.environ["DSAFRBDIR"], #"/mnt/FRBdata/",#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/",
         "logs":cwd[:cwd.index("dsa110-pol")] + "dsapol_logfiles/",
         "gen_bfweights":os.environ["DSA110DIR"] + "operations/beamformer_weights/generated/", #"/mnt/dsa110/operations/beamformer_weights/generated/",
+        "FRBtables":cwd[:cwd.index("dsa110-pol")] + "dsapol_tables/",
         "dsastorageFRBDir":"user@dsa-storage.ovro.pvt:/home/user/data/candidates/candidates/",
         "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/",
         "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/"}

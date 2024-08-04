@@ -145,12 +145,12 @@ FRB_RMgal = []
 FRB_RMgalerr = []
 FRB_RMion = []
 FRB_RMionerr = []
-def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
+def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=dirs['FRBtables']):
     """
     This function updates the global FRB parameters from the provided file. File is a copy
     of the 'tablecsv' tab in the DSA110 FRB spreadsheet.
     """
-    with open(repo_path + 'data/' + fname,"r") as csvfile:
+    with open(path + fname,"r") as csvfile:
         reader = csv.reader(csvfile,delimiter=',')
         for row in reader:
             #print(row)
@@ -239,13 +239,13 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
     return
 update_FRB_params()
 
-def update_FRB_DM_params(FRB_name,DM,fname="DSA110-FRBs-PARSEC_TABLE.csv",path=repo_path):
+def update_FRB_DM_params(FRB_name,DM,fname="DSA110-FRBs-PARSEC_TABLE.csv",path=dirs['FRBtables']):
     """
     This function updates the global FRB parameters from the provided file. File is a copy
     of the 'tablecsv' tab in the DSA110 FRB spreadsheet.
     """
     alldata = []
-    with open(repo_path + 'data/' + fname,"r") as csvfile:
+    with open(path + fname,"r") as csvfile:
         reader = csv.reader(csvfile,delimiter=',')
         for row in reader:
             if row[0] == FRB_name:
@@ -258,7 +258,7 @@ def update_FRB_DM_params(FRB_name,DM,fname="DSA110-FRBs-PARSEC_TABLE.csv",path=r
             alldata.append(row)
     csvfile.close()
 
-    with open(repo_path + 'data/' + fname,"w") as csvfile:
+    with open(path + fname,"w") as csvfile:
         writer = csv.writer(csvfile,delimiter=',')
         for row in alldata:
             writer.writerow(row)
@@ -1583,7 +1583,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     if polcalbutton.clicked and (state_dict['polcalfile'] != ""):
 
 
-        f = open("tmpout.txt","w")
+        f = open(polcal.logfile,"w")
         print("start",file=f)
 
         #calibrate at native resolution
@@ -3354,7 +3354,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
     #update RM displays
     if state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
-        state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=repo_path + "/data/faraday2020v2.hdf5")
+        state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=dirs['FRBtables'] + "faraday2020v2.hdf5")
         state_dict['RM_gal'] = np.around(state_dict['RM_gal'],2)
         state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],2)
         state_dict['RM_galRA'] = state_dict['RA']

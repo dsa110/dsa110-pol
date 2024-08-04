@@ -19,3 +19,6 @@ interface/scatterfittesting.ipynb
 django*
 interface/django*
 interface/casa*
+
+#directories
+#directories.json
