@@ -2,13 +2,16 @@
 DSA-110 polarization utilities
 
 
-Authors: Myles Sherman, Liam Connor, Casey Law, Vikram Ravi, Dana Simard
+Authors: Myles Sherman, Liam Connor, Casey Law, Vikram Ravi, Jakob Faber, Dana Simard
+
 Last Upated: 2024-08-04
 
-This library contains functions and interfaces for polarization analysis of FRBs. Functions herein were
+This library contains functions for polarization analysis of Fast Radio Bursts (FRBs) and the implementation of the DSA-110
+Polarization Analysis and RM Synthesis Enabled for Calibration (`PARSEC`) analysis interface. Functions herein were
 designed for use with the DSA-110 file system and naming conventions, and therefore should be
 used with caution. This is particularly applicable to calibration functions; functions for
-interfacing with filterbank data should be portable to any system.
+interfacing with filterbank data should be portable to any system. The DSA-110 polarization pipeline
+which was built with this module is describe in detail in Sherman et al. 2024a (https://doi.org/10.3847/1538-4357/ad275e).
 
 The following modules are required:
 
@@ -42,4 +45,23 @@ export DSACALDIR="PATH-TO-POLARIZATION-CALIBRATOR-VOLTAGES"/polcal_voltages/
 
 Replacing with the paths specific to your machine.
 
+The following sub-modules are included:
+- `dsapol`: Modules for polarization analysis with scripts and with the `PARSEC` interface.
+	- `dsapol`: Base functions for polarization calibration, Faraday Rotation Measure synthesis, plotting, and polarization fraction analysis
+	- `parsec`: Mid-level "screen" functions for the `PARSEC` analysis interface
+	- `polcal`: Wrapper functions for polarization calibration for use by the `PARSEC` interface
+	- `polbeamform`: Wrapper functions for offline beamforming of baseband voltage data
+	- `customfilplotfuncs`: Custom implementation of `dsa110-T3/dsaT3/filplot_funcs` (https://github.com/dsa110/dsa110-T3) for making candidate plots from visibility data
+	- `dedisp`: Incoherent dedispersion implementation for use by the `PARSEC` interface
+	- `filt`: Wrapper functions for computing matched filtered signal-to-noise for use by the `PARSEC` interface 
+	- `RMcal`: Wrapper functions for Faraday Rotation Measure (RM) Synthesis for use by the `PARSEC` interface
+	- `scatscint`: Wrapper functions for `dsa110-scat` (https://github.com/dsa110/dsa110-scat) scattering and scintillation analysis for use by the `PARSEC` interface
+	- `rmtablefuncs`: Wrapper functions to read/write data to/from `RMTable` (https://github.com/CIRADA-Tools/RMTable) and `PolSpectra` (https://github.com/CIRADA-Tools/PolSpectra) formats (defined by Van Eck et al. 2023 (https://doi.org/10.3847/1538-4365/acda24)
+	- `budget`: Functions to identify RM and DM components and host magnetic field strengths
+- `offline_beamforming`: `bash` scripts used to beamform basebandd voltage data using the `toolkit` cuda kernel developed by Vikram Ravi et al.
+	- `move_cal_voltages.bash`: Moves baseband voltage data from T3 sub-system to the local file system
+	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at low resolution for 256 synthesized beams
+	- `run_beamformer_visibs_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at high resolution at given synthesized beam
+	- `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesizedd beam
 
+- 

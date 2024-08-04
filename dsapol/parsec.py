@@ -1583,7 +1583,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     if polcalbutton.clicked and (state_dict['polcalfile'] != ""):
 
 
-        f = open("tmpout.txt","w")
+        f = open(polcal.logfile,"w")
         print("start",file=f)
 
         #calibrate at native resolution
