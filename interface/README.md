@@ -11,13 +11,13 @@ This module contains high-level interface code used by the `PARSEC` dashboard. T
 
 ## Usage
 
-To start the `PARSEC` GUI on a specific port (e.g. 4343), run the following command from terminal:
+To start the `PARSEC` GUI on a specific port (`PORT`), run the following command from terminal:
 
 ```
-$mercury run PARSEC_Interface-InteractiveMercury-V4.ipynb 4343
+$mercury run PARSEC_Interface-InteractiveMercury-V4.ipynb PORT
 ```
 
-The GUI is then accessible via http://localhost:4343/ . Shutdown `PARSEC` using `Ctrl^C`. To ensure all sub-processes spawned by mercury are terminated, run:
+The GUI is then accessible via http://localhost:PORT/ . Shutdown `PARSEC` using `Ctrl^C`. To ensure all sub-processes spawned by mercury are terminated, run:
 
 ```
 $./kill_mercury.sh
