@@ -58,6 +58,7 @@ The following sub-modules are included:
 	- `scatscint`: Wrapper functions for `dsa110-scat` (https://github.com/dsa110/dsa110-scat) scattering and scintillation analysis for use by the `PARSEC` interface
 	- `rmtablefuncs`: Wrapper functions to read/write data to/from `RMTable` (https://github.com/CIRADA-Tools/RMTable) and `PolSpectra` (https://github.com/CIRADA-Tools/PolSpectra) formats (defined by Van Eck et al. 2023 (https://doi.org/10.3847/1538-4365/acda24)
 	- `budget`: Functions to identify RM and DM components and host magnetic field strengths
+- `dsapol96`: TO DO: IMPLEMENT UPDATED MODULE FOR 96-ANTENNA ARRAY
 - `offline_beamforming`: `bash` scripts used to beamform baseband voltage data using the `toolkit` cuda kernel developed by Vikram Ravi et al.
 	- `move_cal_voltages.bash`: Moves baseband voltage data from T3 sub-system to the local file system
 	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at low resolution for 256 synthesized beams
@@ -68,5 +69,5 @@ The following sub-modules are included:
 	- `kill_mercury.sh`: kills all sub-processes spawned by `mercury`
 	- `last_cal_metadata`: info about averaging used to make most recent pol calibration solution
 	- `IONEXdata`: atmospheric data from the NASA Earthdata database for ionospheric RM estimation with `RMExtract` (https://github.com/lofar-astron/RMextract)
-- `data`: Additional data required for `PARSEC` and routine FRB analysis
-	- `DSA110-FRBs-PARSEC_TABLE.csv`: Table of DSA-110 FRB 
+- `scripts`, `tests`: DEPRECATED, TO DO: REPLACE WITH UPDATED UNIT TESTS
+

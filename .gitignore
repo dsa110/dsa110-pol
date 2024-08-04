@@ -21,4 +21,4 @@ interface/django*
 interface/casa*
 
 #directories
-#directories.json
+directories.json
