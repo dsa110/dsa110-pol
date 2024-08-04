@@ -16,4 +16,6 @@ interface/scatterfittesting.ipynb
 240224aaad_mayra/*
 
 #log files
-#django*
+django*
+interface/django*
+interface/casa*

@@ -58,10 +58,9 @@ The following sub-modules are included:
 	- `scatscint`: Wrapper functions for `dsa110-scat` (https://github.com/dsa110/dsa110-scat) scattering and scintillation analysis for use by the `PARSEC` interface
 	- `rmtablefuncs`: Wrapper functions to read/write data to/from `RMTable` (https://github.com/CIRADA-Tools/RMTable) and `PolSpectra` (https://github.com/CIRADA-Tools/PolSpectra) formats (defined by Van Eck et al. 2023 (https://doi.org/10.3847/1538-4365/acda24)
 	- `budget`: Functions to identify RM and DM components and host magnetic field strengths
-- `offline_beamforming`: `bash` scripts used to beamform basebandd voltage data using the `toolkit` cuda kernel developed by Vikram Ravi et al.
+- `offline_beamforming`: `bash` scripts used to beamform baseband voltage data using the `toolkit` cuda kernel developed by Vikram Ravi et al.
 	- `move_cal_voltages.bash`: Moves baseband voltage data from T3 sub-system to the local file system
 	- `run_beamformer_offline_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at low resolution for 256 synthesized beams
 	- `run_beamformer_visibs_bfweightsupdate_cals_sb.bash`: Beamforms baseband voltages for calibrator observations at high resolution at given synthesized beam
-	- `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesizedd beam
-
-- 
+	- `run_beamformer_visibs_bfweightsupdate_sb.bash`: Beamforms baseband voltages for FRB candidates at high resolution at given synthesized beam
+- `
