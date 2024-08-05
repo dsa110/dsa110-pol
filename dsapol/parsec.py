@@ -4345,7 +4345,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
                 fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
         ax6.errorbar((180/np.pi)*state_dict['PA_f'],state_dict['freq_test'][0],xerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
 
-    ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT],(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+    ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT]*1e-3,(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
     ax6.errorbar((180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],state_dict['freq_test'][0][L_f >=SNRCUT],xerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=5,linewidth=2)
 
     ax0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
@@ -4481,7 +4481,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
                 yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
                 fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
 
-    ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT],(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
+    ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT]*1e-3,(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
 
     ax0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)

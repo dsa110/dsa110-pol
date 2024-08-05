@@ -328,7 +328,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
 
         #create executor
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(get_RM_1D,I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,True)
+        t = executor.submit(get_RM_1D,I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,"RMSYNTHTOKEN" in os.environ)
         t.add_done_callback(lambda future: future_callback_gR1(future,dname))
 
 
@@ -342,7 +342,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
     multithread = nthreads > 1
 
     #run RM synthesis
-    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=fit_window,err=True,matrixmethod=False,multithread=multithread,maxProcesses=nthreads,numbatch=nbatches,sendtodir=sendtodir,monitor=monitor)
+    RM1,phi1,RMsnrs1,RMerr1,tmp = dsapol.faradaycal(I_fcal,Q_fcal,U_fcal,V_fcal,freq_test,trial_RM,trial_phi,plot=False,show=False,fit_window=fit_window,err=True,matrixmethod=False,multithread=multithread,maxProcesses=nthreads,numbatch=nbatches,sendtodir=sendtodir,monitor=monitor and "RMSYNTHTOKEN" in os.environ)
 
     #if set, use better fit of FDF for error
     if fit:
@@ -416,7 +416,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
         #create executor
 
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(get_RM_2D,Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,True)
+        t = executor.submit(get_RM_2D,Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,"RMSYNTHTOKEN" in os.environ)
         t.add_done_callback(lambda future: future_callback_gR2(future,dname))
 
 
@@ -434,7 +434,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
                                                                                         timeaxis=timeaxis,full=True,
                                                                                         input_weights=weights[timestart:timestop],
                                                                                         timestart_in=timestart,timestop_in=timestop,matrixmethod=False,
-                                                                                        multithread=multithread,maxProcesses=nthreads,numbatch=nbatches,sendtodir=sendtodir,monitor=monitor)
+                                                                                        multithread=multithread,maxProcesses=nthreads,numbatch=nbatches,sendtodir=sendtodir,monitor=monitor and "RMSYNTHTOKEN" in os.environ)
     
     #use error from the exponential fit
     RMerr2 = dsapol.RM_error_fit(np.max(RMsnrs2))

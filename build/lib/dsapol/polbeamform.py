@@ -75,8 +75,6 @@ def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir,backgro
         n = ""
         b = ""
     
-    return
-#return os.system(n + dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
-#            + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + b) #" 2>&1 > " + logfile + " &")
+    return os.system(n + dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA " + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + b) #" 2>&1 > " + logfile + " &")
 
 

@@ -53,7 +53,9 @@ export DSAFRBDIR="PATH-TO-FRB-FILTERBANKS"/FRBdata/
 export DSACALDIR="PATH-TO-POLARIZATION-CALIBRATOR-VOLTAGES"/polcal_voltages/
 ```
 
-Replacing with the paths specific to your machine. Next install `dsa110-pol` with `pip`:
+replacing with the paths specific to your machine. One additional environment variable, `RMSYNTHTOKEN` is required to push `tqdm` progress bars to slack for background RM synthesis processes. This is already defined on relevant DSA-110 machines; please submit an issue in this repository if this token is needed on any other machine.
+
+Next install `dsa110-pol` with `pip`:
 
 ```
 cd dsa110-pol

@@ -3778,22 +3778,25 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
         for i in range(len(fit_sample_RM)):
             sigmas[i]=(faraday_error(Q,U,freq_test,fit_sample_RM[i],0))
 
+        try:
+
+            popt,pcov = np.polyfit(fit_sample_RM,fit_sample_SNRs,2,w=1/sigmas,cov=True)
+            fit_RM = np.linspace(trial_RM[max_RM_idx-fit_window],trial_RM[max_RM_idx+fit_window],1000)
+            fit = np.zeros(1000)
+            for i in range(len(popt)):
+                fit += popt[i]*(fit_RM**(len(popt)-1-i))
 
 
-        popt,pcov = np.polyfit(fit_sample_RM,fit_sample_SNRs,2,w=1/sigmas,cov=True)
-        fit_RM = np.linspace(trial_RM[max_RM_idx-fit_window],trial_RM[max_RM_idx+fit_window],1000)
-        fit = np.zeros(1000)
-        for i in range(len(popt)):
-            fit += popt[i]*(fit_RM**(len(popt)-1-i))
+            HWHM_RM = trial_RM[max_RM_idx]
+            step = 0.001
+            while SNR_fit(HWHM_RM,popt) > np.max(SNRs[:,0])/2:
+                HWHM_RM += step
 
 
-        HWHM_RM = trial_RM[max_RM_idx]
-        step = 0.001
-        while SNR_fit(HWHM_RM,popt) > np.max(SNRs[:,0])/2:
-            HWHM_RM += step
+            RM_err = (HWHM_RM - trial_RM[max_RM_idx])
 
-
-        RM_err = (HWHM_RM - trial_RM[max_RM_idx])
+        except TypeError as exc:
+            RM_err = np.nan
 
         if plot:
 
@@ -6082,7 +6085,8 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
     ax4.legend(loc="upper right")
     ax4.set_xlabel(r'$RM\,(rad/m^2)$')
     ax4.set_ylabel(r'$F(\phi)$')
-    ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
+    if np.all(~np.isnan(trial_RM1)):
+        ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
 
     #zoom range plot
     lns = []
@@ -6103,7 +6107,8 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         l2=ax5_1.plot(trial_RMtools2,RMtools_zoomsnrs,label="RM Tools",color="blue")
         lns.append(l2[0])
         labs.append("RM Tools")
-    ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
+    if np.all(~np.isnan(trial_RM2)):
+        ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
     l6 = ax5.axhline(threshold,color="purple",linestyle="--",label=r'${t}\sigma$ threshold'.format(t=threshold),linewidth=2)
     lns.append(l6)
     ax5_1.set_ylabel(r'$F(\phi)$')
