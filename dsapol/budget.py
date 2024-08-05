@@ -751,8 +751,8 @@ def Bhost_dist(DMhost,dmdist,DMaxis,RMhost,RMhosterr,res=10000,res2=500,siglevel
         plt.plot(Baxis,Bdist,linewidth=4,color='tab:purple')
         plt.axvline(B_exp,color="purple")
         plt.axvspan(low,upp,color='purple',alpha=0.1)
-        plt.text(B_exp+0.5,np.nanmax(Bdist),'$B_{{||,host}}={a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}\\,\\mu G$'.format(a=B_exp,b=upp-B_exp,c=B_exp-low),
-                backgroundcolor='thistle',fontsize=18)
+        #plt.text(B_exp+0.5,np.nanmax(Bdist),'$B_{{||,host}}={a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}\\,\\mu G$'.format(a=B_exp,b=upp-B_exp,c=B_exp-low),
+        #        backgroundcolor='thistle',fontsize=18)
         plt.xlabel(r'$B_{||,host}$')
         plt.ylabel("PDF")
         plt.xlim(-B_est*2,B_est*2)

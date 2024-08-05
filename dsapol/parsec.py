@@ -3960,7 +3960,7 @@ def DM_Budget_screen(trialz):
                                   r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['MW'],2),b=np.around(state_dict['dmbudgetdict']['MWerr'],2)),
                                   r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['halo'],2),b=np.around(state_dict['dmbudgetdict']['haloerr'],2)),
                                   r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['dmbudgetdict']["IGM"],2),b=np.around(state_dict['dmbudgetdict']["IGMupperr"],2),c=np.around(state_dict['dmbudgetdict']["IGMlowerr"],2)),
-                                  "\n".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],2),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,2)) for n in range(len(state_dict['intervener_names_DM']))]),
+                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],2),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,2)) for n in range(len(state_dict['intervener_names_DM']))]),
                                   r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost'],2),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost']),2),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit']),2)),
                                   r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost']/(1+trialz.value),2),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost'])/(1+trialz.value),2),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit'])/(1+trialz.value),2))
                                  ]
@@ -4016,7 +4016,7 @@ def RM_Budget_screen(trialz):
     df_RM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(rmobs,2),b=np.around(rmobserr,2)),
                                   r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_gal'],2),b=np.around(state_dict['RM_galerr'],2)),
                                   r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_ion'],2),b=np.around(state_dict['RM_ionerr'],2)),
-                                  "\n".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],2),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,2)) for n in range(len(state_dict['intervener_names_RM']))]),
+                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],2),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,2)) for n in range(len(state_dict['intervener_names_RM']))]),
                                   r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost'],2),b=np.around(state_dict['RMhost_upper_limit']-state_dict['RMhost'],2)),
                                   r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost']/((1+trialz.value)**2),2),b=np.around((state_dict['RMhost_upper_limit']-state_dict['RMhost'])/((1+trialz.value)**2),2))
                                  ]
