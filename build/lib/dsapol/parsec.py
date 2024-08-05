@@ -817,6 +817,9 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'Bfield_display':np.nan,
         'Bfield_pos_err_display':np.nan,
         'Bfield_neg_err_display':np.nan,
+        'maxthreads':10,
+        'maxbatches':10,
+        'maxtrials':1000,
 
         'showghostPA':True,
         'intLbuffer_slider':0,
@@ -3346,7 +3349,8 @@ RM Synthesis State
 def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                  maxRM_num,getRMbutton,useRM2D,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,
                  getRMbutton_zoom,RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display,
-                 getRMgal_button,getRMion_button,rmcomp_menu,RMsynthbackground,refresh_button):
+                 getRMgal_button,getRMion_button,rmcomp_menu,RMsynthbackground,refresh_button,
+                 maxthreads,maxbatches,maxtrials_per_thread):
     #signal.signal(signal.SIGUSR1,handler)    
     #update component options
     update_wdict([rmcomp_menu],['rmcomp_menu'],
@@ -3425,12 +3429,12 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
                     if RMsynthbackground.value:
 
-                        state_dict['comps'][i]['RMcalibrated']['dname_1D'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,fit=False,weights=state_dict['comps'][i]['weights'],background=True)
+                        state_dict['comps'][i]['RMcalibrated']['dname_1D'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,fit=False,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['comps'][i]['weights'],background=True)
 
                         # disregard return values because we'll read from file to see when ready
                     
                     else:
-                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,fit=False,weights=state_dict['comps'][i]['weights'])
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=n_off,fit=False,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['comps'][i]['weights'])
                         state_dict['comps'][i]['RMcalibrated']["RM1"] = [RM,RMerr]
 
                         #update table
@@ -3453,11 +3457,11 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
-                    state_dict['RMcalibrated']['dname_1D'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=False,weights=state_dict['weights'],background=True)
+                    state_dict['RMcalibrated']['dname_1D'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=False,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'],background=True)
 
                 else:
                     
-                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=False,weights=state_dict['weights'])
+                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1'],state_dict["RMcalibrated"]['trial_RM1'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num.value,minRM_num=minRM_num.value,maxRM_num=maxRM_num.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=False,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'])
                     state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
 
                     #update table
@@ -3527,9 +3531,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     n_off = int(NOFFDEF/state_dict['n_t'])
                     
                     if RMsynthbackground.value:
-                        state_dict['comps'][i]["RMcalibrated"]["dname_1D_zoom"] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'],background=True)
+                        state_dict['comps'][i]["RMcalibrated"]["dname_1D_zoom"] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['comps'][i]['weights'],background=True)
                     else:
-                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['comps'][i]['weights'])
                         state_dict['comps'][i]['RMcalibrated']["RM1zoom"] = [RM,RMerr]
                         state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
                         if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
@@ -3543,9 +3547,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     n_off = int(NOFFDEF/state_dict['n_t'])
 
                     if RMsynthbackground.value:
-                        state_dict['comps'][i]["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'],background=True)
+                        state_dict['comps'][i]["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['comps'][i]['weights'],background=True)
                     else:
-                        RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['comps'][i]['weights'])
+                        RM2,RMerr2,upp,low,state_dict['comps'][i]['RMcalibrated']['RMsnrs2'],state_dict['comps'][i]['RMcalibrated']['SNRs_full'],state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip,Qp,Up,Vp,state_dict['comps'][i]['timestart'],state_dict['comps'][i]['timestop'],state_dict['comps'][i]['width_native'],state_dict['tsamp'],state_dict['comps'][i]['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['comps'][i]['weights'])
                         state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                         state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
                         state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
@@ -3574,9 +3578,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
-                    state_dict["RMcalibrated"]["dname_1D_zoom"] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'],background=True)
+                    state_dict["RMcalibrated"]["dname_1D_zoom"] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'],background=True)
                 else:
-                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,weights=state_dict['weights'])
+                    RM,RMerr,state_dict["RMcalibrated"]['RMsnrs1zoom'],state_dict["RMcalibrated"]['trial_RM1zoom'] = RMcal.get_RM_1D(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['base_freq_test'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']),fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'])
                     state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
                     state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
                     if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
@@ -3591,9 +3595,9 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 n_off = int(NOFFDEF/state_dict['n_t'])
 
                 if RMsynthbackground.value:
-                    state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'],background=True)
+                    state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'],background=True)
                 else:
-                    RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,weights=state_dict['weights'])
+                    RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'])
                     state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                     state_dict['RMcalibrated']['RMerrfit'] = RMerr2
                     state_dict['RMcalibrated']['RMFWHM'] = upp-low
@@ -3742,8 +3746,8 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value,figsize=(38,24),datadir=state_dict['datadir'])
 
     #update widget dict
-    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D,rmcomp_menu,RMsynthbackground],
-                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D','rmcomp_menu','RMsynthbackground'],param='value')
+    update_wdict([maxRM_num_tools,dRM_tools,nRM_num,minRM_num,maxRM_num,nRM_num_zoom,RM_window_zoom,dRM_tools_zoom,useRMTools,useRMsynth,useRM2D,rmcomp_menu,RMsynthbackground,maxthreads,maxbatches,maxtrials_per_thread],
+                ['maxRM_num_tools','dRM_tools','nRM_num','minRM_num','maxRM_num','nRM_num_zoom','RM_window_zoom','dRM_tools_zoom','useRMTools','useRMsynth','useRM2D','rmcomp_menu','RMsynthbackground','maxthreads','maxbatches','maxtrials_per_thread'],param='value')
     
     update_wdict([RM_gal_display,RM_galerr_display,RM_ion_display,RM_ionerr_display],['RM_gal_display','RM_galerr_display','RM_ion_display','RM_ionerr_display'],param='data')
         

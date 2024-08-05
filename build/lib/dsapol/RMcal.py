@@ -306,7 +306,7 @@ def future_callback_gR1(future,dname):#,fit,weights,trial_RM,fit_window,Qcal,Uca
 
 
 #function to run 1D RM synthesis
-def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,weights=None,background=False,sendtodir="",monitor=False):
+def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,weights=None,maxthreads=100,maxbatches=10,maxtrials_per_thread=1000,background=False,sendtodir="",monitor=False):
     """
     This function uses the manual 1D RM synthesis module to run RM synthesis
     """
@@ -328,7 +328,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
 
         #create executor
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(get_RM_1D,I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,"RMSYNTHTOKEN" in os.environ)
+        t = executor.submit(get_RM_1D,I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop,freq_test,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,maxthreads,maxbatches,maxtrials_per_thread,False,dirs['logs'] + "RM_files/" + dname,"RMSYNTHTOKEN" in os.environ)
         t.add_done_callback(lambda future: future_callback_gR1(future,dname))
 
 
@@ -338,7 +338,7 @@ def get_RM_1D(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,timestart,timestop
         return dname
 
     #get opt. number of processes, batches
-    nbatches,nthreads = trials_to_multiprocess(len(trial_RM))
+    nbatches,nthreads = trials_to_multiprocess(len(trial_RM),maxthreads,maxbatches,maxtrials_per_thread)
     multithread = nthreads > 1
 
     #run RM synthesis
@@ -390,7 +390,7 @@ def future_callback_gR2(future,dname):#fit,weights,trial_RM,fit_window,dname):
     return
     """
 #function to run 2D RM synthesis
-def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,weights=None,background=False,sendtodir="",monitor=False):
+def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num=int(2e6),minRM_num=-1e6,maxRM_num=1e6,n_off=2000,fit=False,fit_window=50,oversamps=5000,maxthreads=100,maxbatches=10,maxtrials_per_thread=1000,weights=None,background=False,sendtodir="",monitor=False):
     """
     This function uses the manual 2D RM synthesis module to run RM synthesis
     """
@@ -416,7 +416,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
         #create executor
 
         executor = ProcessPoolExecutor(5)
-        t = executor.submit(get_RM_2D,Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,weights,False,dirs['logs'] + "RM_files/" + dname,"RMSYNTHTOKEN" in os.environ)
+        t = executor.submit(get_RM_2D,Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_f,n_t,freq_test,timeaxis,nRM_num,minRM_num,maxRM_num,n_off,fit,fit_window,oversamps,maxthreads,maxbatches,maxtrials_per_thread,weights,False,dirs['logs'] + "RM_files/" + dname,"RMSYNTHTOKEN" in os.environ)
         t.add_done_callback(lambda future: future_callback_gR2(future,dname))
 
 
@@ -424,7 +424,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
 
 
     #get opt. number of processes, batches
-    nbatches,nthreads = trials_to_multiprocess(len(trial_RM))
+    nbatches,nthreads = trials_to_multiprocess(len(trial_RM),maxthreads,maxbatches,maxtrials_per_thread)
     multithread = nthreads > 1
     
     #run RM synthesis
