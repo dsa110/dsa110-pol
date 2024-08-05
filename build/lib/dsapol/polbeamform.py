@@ -1,7 +1,7 @@
 import os
 import numpy as np
 import glob
-
+from astropy.time import Time
 
 """
 This file contains helper functions to create polarized filterbanks using Vikram's offline
@@ -54,6 +54,19 @@ def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir,backgro
     and the command is run in the background. Returns 0 on success, 1 on failure
     """
     #return os.system("/media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/for_testing.bash 2>&1 > /media/ubuntu/ssd/sherman/code/dsa110-pol/offline_beamforming/beamforming_logfile.txt &")
+
+    #check if there are existing filterbanks
+    fils = glob.glob(path + "*fil")
+    if len(fils) > 0:
+        #make directory for backup fils
+        os.system("mkdir " + path + "past_filterbanks")
+
+        #copy filterbanks with timestamp
+        tstamp = str(Time.now().isot)
+        
+        for i in range(len(fils)):
+            os.system("mv " + fils[i] + " " + path + "past_filterbanks/" + fils[i][len(fils[i])-fils[i][::-1].index("/"):-5] + tstamp + "_" + fils[i][-5:])
+
     clear_logfile()
     if background: 
         n = "nohup "
@@ -61,7 +74,9 @@ def make_filterbanks(ids,nickname,bfweights,ibeam,mjd,DM,path=output_dir,backgro
     else: 
         n = ""
         b = ""
-    return os.system(n + dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
-            + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + b) #" 2>&1 > " + logfile + " &")
+    
+    return
+#return os.system(n + dirs["cwd"] + "offline_beamforming/run_beamformer_visibs_bfweightsupdate_sb.bash NA "
+#            + str(ids) + " " + str(nickname) + " " + str(bfweights) + " " + str(ibeam) + " " + str(mjd) + " " + str(DM) + b) #" 2>&1 > " + logfile + " &")
 
 

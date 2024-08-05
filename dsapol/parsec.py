@@ -1260,7 +1260,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
     #if filbutton is clicked, run the offline beamformer to make fil files
     if filbutton.clicked:
-        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'])
+        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'],path=state_dict['datadir'])
         print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
 
@@ -1499,7 +1499,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
                 os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_" + str(i) + ".fil " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_DM_" + str(state_dict['DM']) + "_" + str(i) + ".fil ")
 
             #make new dedispersed filterbanks
-            status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM'])
+            status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM'],path=state_dict['datadir'])
             print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
     #update widget dict
