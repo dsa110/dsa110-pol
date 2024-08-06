@@ -4008,6 +4008,9 @@ def RM_Budget_screen(trialz):
                    RMion=state_dict['RM_ion'],RMionerr=state_dict['RM_ionerr'],ztest=trialz.value,plot=True,intervener_RMs=state_dict['intervener_RMs'],intervener_RM_errs=state_dict['intervener_RM_errs'],intervener_zs=state_dict['intervener_RMzs'],save=True,savedir=state_dict['datadir'])
         rmobs = state_dict['RMinput']
         rmobserr = state_dict['RMinputerr']
+    else:
+        rmobs = np.nan
+        rmobserr = np.nan
 
     update_wdict([trialz],['trialz'],param='value')
 
