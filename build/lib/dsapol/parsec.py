@@ -4052,7 +4052,7 @@ def Bfield_Budget_screen(getBfieldbutton,Bfield_range,Bfield_res):
 def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu):
 
     #check if RM calibrated
-    if state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration":
+    if state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration" and 'IcalRM' in state_dict.keys():
         I_use = copy.deepcopy(state_dict['IcalRM'])
         Q_use = copy.deepcopy(state_dict['QcalRM'])
         U_use = copy.deepcopy(state_dict['UcalRM'])
@@ -4627,7 +4627,8 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
     screen for RM table and archiving data
     """
 
-    
+    global RMtable_archive_df
+    global polspec_archive_df
     RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
     polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
 

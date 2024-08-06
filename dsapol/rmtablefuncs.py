@@ -1,4 +1,5 @@
 import numpy as np
+import numpy.ma as ma
 from rmtable import rmtable
 from astropy.coordinates import SkyCoord
 import astropy.units as u
@@ -38,7 +39,7 @@ def make_FRB_polSpectra(state_dict):
                      beam_pa=[90],
                      stokesV=[state_dict['base_Vcal_f_unnormalized']],
                      stokesV_error=[state_dict['base_Vcal_f_unnormalized_errs']],
-                     quality=[np.array(state_dict['base_I'].mask[:,0],dtype=int)],
+                     quality=[np.array(np.isnan(state_dict['base_I'].mean(1)) if not ma.isMaskedArray(state_dict['base_I']) else state_dict['base_I'].mask[:,0],dtype=int)],
                      quality_meanings=["0 = good, 1 = bad"],
                      cat_id=[state_dict['ids']],
                      telescope=["DSA-110"],
@@ -85,8 +86,8 @@ def make_FRB_RMTable(state_dict):
                'Ncomp':[state_dict['n_comps']],
                'stokesI':[state_dict['Iflux']],
                'stokesI_err':[state_dict['Iflux_err']],
-               'spectral_index':[np.nan],
-               'spectral_index_err':[np.nan],
+               'spectral_index':[np.nan if not "specidx_best" in state_dict.keys() else state_dict["specidx_best"][0]],
+               'spectral_index_err':[np.nan if not "specidx_best" in state_dict.keys() else state_dict["specidx_best"][1]],
                'reffreq_I':[1405e6],
                'polint':[state_dict['polint']],
                'polint_err':[state_dict['polint_err']],
