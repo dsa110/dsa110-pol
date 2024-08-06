@@ -81,8 +81,7 @@ $python
 >>>from dsapol import dsapol
 ```
 
-to use the user-facing functions. The other modules (as described below) are primarily for use by the `PARSEC` interface. `PARSEC` is a user interface used for baseband data analysis for DSA-110 FRBs. It is primarily designed for internal use; a brief tutorial for DSA-110 Team members is available at https://caltech.sharepoint.com/:b:/r/sites/ovro/projects/dsadocuments/DSA-110-Science/Analysis-documents/PARSECtutorialpdf.pdf?csf=1&web=1&e=1qeA8v. `PARSEC` can be accessed
-from https://code.deepsynoptic.org/, or, if the required data files are present, by running the following:
+to use the user-facing functions. The other modules (as described below) are primarily for use by the `PARSEC` interface. `PARSEC` is a user interface used for baseband data analysis for DSA-110 FRBs. It is primarily designed for internal use; a brief tutorial for DSA-110 Team members is available at https://tinyurl.com/DSA110PARSECtutorial `PARSEC` can be accessed from https://code.deepsynoptic.org/, or, if the required data files are present, by running the following:
 
 ```
 $cd interface
