@@ -3030,8 +3030,8 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
     #plt.subplot(311)
 
     g1 = plt.GridSpec(3,1,height_ratios=[2,2,1])
-    g2 = plt.GridSpec(3,1,hspace=0,height_ratios=[2,2,1],top=0.7)
-    fig = plt.figure(figsize=(18,12))
+    g2 = plt.GridSpec(3,1,hspace=0,height_ratios=[2,2,1],top=0.8)
+    fig = plt.figure(figsize=(18,10))
     ax1 = fig.add_subplot(g1[0,:])
     if scintmenu.value == 'All' and ~np.all(np.isnan(state_dict['I_fcal'])):
         ax1.plot(state_dict['freq_test'][0],state_dict['I_fcal'],label='Spectrum')
@@ -3059,7 +3059,7 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
         ax2.set_xlim(np.min(state_dict['scint_lags']),np.max(state_dict['scint_lags']))
     #plt.xlabel("Lag (MHz)")
     ax2.set_ylabel("Intensity")
-    ax2.set_title("ACF")
+    #ax2.set_title("ACF")
 
     if calc_bw_button.clicked:
         """
