@@ -85,7 +85,7 @@ to use the user-facing functions. The other modules (as described below) are pri
 
 ```
 $cd interface
-$mercury run PARSEC_Interface-InteractiveMercury-V4.ipynb
+$mercury run PARSEC_Interface.ipynb
 ```
 
 ## Modules
