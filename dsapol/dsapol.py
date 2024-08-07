@@ -1164,7 +1164,7 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
 
 
 #Plot dynamic spectra, I Q U V
-def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis'):
+def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis',figsize=(25,15),save=False,timestart=-1,timestop=-1):
     """
     This function plots the given dynamic spectra and outputs images in the specified directory. 
     The spectra are normalized by subtracting the time average in each frequency channel.
@@ -1184,12 +1184,13 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
             buff --> int, number of samples to buffer either side of pulse if needed
 
     """
-    if width_native == -1:
-        timestart = 0
-        timestop = I.shape[1]
-        window = 0
-    else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
+    if timestop == -1 and timestart == -1:
+        if width_native == -1:
+            timestart = 0
+            timestop = I.shape[1]
+            window = 0
+        else:
+            peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
 
     #optimal weighting
     if weighted:
@@ -1212,40 +1213,66 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
         print("Done weighting!")
 
     #Dynamic Spectra
-    f=plt.figure(figsize=(25,15))
+    f=plt.figure(figsize=figsize)
     pylab.subplot(2,2,1)
-    plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " I")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
+    #plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(I[:,timestart-window:timestop+window],aspect="auto",cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    vmin,vmax = plt.gca().get_images()[0].get_clim()
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " I")
+    plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"I",fontsize=35,color='red',weight='bold') 
+    plt.xticks([])
+    #plt.colorbar()
+    #plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("Frequency (MHz)")
 
     pylab.subplot(2,2,2)
-    plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " Q")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
+    #plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(Q[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " Q")
+    plt.text(32.7*(1e-3)*n_t*(timestart - window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"Q",fontsize=35,color='red',weight='bold')
+    #plt.colorbar()
+    plt.yticks([])
+    plt.xticks([])
+    #plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    #plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,3)
-    plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " U")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
+    #plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(U[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " U")
+    plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.max(freq_test[0]) - (np.max(freq_test[0])-np.min(freq_test[0]))*0.9,"U",fontsize=35,color='red',weight='bold')
+    #plt.colorbar()
+    plt.xlabel("Time (ms)")#Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("Frequency (MHz)")
 
     pylab.subplot(2,2,4)
-    plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " V")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
-
-    plt.savefig(datadir + label + "_freq-time_" + calstr + str(n_f) + "_binned" + ext)
+    #plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(V[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " V")
+    plt.text(32.7*(1e-3)*n_t*(timestart - window*0.8),np.max(freq_test[0]) - (np.max(freq_test[0])-np.min(freq_test[0]))*0.9,"V",fontsize=35,color='red',weight='bold')
+    #plt.colorbar()
+    plt.yticks([])
+    plt.xlabel("Time (ms)")#Sample (" + str(t_samp*n_t) + " s sampling time)")
+    #plt.ylabel("frequency sample")
+    plt.subplots_adjust(hspace=0,wspace=0)
+    if save:
+        plt.savefig(datadir + label + "_freq-time_" + calstr + str(n_f) + "_binned" + ext)
     if show:
         plt.show()
     plt.close(f)

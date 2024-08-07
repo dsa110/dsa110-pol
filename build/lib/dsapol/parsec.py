@@ -291,7 +291,7 @@ state_map = {'load':0,
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
-state_dict['base_df'] = 30.4E3 #Hz
+state_dict['base_df'] = 30.4E3 
 state_dict['dDM'] = 0
 state_dict['window'] = 2**5
 state_dict['rel_n_t'] = 1
@@ -334,6 +334,10 @@ state_dict['base_I'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_Q'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_U'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 state_dict['base_V'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+#state_dict['backup_base_I'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+#state_dict['backup_base_Q'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+#state_dict['backup_base_U'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
+#state_dict['backup_base_V'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
 #state_dict['fobj'] = None
 state_dict['tsamp'] = 32.7e-6
 state_dict['base_freq_test'] = [np.linspace(1311.25000003072,1498.75,6144)]*4 
@@ -627,6 +631,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'z_display':zinit,
          'showlog':True,
          'polcalloadbutton':False,
+         'logwindow_slider_dynspec':5,
 
          'n_t_slider':1, ############### (1) Dedispersion ##################
          'logn_f_slider':5,
@@ -1178,6 +1183,10 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_Q'] = Q
         state_dict['base_U'] = U
         state_dict['base_V'] = V
+        #state_dict['backup_base_I'] = I
+        #state_dict['backup_base_Q'] = Q
+        #state_dict['backup_base_U'] = U
+        #state_dict['backup_base_V'] = V
         state_dict['tsamp'] = fobj.header.tsamp
         #state_dict['fobj'] = fobj
         state_dict['base_freq_test'] = freq_test
@@ -1337,7 +1346,15 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
                     ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display","z_display"],
                     param='data')
     return im
+
+def load_dynspecplot_screen(logwindow_slider_dynspec):
+
+    if ~np.all(np.isnan(state_dict['base_I'])):#'base_I' in state_dict.keys():
     
+        dsapol.plot_spectra_2D(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_t'],state_dict['base_n_f'],state_dict['base_freq_test'],n_off=int(NOFFDEF//state_dict['base_n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_dynspec.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['base_time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+
+    update_wdict([logwindow_slider_dynspec],['logwindow_slider_dynspec'],param='value')
+    return
 """
 Dedispersion Tuning state
 """
@@ -1515,6 +1532,15 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
     #            param='data')
 
     return #ddm_num
+
+def dedisp_dynspecplot_screen(logwindow_slider_init):
+
+    if 'I' in state_dict.keys() and ~np.all(np.isnan(state_dict['I'])):#'base_I' in state_dict.keys():
+
+        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_init.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+
+    update_wdict([logwindow_slider_init],['logwindow_slider_init'],param='value')
+    return
 
 
 """
@@ -2032,6 +2058,14 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
     
     return #beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 
+
+def polcal_dynspecplot_screen():
+
+    if 'Ical' in state_dict.keys() and ~np.all(np.isnan(state_dict['Ical'])):#'base_I' in state_dict.keys():
+
+        dsapol.plot_spectra_2D(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+
+    return
 
 """
 Filter Weights State
@@ -3819,6 +3853,15 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
 
     update_wdict([RMdisplay,RMerrdisplay],['RMdisplay','RMerrdisplay'],param='data')
     update_wdict([rmcal_menu,rmcal_input],['rmcal_menu','rmcal_input'],param='value')    
+    return
+
+
+def RM_dynspecplot_screen():
+
+    if 'IcalRM' in state_dict.keys() and ~np.all(np.isnan(state_dict['IcalRM'])):#'base_I' in state_dict.keys():
+
+        dsapol.plot_spectra_2D(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+
     return
 
 
