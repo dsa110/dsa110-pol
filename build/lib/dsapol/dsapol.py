@@ -15,7 +15,7 @@ from scipy.signal import peak_widths
 import copy
 import numpy as np
 
-
+from tqdm.contrib.slack import tqdm,trange
 import numpy.ma as ma
 from sigpyproc import FilReader
 from sigpyproc.Filterbank import FilterbankBlock
@@ -34,13 +34,21 @@ from scipy.ndimage import convolve1d
 from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 ext= ".pdf"
-DEFAULT_DATADIR = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
+import json
+import os
+import sys
+f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
+dirs = json.load(f)
+f.close()
 
+DEFAULT_DATADIR = dirs["data"] + "testimgs/" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
+logfile = dirs["logs"] + "dsapol_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/dsapol_logfile.txt"
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u
 
 import matplotlib.ticker as ticker
+from concurrent.futures import ProcessPoolExecutor, as_completed, wait
 
 #3C48 and 3C286 polynomial fit parameters from Perley-Butler 2013
 coeffs_3C286 = [1.2481,-0.4507,-0.1798,0.0357]
@@ -86,17 +94,19 @@ def create_stokes_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=Fal
     if alpha:
         labels=["I","Q","U","V"]
     for ii in range(4):
-        print("Reading stokes param..." + str(ii),end="")
+        if verbose:
+            print("Reading stokes param..." + str(ii),end="")
         if alpha:
             fn = '%s_%s.fil'%(sdir,labels[ii])
         else:
             fn = '%s_%d.fil'%(sdir,ii)
-        d = read_fil_data_dsa(fn, start=start, stop=nsamp)[0]
+        d = read_fil_data_dsa(fn, start=start, stop=nsamp,verbose=verbose)[0]
         #if d == 0:
             #print("Failed to read file: " + fn + ", returning 0")
          
         stokes_arr.append(d.astype(dtype))
-        print("Done!")
+        if verbose:
+            print("Done!")
     stokes_arr = np.concatenate(stokes_arr).reshape(4, -1, nsamp)
     return stokes_arr
 
@@ -117,12 +127,13 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False,st
         print("Reading stokes parameters from " + sdir)
     stokes_arr=[]
     ii =0
-    print("Reading stokes param..." + str(ii),end="")
+    if verbose:
+        print("Reading stokes param..." + str(ii),end="")
     if alpha:
         fn = '%s_%s.fil'%(sdir,"I")
     else:
         fn = '%s_%d.fil'%(sdir,ii)
-    d = read_fil_data_dsa(fn, start=start, stop=nsamp)[0]
+    d = read_fil_data_dsa(fn, start=start, stop=nsamp,verbose=verbose)[0]
     #if d == 0:
         #print("Failed to read file: " + fn + ", returning 0")
     return d.astype(np.float16)
@@ -132,7 +143,7 @@ def create_I_arr(sdir, nsamp=10240,verbose=False,dtype=np.float32,alpha=False,st
     #return stokes_arr
 
 #Creates freq, time axes
-def create_freq_time(sdir,nsamp=10240,alpha=False,start=0):#1500):
+def create_freq_time(sdir,nsamp=10240,alpha=False,start=0,verbose=False):#1500):
     """
     This function creates frequency and time axes from stokes filterbank headers
 
@@ -150,7 +161,7 @@ def create_freq_time(sdir,nsamp=10240,alpha=False,start=0):#1500):
             fn = '%s_%s.fil'%(sdir,labels[ii])
         else:
             fn = '%s_%d.fil'%(sdir,ii)
-        d = read_fil_data_dsa(fn, start=start, stop=nsamp)
+        d = read_fil_data_dsa(fn, start=start, stop=nsamp,verbose=verbose)
         freq.append(d[1])
         dt.append(d[2])
         #print(len(freq[ii]))
@@ -194,7 +205,8 @@ def read_fil_data_dsa(fn, start=0, stop=1,verbose=True):
     Outputs: (data,freq,delta_t,header) --> 2D filterbank data, frequency axis, time axis, and header dictionary 
 
     """
-    print("Reading Filterbank File: " + fn)
+    if verbose:
+        print("Reading Filterbank File: " + fn)
     fil_obj = FilReader(fn)
     header = fil_obj.header
     delta_t = fil_obj.header['tsamp']
@@ -206,7 +218,8 @@ def read_fil_data_dsa(fn, start=0, stop=1,verbose=True):
     try:
         data = fil_obj.readBlock(start, stop)
     except(ValueError):
-        print("Read data failed, returning 0")
+        if verbose:
+            print("Read data failed, returning 0")
         data = 0
 
     return data, freq, delta_t, header
@@ -286,7 +299,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0,verbose=False,fixchansfile='',fixchansfile_overwrite=False):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -303,8 +316,8 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
 
     """
     sdir = datadir + fn_prefix 
-    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha,start=start)
-    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha,start=start)
+    sarr = create_stokes_arr(sdir, nsamp=nsamps,dtype=dtype,alpha=alpha,start=start,verbose=verbose)
+    freq,dt = create_freq_time(sdir, nsamp=nsamps,alpha=alpha,start=start,verbose=verbose)
     if alpha:
         fobj=FilReader(sdir+"_I.fil")
     else:
@@ -313,8 +326,9 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     #Bin in time and frequency
     #n_t = 1#8
     #n_f = 1#32
-    print("Binning by " + str(n_t)  + " in time")
-    print("Binning by " + str(n_f) + " in frequency")
+    if verbose:
+        print("Binning by " + str(n_t)  + " in time")
+        print("Binning by " + str(n_f) + " in frequency")
     #timeaxis = np.arange(fobj.header.tstart*86400, fobj.header.tstart*86400 + fobj.header.tsamp*fobj.header.nsamples/n_t, fobj.header.tsamp*n_t)
     if fobj.header.nsamples == 5120:
         timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//n_t)
@@ -326,13 +340,20 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     if fixchans == True:
         #bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
         #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
-        bad_idxs = np.all(I==0,axis=1)
-        good_idxs = np.logical_not(bad_idxs)
-        bad_chans = np.arange(I.shape[0])[bad_idxs]
-        good_chans = np.arange(I.shape[0])[good_idxs]
-        print("Bad Channels: " + str(bad_chans))
+        if fixchansfile != '':
+            bad_chans = np.load(fixchansfile)
+            good_chans = np.array(list(set(np.arange(I.shape[0])) - set(bad_chans)))
+        else:
+            bad_idxs = np.all(I==0,axis=1)
+            good_idxs = np.logical_not(bad_idxs)
+            bad_chans = np.arange(I.shape[0])[bad_idxs]
+            good_chans = np.arange(I.shape[0])[good_idxs]
+            if fixchansfile_overwrite:
+                np.save(datadir + "/badchans.npy",bad_chans)
+                print("Saving bad channels to " + datadir + "/badchans.npy")
+        if verbose:
+            print("Bad Channels: " + str(bad_chans))
         
-
 
 
 
@@ -449,7 +470,7 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     wav_arr = []
     for i in range(4):
         freq_arr.append(freq[i].reshape(-1,n_f).mean(1))
-        wav_arr.append(list(c/(np.array(freq_arr[i])*(1e6))))
+        wav_arr.append(c/(np.array(freq_arr[i])*(1e6)))
 
     
     return (I,Q,U,V,fobj,timeaxis,freq_arr,wav_arr,bad_chans)
@@ -471,7 +492,7 @@ def write_fil_data_dsa(arr,fn,fobj):
     b.toFile(fn)
     return
 
-def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,verbose=False):
     """ 
     This function writes the provided Stokes dynamic spectra to 
     filterbank files in the given directory.
@@ -484,25 +505,33 @@ def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
             alpha --> bool, True if desired filterbanks should end with 'I,Q,U,V', False if desired filterbanks should end with '0,1,2,3' (default=False)
     """
     if alpha:
-        sdir = datadir + fn_prefix + "_" + suffix
-        print("Writing Stokes I to " + sdir + "_I.fil")
+        sdir = datadir + fn_prefix + suffix
+        if verbose:
+            print("Writing Stokes I to " + sdir + "_I.fil")
         write_fil_data_dsa(I,sdir + "_I.fil",fobj)
-        print("Writing Stokes Q to " + sdir + "_Q.fil")
+        if verbose:
+            print("Writing Stokes Q to " + sdir + "_Q.fil")
         write_fil_data_dsa(Q,sdir + "_Q.fil",fobj)
-        print("Writing Stokes U to " + sdir + "_U.fil")
+        if verbose:
+            print("Writing Stokes U to " + sdir + "_U.fil")
         write_fil_data_dsa(U,sdir + "_U.fil",fobj)
-        print("Writing Stokes V to " + sdir + "_V.fil")
+        if verbose:
+            print("Writing Stokes V to " + sdir + "_V.fil")
         write_fil_data_dsa(V,sdir + "_V.fil",fobj)
 
     else:
-        sdir = datadir + fn_prefix + "_" + suffix
-        print("Writing Stokes I to " + sdir + "_0.fil")
+        sdir = datadir + fn_prefix + suffix
+        if verbose:
+            print("Writing Stokes I to " + sdir + "_0.fil")
         write_fil_data_dsa(I,sdir + "_0.fil",fobj)
-        print("Writing Stokes Q to " + sdir + "_1.fil")
+        if verbose:
+            print("Writing Stokes Q to " + sdir + "_1.fil")
         write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
-        print("Writing Stokes U to " + sdir + "_2.fil")
+        if verbose:
+            print("Writing Stokes U to " + sdir + "_2.fil")
         write_fil_data_dsa(U,sdir + "_2.fil",fobj)
-        print("Writing Stokes V to " + sdir + "_3.fil")
+        if verbose:
+            print("Writing Stokes V to " + sdir + "_3.fil")
         write_fil_data_dsa(V,sdir + "_3.fil",fobj)
     return
 
@@ -624,7 +653,7 @@ def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=T
     return (I,fobj,timeaxis,freq_1D,wav_1D)
 
 #Get frequency averaged stokes params vs time; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10):
+def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10,error=False,badchans=[]):
     """
     This function calculates the frequency averaged time series for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -663,12 +692,21 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         Q_t = (np.mean(Q,axis=0) - np.mean(np.mean(Q[:,:n_off],axis=0)))/np.std(np.mean(Q[:,:n_off],axis=0))
         U_t = (np.mean(U,axis=0) - np.mean(np.mean(U[:,:n_off],axis=0)))/np.std(np.mean(U[:,:n_off],axis=0))
         V_t = (np.mean(V,axis=0) - np.mean(np.mean(V[:,:n_off],axis=0)))/np.std(np.mean(V[:,:n_off],axis=0))
+        if error:
+            I_t_err = ((np.nanstd(I,axis=0)/np.sqrt(I.shape[0] - len(badchans))) - np.mean(np.mean(I[:,:n_off],axis=0)))/np.std(np.mean(I[:,:n_off],axis=0))
+            Q_t_err = ((np.nanstd(Q,axis=0)/np.sqrt(Q.shape[0] - len(badchans))) - np.mean(np.mean(Q[:,:n_off],axis=0)))/np.std(np.mean(Q[:,:n_off],axis=0))
+            U_t_err = ((np.nanstd(U,axis=0)/np.sqrt(U.shape[0] - len(badchans))) - np.mean(np.mean(U[:,:n_off],axis=0)))/np.std(np.mean(U[:,:n_off],axis=0))
+            V_t_err = ((np.nanstd(V,axis=0)/np.sqrt(V.shape[0] - len(badchans))) - np.mean(np.mean(V[:,:n_off],axis=0)))/np.std(np.mean(V[:,:n_off],axis=0))
     else:
         I_t = (np.mean(I,axis=0))
         Q_t = (np.mean(Q,axis=0))
         U_t = (np.mean(U,axis=0))
         V_t = (np.mean(V,axis=0))
-
+        if error:
+            I_t_err = ((np.std(I,axis=0)/np.sqrt(I.shape[0] - len(badchans))))
+            Q_t_err = ((np.std(Q,axis=0)/np.sqrt(Q.shape[0] - len(badchans)))) 
+            U_t_err = ((np.std(U,axis=0)/np.sqrt(U.shape[0] - len(badchans))))
+            V_t_err = ((np.std(V,axis=0)/np.sqrt(V.shape[0] - len(badchans))))
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -688,8 +726,10 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
             plt.show()
         plt.close(f)
     
-    
-    return (I_t,Q_t,U_t,V_t)
+    if error:
+        return (I_t,Q_t,U_t,V_t,I_t_err,Q_t_err,U_t_err,V_t_err)
+    else:
+        return (I_t,Q_t,U_t,V_t)
 
 
 #Get optimal SNR weights using binning that maximizes SNR
@@ -735,7 +775,7 @@ def get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_of
         timeaxist = timeaxist[:,timeaxist.shape[1]%n_t_weight:]
     
     timeaxisb = (((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())[0]
-    print(len(timeaxisb),len(I_t))
+    #print(len(timeaxisb),len(I_t))
     #print(timeaxist)
     #print(timeaxisb)
     #print(((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())
@@ -863,7 +903,7 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
 
     timeaxisb = (((timeaxist.transpose()).reshape(-1,n_t_weight,timeaxist.shape[0]).mean(1)).transpose())[0]
     #timeaxisb = np.linspace(0,I_t.shape[0],len(I_t))
-    print(len(timeaxisb),len(I_t))
+    #print(len(timeaxisb),len(I_t))
 
 
     #Interpolate to original sample rate
@@ -880,9 +920,9 @@ def get_weights_1D(I_t_init,Q_t_init,U_t_init,V_t_init,timestart,timestop,width_
     V_t_weight = fV(timeaxis)#/np.sum(fV(timeaxis))
 
     #savgol filter
-    if sf_window_weights <= 3:
-        print("No SF Filter")
-    else:
+    #if sf_window_weights <= 3:
+    #print("No SF Filter")
+    if sf_window_weights > 3:
         I_t_weight = sf(I_t_weight,sf_window_weights,3)
         Q_t_weight = sf(Q_t_weight,sf_window_weights,3)
         U_t_weight = sf(U_t_weight,sf_window_weights,3)
@@ -1124,7 +1164,7 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
 
 
 #Plot dynamic spectra, I Q U V
-def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis'):
+def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis',figsize=(25,15),save=False,timestart=-1,timestop=-1,sat=1):
     """
     This function plots the given dynamic spectra and outputs images in the specified directory. 
     The spectra are normalized by subtracting the time average in each frequency channel.
@@ -1144,12 +1184,13 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
             buff --> int, number of samples to buffer either side of pulse if needed
 
     """
-    if width_native == -1:
-        timestart = 0
-        timestop = I.shape[1]
-        window = 0
-    else:
-        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
+    if timestop == -1 and timestart == -1:
+        if width_native == -1:
+            timestart = 0
+            timestop = I.shape[1]
+            window = 0
+        else:
+            peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
 
     #optimal weighting
     if weighted:
@@ -1172,40 +1213,69 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
         print("Done weighting!")
 
     #Dynamic Spectra
-    f=plt.figure(figsize=(25,15))
+    f=plt.figure(figsize=figsize)
     pylab.subplot(2,2,1)
-    plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " I")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
+    #plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    im1=plt.imshow(I[:,timestart-window:timestop+window],aspect="auto",cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    vmin,vmax = plt.gca().get_images()[0].get_clim()
+    #plt.xlim(timestart-window,timestop+window)
+    vmin = -vmax*sat
+    vmax = vmax*sat
+    im1.set_clim(vmin=vmin,vmax=vmax)
+    #plt.title(label + " I")
+    plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"I",fontsize=35,color='red',weight='bold') 
+    plt.xticks([])
+    #plt.colorbar()
+    #plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("Frequency (MHz)")
 
     pylab.subplot(2,2,2)
-    plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " Q")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
+    #plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(Q[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " Q")
+    plt.text(32.7*(1e-3)*n_t*(timestart - window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"Q",fontsize=35,color='red',weight='bold')
+    #plt.colorbar()
+    plt.yticks([])
+    plt.xticks([])
+    #plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    #plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,3)
-    plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " U")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
+    #plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(U[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " U")
+    plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.max(freq_test[0]) - (np.max(freq_test[0])-np.min(freq_test[0]))*0.9,"U",fontsize=35,color='red',weight='bold')
+    #plt.colorbar()
+    plt.xlabel("Time (ms)")#Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("Frequency (MHz)")
 
     pylab.subplot(2,2,4)
-    plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.xlim(timestart-window,timestop+window)
-    plt.title(label + " V")
-    plt.colorbar()
-    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("frequency sample")
-
-    plt.savefig(datadir + label + "_freq-time_" + calstr + str(n_f) + "_binned" + ext)
+    #plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.imshow(V[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
+            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
+                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
+                np.min(freq_test[0]),np.max(freq_test[0])])
+    #plt.xlim(timestart-window,timestop+window)
+    #plt.title(label + " V")
+    plt.text(32.7*(1e-3)*n_t*(timestart - window*0.8),np.max(freq_test[0]) - (np.max(freq_test[0])-np.min(freq_test[0]))*0.9,"V",fontsize=35,color='red',weight='bold')
+    #plt.colorbar()
+    plt.yticks([])
+    plt.xlabel("Time (ms)")#Sample (" + str(t_samp*n_t) + " s sampling time)")
+    #plt.ylabel("frequency sample")
+    plt.subplots_adjust(hspace=0,wspace=0)
+    if save:
+        plt.savefig(datadir + label + "_freq-time_" + calstr + str(n_f) + "_binned" + ext)
     if show:
         plt.show()
     plt.close(f)
@@ -1338,7 +1408,7 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
     return (peak, timestart, timestop)
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
-def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1):
+def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1,intL=None,intR=None):
     """
     This function calculates and plots the polarization fraction averaged over both time and 
     frequency, the total an polarized signal-to-noise, and the average polarization fraction within the peak.
@@ -1511,6 +1581,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
     #avg_frac = (np.mean(pol_t[timestart:timestop][pol_t[timestart:timestop]<1]))
     #avg_frac = (np.mean(pol_t[timestart:timestop]))
     
+
     if weighted:
         if input_weights == []:
             I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
@@ -1520,13 +1591,14 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
             I_t_weights_unpadded = np.trim_zeros(input_weights)
 
 
-        if multipeaks:
+        if multipeaks and (intL == None or intR == None):
             pks,props = find_peaks(I_t_weights,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
             intL = intL[0]
             intR = intR[-1]
-        else:
+        elif (intL == None or intR == None):
             FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
+        
         intL = int(intL)
         intR = int(intR)
 
@@ -1586,30 +1658,49 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         I_binned = convolve(I_t,I_t_weights_unpadded)
         noise = np.std(np.concatenate([I_binned[:sigbin-(timestop-timestart)*2],I_binned[sigbin+(timestop-timestart)*2:]]))
         snr = sig0/noise
-        print((sig0,noise,snr))
+        #print((sig0,noise,snr))
 
         T_trial_binned = convolve(pol_t*I_t,I_t_weights_unpadded)
         sig0 = T_trial_binned[sigbin]
         Q_binned = convolve(Q_t,I_t_weights_unpadded)
         noise = np.std(np.concatenate([Q_binned[:sigbin-(timestop-timestart)*2],Q_binned[sigbin+(timestop-timestart)*2:]]))
         snr_frac = sig0/noise
-        print((sig0,noise,snr_frac))
+        #print((sig0,noise,snr_frac))
 
         L_trial_binned = convolve(L_t*I_t,I_t_weights_unpadded)
         sig0 = L_trial_binned[sigbin]
         snr_L = sig0/noise
-        print((sig0,noise,snr_L))
+        #print((sig0,noise,snr_L))
 
         C_trial_binned = np.convolve(np.abs(C_t)*I_t,I_t_weights_unpadded)
         sig0 = C_trial_binned[sigbin]
         V_binned = convolve(V_t,I_t_weights_unpadded)
         noise = np.std(np.concatenate([V_binned[:sigbin-(timestop-timestart)*2],V_binned[sigbin+(timestop-timestart)*2:]]))
         snr_C = sig0/noise
-        print((sig0,noise,snr_C))
+        #print((sig0,noise,snr_C))
 
         
 
     else:
+        if input_weights == []:
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
+            I_t_weights_unpadded = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
+        else:
+            I_t_weights = input_weights
+            I_t_weights_unpadded = np.trim_zeros(input_weights)
+
+
+        if multipeaks and (intL == None or intR == None):
+            pks,props = find_peaks(I_t,height=height)
+            FWHM,heights,intL,intR = peak_widths(I_t,pks)
+            intL = intL[0]
+            intR = intR[-1]
+        elif (intL == None or intR == None):
+            FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
+        
+        intL = int(intL)
+        intR = int(intR)
+
         #average,error
         off_pulse_I = np.nanstd(I_t[:n_off])
         off_pulse_Q = np.nanstd(Q_t[:n_off])
@@ -1646,24 +1737,24 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
         snr = sig0/noise
 
-        sig0 = np.nanmean(pol_t*I_t[timestart:timestop])
-        pol_t_cut1 = pol_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((pol_t*I_t)[timestart:timestop])
+        pol_t_cut1 = (pol_t*I_t)[timestart%(timestop-timestart):]
         pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
         pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(pol_t_binned)
         noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
         snr_frac = sig0/noise
 
-        sig0 = np.nanmean(L_t*I_t[timestart:timestop])
-        L_t_cut1 = L_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((L_t*I_t)[timestart:timestop])
+        L_t_cut1 = (L_t*I_t)[timestart%(timestop-timestart):]
         L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
         L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(L_t_binned)
         noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
         snr_L = sig0/noise
 
-        sig0 = np.nanmean(np.abs(C_t)*I_t[timestart:timestop])
-        C_t_cut1 = np.abs(C_t)*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((np.abs(C_t)*I_t)[timestart:timestop])
+        C_t_cut1 = (np.abs(C_t)*I_t)[timestart%(timestop-timestart):]
         C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
         C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(C_t_binned)
@@ -1943,24 +2034,24 @@ def get_pol_fraction_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=Fal
         noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
         snr = sig0/noise
 
-        sig0 = np.nanmean(pol_t*I_t[timestart:timestop])
-        pol_t_cut1 = pol_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((pol_t*I_t)[timestart:timestop])
+        pol_t_cut1 = (pol_t*I_t)[timestart%(timestop-timestart):]
         pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
         pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(pol_t_binned)
         noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
         snr_frac = sig0/noise
 
-        sig0 = np.nanmean(L_t*I_t[timestart:timestop])
-        L_t_cut1 = L_t*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((L_t*I_t)[timestart:timestop])
+        L_t_cut1 = (L_t*I_t)[timestart%(timestop-timestart):]
         L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
         L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(L_t_binned)
         noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
         snr_L = sig0/noise
 
-        sig0 = np.nanmean(np.abs(C_t)*I_t[timestart:timestop])
-        C_t_cut1 = np.abs(C_t)*I_t[timestart%(timestop-timestart):]
+        sig0 = np.nanmean((np.abs(C_t)*I_t)[timestart:timestop])
+        C_t_cut1 = (np.abs(C_t)*I_t)[timestart%(timestop-timestart):]
         C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
         C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
         sigbin = np.argmax(C_t_binned)
@@ -2048,7 +2139,7 @@ def PA_err_fit_array(LSNR_arr,popt1=[ 0.2685898,  28.71010826],popt2=[0.93328853
     return np.array(PAerrs)
 
 
-def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1,errormethod='MC'):
+def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,input_weights=[],unbias_factor=1,errormethod='MC',intL=None,intR=None):
     """
     This function calculates and plots the polarization angle averaged over both time and
     frequency, and the average polarization angle within the peak.
@@ -2149,17 +2240,15 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
             I_t_weights = input_weights
 
  
-        if multipeaks:
+        if multipeaks and (intL == None or intR == None):
             pks,props = find_peaks(I_t_weights,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
             intL = intL[0]
             intR = intR[-1]
-        else:
+        elif (intL == None or intR == None):
             FWHM,heights,intL,intR = peak_widths(I_t_weights,[np.argmax(I_t_weights)])
-        print("here: " + str((intL,intR)))
         intL = int(intL)
         intR = int(intR)
-        print("here: " + str((intL,intR)))
 
         #average,error
         PA_t_cut1 = PA_t[intL:intR]
@@ -2171,17 +2260,15 @@ def get_pol_angle(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=
         sigma_PA = np.sqrt(np.nansum((I_t_weights_pol_cut*(PA_t_errs[intL:intR]))**2))/np.nansum(I_t_weights_pol_cut)
 
     else:
-        if multipeaks:
+        if multipeaks and (intL == None or intR == None):
             pks,props = find_peaks(I_t,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t,pks)
             intL = intL[0]
             intR = intR[-1]
-        else:
+        elif (intL == None or intR == None):
             FWHM,heights,intL,intR = peak_widths(I_t,[np.argmax(I_t)])
-        print("here: " + str((intL,intR)))
         intL = int(intL)
         intR = int(intR)
-        print("here: " + str((intL,intR)))
 
         #avg_PA = np.mean(PA_t[timestart:timestop][PA_t[timestart:timestop]<1])
         avg_PA = np.nanmean(PA_t[intL:intR])
@@ -2857,7 +2944,7 @@ def absgaincal(gain_dir,source_name,obs_name,n_t,n_f,nsamps,deg,ibeam,suffix="_d
 
     #polyfit
     popt = np.polyfit(freq_test_fullres[0],GY_fullres,deg=deg)
-    print(len(popt))
+    #print(len(popt))
     GY_fit = np.zeros(len(GY_fullres))
     for i in range(len(popt)):
         GY_fit += popt[i] * (freq_test_fullres[0]**(deg - i))
@@ -3311,7 +3398,7 @@ def get_calmatrix_from_ratio_phasediff(ratio,phase_diff,gyy_mag=1,gyy_phase=0):#
     return [gxx,gyy]
 
 #Takes data products for target and returns calibrated Stokes parameters
-def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True):
+def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False,maxProcesses=100,idx=np.nan,bad_chans=[],verbose=False):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3332,20 +3419,81 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True):
         #print("2D Calibration")
         gxx_cal = np.transpose(np.tile(gxx,(I_obs.shape[1],1)))
         gyy_cal = np.transpose(np.tile(gyy,(I_obs.shape[1],1)))
-        print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+        if verbose:
+            print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
     else:
-        print("1D Calibration")
+        if verbose:
+            print("1D Calibration")
         gxx_cal = gxx
         gyy_cal = gyy
-        print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+        if verbose:
+            print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+
+
+    if multithread:
+        I_true = np.zeros(I_obs.shape)
+        Q_true = np.zeros(Q_obs.shape)
+        U_true = np.zeros(U_obs.shape)
+        V_true = np.zeros(V_obs.shape)
+
+        executor = ProcessPoolExecutor(maxProcesses)
+        chunk_size = I_obs.shape[1]//maxProcesses
+        task_list = []
+        for i in range(maxProcesses):
+
+            I_obs_i = I_obs[:,i*chunk_size:(i+1)*chunk_size]
+            Q_obs_i = Q_obs[:,i*chunk_size:(i+1)*chunk_size]
+            U_obs_i = U_obs[:,i*chunk_size:(i+1)*chunk_size]
+            V_obs_i = V_obs[:,i*chunk_size:(i+1)*chunk_size]
+
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i,bad_chans,verbose))
+
+        if I_obs.shape[1]%maxProcesses != 0:
+            i = maxProcesses
+            I_obs_i = I_obs[:,maxProcesses*chunk_size:]
+            Q_obs_i = Q_obs[:,maxProcesses*chunk_size:]
+            U_obs_i = U_obs[:,maxProcesses*chunk_size:]
+            V_obs_i = V_obs[:,maxProcesses*chunk_size:]
+
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i,bad_chans,verbose))
+
+        for future in as_completed(task_list):
+            I_true_i,Q_true_i,U_true_i,V_true_i,i = future.result()
+
+            if i == maxProcesses:
+                I_true[:,maxProcesses*chunk_size:] = I_true_i
+                Q_true[:,maxProcesses*chunk_size:] = Q_true_i
+                U_true[:,maxProcesses*chunk_size:] = U_true_i
+                V_true[:,maxProcesses*chunk_size:] = V_true_i
+            else:
+                I_true[:,i*chunk_size:(i+1)*chunk_size] = I_true_i
+                Q_true[:,i*chunk_size:(i+1)*chunk_size] = Q_true_i
+                U_true[:,i*chunk_size:(i+1)*chunk_size] = U_true_i
+                V_true[:,i*chunk_size:(i+1)*chunk_size] = V_true_i
+
+        executor.shutdown(wait=True)
+
+    else:
+
+        I_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) + (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
+        Q_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) - (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
     
-    I_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) + (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
-    Q_true = 0.5*((((np.abs(1/gxx_cal)**2))*(I_obs + Q_obs)) - (((np.abs(1/gyy_cal)**2))*(I_obs - Q_obs)))
+        xy_obs = U_obs + 1j*V_obs
+        xy_cal = xy_obs / (gxx_cal*np.conj(gyy_cal))#* np.exp(-1j * (np.angle(gxx_cal)-np.angle(gyy_cal)))
+        U_true, V_true = xy_cal.real, xy_cal.imag
+
+    #re-mask data
     
-    xy_obs = U_obs + 1j*V_obs
-    xy_cal = xy_obs / (gxx_cal*np.conj(gyy_cal))#* np.exp(-1j * (np.angle(gxx_cal)-np.angle(gyy_cal)))
-    U_true, V_true = xy_cal.real, xy_cal.imag
-    
+    mask = np.zeros(I_true.shape)
+    if len(bad_chans) > 0:
+        mask[bad_chans,:] = 1
+    I_true = ma.masked_array(I_true,mask)
+    Q_true = ma.masked_array(Q_true,mask)
+    U_true = ma.masked_array(U_true,mask)
+    V_true = ma.masked_array(V_true,mask)
+
+    if ~np.isnan(idx):
+        return (I_true,Q_true,U_true,V_true,idx)
     return (I_true,Q_true,U_true,V_true)
 
 
@@ -3396,7 +3544,7 @@ def calibrate_matrix(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True):
     
 
 #Apply parallactic angle correction
-def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,stokes=True):
+def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,stokes=True,verbose=False):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3435,8 +3583,9 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
     #RA = FRB_RA[FRBidx]
     #DEC = FRB_DEC[FRBidx]
 
-    print("FRB RA: " + str(RA) + " degrees")
-    print("FRB DEC: " + str(DEC) + " degrees")
+    if verbose:
+        print("FRB RA: " + str(RA) + " degrees")
+        print("FRB DEC: " + str(DEC) + " degrees")
 
     RA = RA*np.pi/180
     DEC = DEC*np.pi/180
@@ -3445,23 +3594,28 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
     observing_time = Time(fobj.header.tstart, format='mjd', location=observing_location)#Time(fobj.header.tstart, format='mjd', location=observing_location)
     GST = Time(fobj.header.tstart, format='mjd').to_datetime().hour + Time(fobj.header.tstart, format='mjd').to_datetime().minute/60 + Time(fobj.header.tstart, format='mjd').to_datetime().second/3600#observing_time.sidereal_time('mean').hour
     LST = (GST + Lon*24/360)%24
-    print(observing_time.isot)
-    print(LST)
+    if verbose:
+        print(observing_time.isot)
+        print(LST)
 
     HA = (LST*360/24)*np.pi/180 - RA #rad
 
 
     elev = np.arcsin(np.sin(Lat*np.pi/180)*np.sin(DEC) + np.cos(Lat*np.pi/180)*np.cos(DEC)*np.cos(HA))
-    print("elevation est. : " + str(elev*180/np.pi) + " degrees")
+    if verbose:
+        print("elevation est. : " + str(elev*180/np.pi) + " degrees")
 
     #apply correction to azimuth due to beam offset
     az = np.arcsin(-np.cos(DEC)*np.sin(HA)/np.cos(elev))
     az_corr = (ibeam - centerbeam)*synth_beamsize
-    print("initial azimuth est. : " + str(az*180/np.pi) + " degrees")
-    print("corrected azimuth est. : " + str((az-az_corr)*180/np.pi) + " degrees")
+    
+    if verbose:
+        print("initial azimuth est. : " + str(az*180/np.pi) + " degrees")
+        print("corrected azimuth est. : " + str((az-az_corr)*180/np.pi) + " degrees")
 
     ParA = np.arcsin(np.sin(HA)*np.cos(Lat*np.pi/180)/np.cos(elev)) + chi_ant
-    print("initial parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
+    if verbose:
+        print("initial parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
 
     #ParA = np.arcsin(-np.sin(az-az_corr)*np.cos(Lat*np.pi/180)/np.cos(DEC)) + chi_ant
     arg = -np.sin(az-az_corr)*np.cos(Lat*np.pi/180)/np.cos(DEC)
@@ -3472,7 +3626,8 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
     ParA = np.arcsin(arg) + chi_ant
     
-    print("corrected parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
+    if verbose:
+        print("corrected parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
 
     #calibrate
     Qcal = Q_obs*np.cos(2*ParA) - U_obs*np.sin(2*ParA)
@@ -3486,12 +3641,13 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
 
 #Estimate RM by maximizing SNR over given trial RM; wav is wavelength array
-def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True): 
+def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0,sendtodir='',monitor=False): 
+    if multithread: assert(numbatch*maxProcesses <= len(trial_RM)) #assert(len(trial_RM)%(maxProcesses*numbatch) == 0)
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
 
-    #Calculate polarization
+    #Calculate polarization        
     P = Q + 1j*U
     
     if plot:
@@ -3509,14 +3665,82 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
     #SNR matrix
     SNRs = np.zeros((len(trial_RM),len(trial_phi)))
     
-    for i in range(len(trial_RM)):
+    #matrix implementation
+    if matrixmethod:
+        RMmesh,wavmesh = np.meshgrid(trial_RM,wav) 
+         
         for j in range(len(trial_phi)):
-            RM_i = trial_RM[i]
-            phi_j = trial_phi[j]
+       
+            cterm = np.matrix(np.cos(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            sterm = np.matrix(np.sin(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            SNRs[:,j] = np.array(np.abs(np.matrix(Q)*cterm + np.matrix(U)*sterm + 1j*(np.matrix(Q)*sterm - np.matrix(U)*cterm)))[0,:]
+    
+    else:
 
-            P_trial = P*np.exp(-1j*((2*RM_i*(((wav)**2) - np.mean((wav)**2))) + phi_j))
 
-            SNRs[i,j] = np.abs(np.mean(P_trial))
+        if multithread:
+
+            if monitor: itrf = tqdm(range(numbatch),token=os.environ["RMSYNTHTOKEN"],channel="rmsynthstatus",position=0,desc=str(numbatch) + " Batches")
+            else: itrf = range(numbatch)
+            for j in itrf:
+
+                #create executor
+                executor = ProcessPoolExecutor(maxProcesses)
+
+                task_list = []
+                trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
+                for i in range(maxProcesses*j,maxProcesses*(j+1)):
+                    trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
+
+                    #start thread
+                    task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                            False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
+                                            False,False,1,1,i,sendtodir,monitor))
+
+                if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
+                    trial_RM_i = trial_RM[numbatch*maxProcesses:]
+
+                    task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                            False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
+                                            False,False,1,1,maxProcesses*numbatch,sendtodir,monitor))
+
+
+                #wait for tasks to complete
+                #wait(task_list)
+                #print("done submitting tasks")
+                for future in as_completed(task_list):
+                    tmp,tmp,SNRs_i,tmp,i = future.result()
+                    if i == maxProcesses*numbatch:
+                        SNRs[numbatch*maxProcesses:,0] = SNRs_i
+                    else:
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+
+
+                    if sendtodir != '':
+                        prevSNRs = np.load(sendtodir + "/SNRs.npy")
+                        prevSNRs = np.concatenate([prevSNRs,SNRs_i])
+                        np.save(sendtodir + "/SNRs.npy",prevSNRs)
+
+
+                        prevRMs = np.load(sendtodir + "/trialRM.npy")
+                        if i == maxProcesses*numbatch:
+                            prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
+                        else:
+                            prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
+                        np.save(sendtodir + "/trialRM.npy",prevRMs)
+                executor.shutdown(wait=True)
+            
+
+   
+        else:
+            for i in range(len(trial_RM)):
+                for j in range(len(trial_phi)):
+                    RM_i = trial_RM[i]
+                    phi_j = trial_phi[j]
+
+                    P_trial = P*np.exp(-1j*((2*RM_i*(((wav)**2) - np.mean((wav)**2))) + phi_j))
+
+                    SNRs[i,j] = np.abs(np.mean(P_trial))
     
 
     if plot:
@@ -3533,7 +3757,7 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
         plt.close(f)
         
        
-        if len(trial_RM) > 1 and len(trial_phi) >1:
+        if len(trial_RM) > 1 and len(trial_phi) >1 and (not matrixmethod):
             f=plt.figure(figsize=(12,6))
             plt.imshow(SNRs,aspect='auto')
             plt.colorbar()
@@ -3584,22 +3808,25 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
         for i in range(len(fit_sample_RM)):
             sigmas[i]=(faraday_error(Q,U,freq_test,fit_sample_RM[i],0))
 
+        try:
+
+            popt,pcov = np.polyfit(fit_sample_RM,fit_sample_SNRs,2,w=1/sigmas,cov=True)
+            fit_RM = np.linspace(trial_RM[max_RM_idx-fit_window],trial_RM[max_RM_idx+fit_window],1000)
+            fit = np.zeros(1000)
+            for i in range(len(popt)):
+                fit += popt[i]*(fit_RM**(len(popt)-1-i))
 
 
-        popt,pcov = np.polyfit(fit_sample_RM,fit_sample_SNRs,2,w=1/sigmas,cov=True)
-        fit_RM = np.linspace(trial_RM[max_RM_idx-fit_window],trial_RM[max_RM_idx+fit_window],1000)
-        fit = np.zeros(1000)
-        for i in range(len(popt)):
-            fit += popt[i]*(fit_RM**(len(popt)-1-i))
+            HWHM_RM = trial_RM[max_RM_idx]
+            step = 0.001
+            while SNR_fit(HWHM_RM,popt) > np.max(SNRs[:,0])/2:
+                HWHM_RM += step
 
 
-        HWHM_RM = trial_RM[max_RM_idx]
-        step = 0.001
-        while SNR_fit(HWHM_RM,popt) > np.max(SNRs[:,0])/2:
-            HWHM_RM += step
+            RM_err = (HWHM_RM - trial_RM[max_RM_idx])
 
-
-        RM_err = (HWHM_RM - trial_RM[max_RM_idx])
+        except TypeError as exc:
+            RM_err = np.nan
 
         if plot:
 
@@ -3623,7 +3850,7 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
     else:
         RM_err = None
 
-    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RM_err)
+    return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RM_err,mt_offset)
 
 def SNR_fit(RM,popt):
     fit = 0
@@ -3660,7 +3887,8 @@ def faraday_error(Q_f,U_f,freq_test,RM,phi=0):
     return method1HWHM
 
 #Specific Faraday calibration to get SNR spectrum in range around peak
-def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1):
+def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0,sendtodir='',monitor=False):
+    if multithread: assert(numbatch*maxProcesses <= len(trial_RM))
     #Get wavelength axis
     c = (3e8) #m/s
     wav = c/(freq_test[0]*(1e6))#wav_test[0]
@@ -3671,7 +3899,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         timestart = 0
         timestop = I.shape[1]
     elif input_weights != []:
-        print("Using Custom Input Weights")
+        #print("Using Custom Input Weights")
         timestart = timestart_in 
         timestop = timestop_in
     else:
@@ -3683,7 +3911,7 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         if input_weights!=[]:
             I_t_weights = input_weights
         else:
-            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
+            I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj=None,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
         I_t_weights_2D = np.array([I_t_weights]*I.shape[0])
 
 
@@ -3713,41 +3941,6 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
             plt.plot(noise)
             plt.show()
 
-        """
-        L0_t_w = L0_t*I_t_weights
-        sig0 = np.sum(L0_t_w[timestart:timestop])
-        L_trial_binned = (convolve(L0_t,I_t_weights))#,mode="same"))
-        sigbin = np.argmax(L_trial_binned)
-        #noise = np.std(np.concatenate([L_trial_binned[:sigbin],L_trial_binned[sigbin+1:]]))
-        Q_binned = (convolve(Q.mean(0),I_t_weights))#,mode="same"))
-        #print(np.std(np.concatenate([L_trial_binned[:sigbin][np.abs(L_trial_binned[:sigbin]) > eps],L_trial_binned[sigbin+1:][np.abs(L_trial_binned[sigbin+1:]) > eps]])))
-        Qnoise = np.std(np.concatenate([Q_binned[:sigbin][np.abs(Q_binned[:sigbin]) > eps],Q_binned[sigbin+1:][np.abs(Q_binned[sigbin+1:]) > eps]]))
-        
-        
-        U_binned = (convolve(U.mean(0),I_t_weights))#,mode="same"))
-        #print(np.std(np.concatenate([L_trial_binned[:sigbin][np.abs(L_trial_binned[:sigbin]) > eps],L_trial_binned[sigbin+1:][np.abs(L_trial_binned[sigbin+1:]) > eps]])))
-        Unoise = np.std(np.concatenate([U_binned[:sigbin][np.abs(U_binned[:sigbin]) > eps],U_binned[sigbin+1:][np.abs(U_binned[sigbin+1:]) > eps]]))
-        
-        #don't have a good estimate of Q and U, and noise is within 1%, so just use Q noise
-        noise = Qnoise#np.sqrt((U_binned[sigbin]*Unoise)**2 + (Q_binned[sigbin]*Qnoise)**2)/np.sqrt((sig0**2))
-        print((Qnoise,Unoise)) 
-        
-        plt.figure(figsize=(12,6))
-        plt.plot(L_trial_binned)
-        plt.plot(Q_binned)
-        plt.plot(U_binned)
-        plt.axvline(sigbin)
-        plt.axhline(noise)
-        plt.axhline(-noise)
-        #plt.plot(I_t_weights)
-        #plt.xlim(timestart-10,timestop+10)
-        #plt.plot(sigbin)
-        plt.show()
-        plt.figure(figsize=(12,6))
-        plt.plot(Q.mean(0))
-        plt.plot(L0_t)
-        plt.show()
-        """
     else:
         
         sig0 = np.mean(np.sqrt(np.mean(Q,axis=0)**2 + np.mean(U,axis=0)**2)[timestart:timestop])
@@ -3765,68 +3958,170 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         U_binned = U_cut.reshape(len(U_cut)//(timestop-timestart),timestop-timestart).mean(1)
         Unoise = (np.std(np.concatenate([U_binned[:sigbin],U_binned[sigbin+1:]])))
         noise = Qnoise#np.sqrt((Q_binned[sigbin]*Qnoise)**2  + (U_binned[sigbin]*Unoise)**2)/sig0
-    print(noise)        
+    #print(noise)        
     snr0 = sig0/noise
 
     P_cut = P[:,timestart:timestop]
     wavall_cut = np.array([wav]*np.shape(P_cut)[1]).transpose()
     #if weighted:
     #    I_t_weights_cut = I_t_weights#I_t_weights[timestart:timestop]
-    print(P_cut.shape,wavall_cut.shape)
+    #print(P_cut.shape,wavall_cut.shape)
 
     #if full return full time vs RM matrix to estimate RM variation over the pulse width
     if full:
         SNRs_full = np.zeros((len(trial_RM),timestop-timestart))
-    for i in range(len(trial_RM)):
+
+    #matrix method
+    if matrixmethod:
+        RMmesh,wavmesh = np.meshgrid(trial_RM,wav)
+
         for j in range(len(trial_phi)):
-            RM_i = trial_RM[i]
-            phi_j = trial_phi[j]
 
-            P_trial = P_cut*np.exp(-1j*((2*RM_i*(((wavall_cut)**2) - np.mean(wav**2))) + phi_j))
-            Q_trial_t = np.mean(np.real(P_trial),axis=0)
-            U_trial_t = np.mean(np.imag(P_trial),axis=0)
-            #print(timestop-timestart)
-            #L_trial = np.sqrt(np.real(P_trial)**2 + np.imag(P_trial)**2)
-            #L_trial_t = np.mean(L_trial,axis=0)
+            cterm = np.matrix(np.cos(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            sterm = np.matrix(np.sin(2*RMmesh*((wavmesh**2) - np.mean(wav**2)) + trial_phi[j]))
+            
+            sig_all = np.zeros(len(trial_RM))
+            for tidx in range(len(I_t_weights)):
+                
+                
+                Q_cut = np.matrix(np.real(P_cut[:,tidx]))
+                U_cut = np.matrix(np.imag(P_cut[:,tidx]))
+                L_cut = np.array(np.abs(Q_cut*cterm + U_cut*sterm + 1j*(Q_cut*sterm - U_cut*cterm)))[0,:]
+                
+                if full:
+                    SNRs_full[:,tidx] = L_cut#np.array(np.abs(Q_cut*cterm + U_cut*sterm + 1j*(Q_cut*sterm - U_cut*cterm)))[0,:]/len(wavall_cut)
+                
+                if weighted:
+                    sig_all[tidx] += L_cut*I_t_weights[tidx]
+                else:
+                    sig_all[tidx] += L_cut
+            SNRs[:,j] = sig_all/noise
 
-            L_trial_t = np.sqrt(Q_trial_t**2 + U_trial_t**2)
-            if full:
-                SNRs_full[i,:] = L_trial_t
+    else:
 
-            #sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
-            if weighted:
-                sig = np.sum(L_trial_t*I_t_weights)
-            else:
-                sig = np.mean(L_trial_t)
+        if multithread:
 
 
-            """
-            L_trial_offp = np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])
-            L_trial_offp = L_trial_offp[:len(L_trial_offp) - (len(L_trial_offp)%(timestop-timestart))]
-            print(L_trial_offp.reshape(len(L_trial_offp)//(timestop-timestart),timestop-timestart))
-            L_trial_binned_offp = np.mean(L_trial_offp.reshape(len(L_trial_offp)//(timestop-timestart),timestop-timestart))
-            #print(L_trial_offp)
-            #print(L_trial_binned_offp)
-            #binned_off_pulse =  #dsapol.avg_time(np.concatenate([L_trial_t[:timestart],L_trial_t[timestop:]])[:4096],timestop-timestart)
-            noise = np.sqrt(np.mean(L_trial_binned_offp**2))
-            print(noise)
-            #print(sig,noise)
+            if monitor: itrf = tqdm(range(numbatch),token=os.environ["RMSYNTHTOKEN"],channel="rmsynthstatus",position=0,desc="2D RM Synthesis;" + str(numbatch) + " Batches")
+            else: itrf = range(numbatch)
+            for j in itrf:
 
-            if i == 0:
-                L_trial_cut1 = L_trial_t[timestart%(timestop-timestart):]
-                L_trial_cut = L_trial_cut1[:(len(L_trial_cut1)-(len(L_trial_cut1)%(timestop-timestart)))]
+                #create executor
+                #with ProcessPoolExecutor(maxProcesses) as executor:
+                executor = ProcessPoolExecutor(maxProcesses)
 
-                L_trial_binned = L_trial_cut.reshape(len(L_trial_cut)//(timestop-timestart),timestop-timestart).mean(1)
-                sigbin = np.argmax(L_trial_binned)
-                noise = (np.std(np.concatenate([L_trial_cut[:sigbin],L_trial_cut[sigbin+1:]])))
-            else:
-                noise = noise
-            """
-            SNRs[i,j] = sig/noise#np.abs(np.sum(P_trial))
+                task_list = []
+                trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
+                for i in range(maxProcesses*j,maxProcesses*(j+1)):
+                    trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
+
+                    #start thread
+                    task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                                                                                                t_samp,False,datadir,calstr,label,n_f,n_t,False,
+                                                                                                False,buff,weighted,n_t_weight,timeaxis,
+                                                                                                sf_window_weights,n_off,full,input_weights,
+                                                                                                timestart_in,timestop_in,False,False,1,1,i,sendtodir,monitor))
+                        
+                        
+                if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
+                    trial_RM_i = trial_RM[numbatch*maxProcesses:]
+
+
+                    task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                                                                                                t_samp,False,datadir,calstr,label,n_f,n_t,False,
+                                                                                                False,buff,weighted,n_t_weight,timeaxis,
+                                                                                                sf_window_weights,n_off,full,input_weights,
+                                                                                                timestart_in,timestop_in,False,False,1,1,numbatch*maxProcesses,sendtodir,monitor))
+
+                    """
+
+                    if full:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                                    width_native,t_samp,False,datadir,calstr,label,n_f,n_t,
+                                                    show,False,buff,weighted,n_t_weight,timeaxis,fobj,sf_window_weights,
+                                                    n_off,full,input_weights,timestart_in,timestop_in,False,False,
+                                                    1,1,i)
+                        SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                    else:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = faradaycal_SNR(I,Q,U,V,freq_test,trial_RM_i,trial_phi,
+                                                    width_native,t_samp,False,datadir,calstr,label,n_f,n_t,
+                                                    show,False,buff,weighted,n_t_weight,timeaxis,fobj,sf_window_weights,
+                                                    n_off,full,input_weights,timestart_in,timestop_in,False,False,
+                                                    1,1,i)
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+                    """ 
+                
+                    
+
+                #wait for tasks to complete
+                #wait(task_list)
+                for future in as_completed(task_list):
+                    
+                    if full:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
+                            
+                        if i == numbatch*maxProcesses:
+                            SNRs_full[numbatch*maxProcesses:,:] = SNRs_full_i
+                        else:
+                            SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                      
+                    else:
+                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
+                            
+                        
+                        
+                    if i == numbatch*maxProcesses:
+                        SNRs[numbatch*maxProcesses:,0] = SNRs_i
+                    else:
+                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
+
+                    if sendtodir != '':
+                        prevSNRs = np.load(sendtodir + "/SNRs.npy")
+                        prevSNRs = np.concatenate([prevSNRs,SNRs_i])
+                        np.save(sendtodir + "/SNRs.npy",prevSNRs)
+
+                        prevSNRs = np.load(sendtodir + "/SNRs_full.npy")
+                        prevSNRs = np.concatenate([prevSNRs,SNRs_full_i],axis=0)                            
+                        np.save(sendtodir + "/SNRs_full.npy",prevSNRs)
+
+                        prevRMs = np.load(sendtodir + "/trialRM.npy")
+                        if i == maxProcesses*numbatch:
+                            prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
+                        else:
+                            prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
+                        np.save(sendtodir + "/trialRM.npy",prevRMs)
+
+
+                executor.shutdown(wait=True)
+        else:
+            for i in range(len(trial_RM)):
+                for j in range(len(trial_phi)):
+                    RM_i = trial_RM[i]
+                    phi_j = trial_phi[j]
+
+                    P_trial = P_cut*np.exp(-1j*((2*RM_i*(((wavall_cut)**2) - np.mean(wav**2))) + phi_j))
+                    Q_trial_t = np.mean(np.real(P_trial),axis=0)
+                    U_trial_t = np.mean(np.imag(P_trial),axis=0)
+                    #print(timestop-timestart)
+                    #L_trial = np.sqrt(np.real(P_trial)**2 + np.imag(P_trial)**2)
+                    #L_trial_t = np.mean(L_trial,axis=0)
+
+                    L_trial_t = np.sqrt(Q_trial_t**2 + U_trial_t**2)
+                    if full:
+                        SNRs_full[i,:] = L_trial_t
+
+                    #sig = np.mean(L_trial_t[timestart:timestop])#np.abs(np.mean(np.mean(P_trial,axis=0)[timestart:timestop]))#
+                    if weighted:
+                        sig = np.sum(L_trial_t*I_t_weights)
+                    else:
+                        sig = np.mean(L_trial_t)
+
+                    SNRs[i,j] = sig/noise#np.abs(np.sum(P_trial))
 
     (max_RM_idx,max_phi_idx) = np.unravel_index(np.argmax(SNRs),np.shape(SNRs))
     max_RM_idx = np.argmax(SNRs)
-    print(max_RM_idx)
+    #print(max_RM_idx)
 
     significance = ((np.max(SNRs)-snr0)/snr0)
 
@@ -3874,13 +4169,23 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 plt.show()
     else:
         RMerr = None
-
+        upper = None
+        lower = None
+    
+    
+    if sendtodir != '':
+        np.save(sendtodir + "/result.npy",np.array([trial_RM[max_RM_idx],RMerr,upper,lower]))
+    
     if full:
         #for full time-dependent analysis, get RM vs time
-        peak_RMs = trial_RM[np.argmax(SNRs_full,axis=1)]
-        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,SNRs_full,peak_RMs)
+        #print(trial_RM,trial_RM.shape)
+        #print(SNRs_full,SNRs_full.shape)
+        peak_RMs = trial_RM[np.argmax(SNRs_full,axis=0)]
+        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,SNRs_full,peak_RMs,mt_offset)
     else:
-        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise)
+        return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,mt_offset)
+
+    
 
 #Calculate Error for SNR method
 def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):
@@ -4123,8 +4428,9 @@ def get_calibs(gaincal_fn,phasecal_fn,freq_test,use_fit=True):
 
 #find beam for calibrator observation
 #function to get beam of calibrator
-def find_beam(file_suffix,shape=(16,7680,256),path='/home/ubuntu/sherman/scratch_weights_update_2022-06-03/',plot=False,show=False):
+def find_beam(file_suffix,shape=(16,7680,256),path=dirs['data'],plot=False,show=False):
     #file_suffix = ""
+    print("Starting find beam process...",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
     d = np.zeros(shape)
     i = 0
     for corrs in ['corr03', 'corr04', 'corr05', 'corr06', 'corr07',
@@ -4202,8 +4508,9 @@ def RM_error_fit(x,a=35.16852537, b=-0.08341036):
 
 #Plotting Functions
 
-def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False):
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False,datadir=None):
+    if datadir is None:
+        datadir = dirs['data'] + ids + "_" + nickname + "/"
     outdata = dict()
     outdata["inputs"] = dict()
     outdata["inputs"]["n_t"] = n_t
@@ -4346,8 +4653,9 @@ from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 #interactive functions
-def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False):
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False,datadir=None):
+    if datadir is None:
+        datadir = dirs['data'] + ids + "_" + nickname + "/"
     #function for tuning the following paramters:
     #n_t
     #n_f
@@ -5772,8 +6080,11 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
 
 #plotting functions
-def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title=""):
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title="",figsize=(38,28),datadir=None):
+    if datadir is None:
+        #datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+        datadir=dirs['data'] +ids + "_" + nickname + "/"
+
     #parse results
     RMsynth_snrs, RMtools_snrs = RMsnrs
     if len(RMzoomsnrs) == 3:
@@ -5782,7 +6093,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         RMsynth_zoomsnrs, RMSNR_zoomsnrs = RMzoomsnrs
 
 
-    fig, axs = plt.subplots(2,1,figsize=(38,28), gridspec_kw={'height_ratios': [1, 1]})
+    fig, axs = plt.subplots(2,1,figsize=figsize, gridspec_kw={'height_ratios': [1, 1]})
 
     ax4= axs[0]# = plt.subplot2grid(shape=(2, 2), loc=(0, 0), colspan=2)
     ax5 =axs[1]#= plt.subplot2grid(shape=(2, 2), loc=(1, 0), colspan=2,rowspan=2)
@@ -5804,7 +6115,8 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
     ax4.legend(loc="upper right")
     ax4.set_xlabel(r'$RM\,(rad/m^2)$')
     ax4.set_ylabel(r'$F(\phi)$')
-    ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
+    if np.all(~np.isnan(trial_RM1)):
+        ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
 
     #zoom range plot
     lns = []
@@ -5825,7 +6137,8 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         l2=ax5_1.plot(trial_RMtools2,RMtools_zoomsnrs,label="RM Tools",color="blue")
         lns.append(l2[0])
         labs.append("RM Tools")
-    ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
+    if np.all(~np.isnan(trial_RM2)):
+        ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
     l6 = ax5.axhline(threshold,color="purple",linestyle="--",label=r'${t}\sigma$ threshold'.format(t=threshold),linewidth=2)
     lns.append(l6)
     ax5_1.set_ylabel(r'$F(\phi)$')
@@ -5846,11 +6159,12 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True,figsize=(42,36),datadir=None):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
-    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
+    if datadir is None:
+        datadir = dirs['data'] + ids + "_" + nickname + "/"
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0
@@ -5915,13 +6229,21 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     tshifted = (t - np.argmax(I_t)*(t_samp*1e6)*n_t)/1000
     tpeak = (np.argmax(I_t)*(t_samp*1e6)*n_t)/1000
     
-    fig= plt.figure(figsize=(42,36))
-    ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
-    ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
-    ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
-    ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
-    ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
-
+    if showspectrum:
+        fig= plt.figure(figsize=figsize)
+        ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
+        ax1 = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+        ax2 = plt.subplot2grid(shape=(8, 8), loc=(3, 0), colspan=4, rowspan=4)
+        ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
+        ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
+    else:
+        smallfigsize = (figsize[0]//2,figsize[1])
+        fig= plt.figure(figsize=smallfigsize)
+        ax0 = plt.subplot2grid(shape=(8, 4), loc=(0, 0), colspan=4)
+        ax1 = plt.subplot2grid(shape=(8, 4), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+        ax2 = plt.subplot2grid(shape=(8, 4), loc=(3, 0), colspan=4, rowspan=4)
+        #ax3 = plt.subplot2grid(shape=(8, 8), loc=(3, 4), rowspan=4,colspan=2)
+        #ax6 = plt.subplot2grid(shape=(8, 8), loc=(3,6), rowspan=4,colspan=1)
 
     intL = int(intL)
     intR = int(intR)
@@ -5964,29 +6286,30 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax0.set_ylim(-1.4*95,1.1*95)
     #ax0.legend(loc="upper right")
 
-    if ghostPA:
-        ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
-
-    if sigflag:
-        if SNRCUT != None:
-            ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+    if showspectrum:
+        if ghostPA:
+            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+    
+        if sigflag:
+            if SNRCUT != None:
+                ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
+            else:
+                ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
         else:
-            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Intrinsic PPA",color="blue",markersize=10,linewidth=2)
-    else:
-        if SNRCUT != None:
-            ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
-        else:
-            ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+            if SNRCUT != None:
+                ax6.errorbar((180/np.pi)*PA_f[L_f >=SNRCUT],freq_test[0][L_f >= SNRCUT],xerr=(180/np.pi)*PA_f_errs[L_f >= SNRCUT],fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
+            else:
+                ax6.errorbar((180/np.pi)*PA_f,freq_test[0],xerr=(180/np.pi)*PA_f_errs,fmt='o',label="Measured PA",color="blue",markersize=10,linewidth=2)
 
-    if sigflag:
-        ax6.set_xlabel(r'PPA ($^\circ$)')
-    else:
-        ax6.set_xlabel(r'PA ($^\circ$)')
-    #ax6.set_xlabel("degrees")
-    ax6.set_xlim(-1.1*95,1.1*95)
-    ax6.set_xlim(-1.4*95,1.1*95)
-    ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
-    #ax6.tick_params(axis='x', labelrotation = 45)
+        if sigflag:
+            ax6.set_xlabel(r'PPA ($^\circ$)')
+        else:
+            ax6.set_xlabel(r'PA ($^\circ$)')
+        #ax6.set_xlabel("degrees")
+        ax6.set_xlim(-1.1*95,1.1*95)
+        ax6.set_xlim(-1.4*95,1.1*95)
+        ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
+        #ax6.tick_params(axis='x', labelrotation = 45)
 
     #pol fracs
     if short_labels:
@@ -6011,25 +6334,31 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
     ax2.set_xlim(timestart- wind*1000/((t_samp*1e6)*n_t),timestop+ wind*1000/((t_samp*1e6)*n_t))
     #ax2.tick_params(axis='x', labelrotation = 45)
 
-    color1=ax3.step(I_f,freq_test[0],label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)',color="black",linewidth=3)
-    color2 = ax3.step(L_f,freq_test[0],label=r'Linear Polarization ($\sqrt{Q^2 + U^2}/I$)',color="blue",linewidth=2.5)
-    color3=ax3.step(C_f,freq_test[0],label=r'Circular Polarization ($V/I$)',color="orange",linewidth=2)
-    ax3.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
-    ax3.set_xlabel(r'S/N')
-    #ax3.tick_params(axis='x', labelrotation = 45)
+    if showspectrum:
+        color1=ax3.step(I_f,freq_test[0],label=r'Total Polarization ($\sqrt{Q^2 + U^2 + V^2}/I$)',color="black",linewidth=3)
+        color2 = ax3.step(L_f,freq_test[0],label=r'Linear Polarization ($\sqrt{Q^2 + U^2}/I$)',color="blue",linewidth=2.5)
+        color3=ax3.step(C_f,freq_test[0],label=r'Circular Polarization ($V/I$)',color="orange",linewidth=2)
+        ax3.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
+        ax3.set_xlabel(r'S/N')
+        #ax3.tick_params(axis='x', labelrotation = 45)
 
     ticklabelsx = np.array(ax1.get_xticks(),dtype=int)[1:-1]
     ticksx = np.array(np.argmax(I_t) + np.array(ticklabelsx)/(32.7*n_t/1000),dtype=float)
     print(ticklabelsx)
     print(ticksx)
 
-    ticklabelsy =np.array(ax3.get_yticks(),dtype=int)[1:-1]
-    print(ticklabelsy)
-    ticksy= np.array(((ticklabelsy - np.max(freq_test[0]))/(freq_test[0][1]-freq_test[0][0])),dtype=int)#(np.max(freq_test[0]) -np.min(freq_test[0]))
-    print(ticksy)
+    if showspectrum:
+        ticklabelsy =np.array(ax3.get_yticks(),dtype=int)[1:-1]
+        print(ticklabelsy)
+        ticksy= np.array(((ticklabelsy - np.max(freq_test[0]))/(freq_test[0][1]-freq_test[0][0])),dtype=int)#(np.max(freq_test[0]) -np.min(freq_test[0]))
+        print(ticksy)
+        
 
     ax2.imshow(I,aspect="auto",vmin=0,vmax=np.percentile(I,99),interpolation="nearest")
     ax2.set_xticks(ticksx,np.around(ticklabelsx,1))
+    if not showspectrum:
+        ticksy = ax2.get_yticks()[2:-1]
+        ticklabelsy = np.array(np.around(freq_test[0][np.array(ticksy,dtype=int)],0),dtype=int)
     ax2.set_yticks(ticksy,np.around(ticklabelsy,1))
 
 
@@ -6042,8 +6371,9 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
         else:
             fig.text(0.5, 1, "FRB20" + ids[:6], ha='center')
     ax1.xaxis.set_major_locator(ticker.NullLocator())
-    ax3.yaxis.set_major_locator(ticker.NullLocator())
-    ax6.yaxis.set_major_locator(ticker.NullLocator())
+    if showspectrum:
+        ax3.yaxis.set_major_locator(ticker.NullLocator())
+        ax6.yaxis.set_major_locator(ticker.NullLocator())
     fig.subplots_adjust(hspace=0)
     fig.subplots_adjust(wspace=0)
     plt.savefig(datadir + ids + "_" + nickname + "_pol_summary_plot"+ suffix + ".pdf")
@@ -6053,3 +6383,12 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
 
     return I_f,Q_f,U_f,L_f,V_f
 
+
+
+#compute the unbiased linear polarization
+def L_unbias(It,Qt,Ut,n_off,unbias_factor=1):
+
+    L_tcal_trm = np.sqrt(Qt**2 + Ut**2)
+    L_tcal_trm[L_tcal_trm**2 <= (unbias_factor*np.std(It[:n_off]))**2] = np.std(It[:n_off])
+    L_tcal_trm = np.sqrt(L_tcal_trm**2 - np.std(It[:n_off])**2)
+    return L_tcal_trm

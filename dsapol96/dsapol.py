@@ -15,7 +15,7 @@ from scipy.signal import peak_widths
 import copy
 import numpy as np
 
-from tqdm.contrib.slack import tqdm,trange
+
 import numpy.ma as ma
 from sigpyproc import FilReader
 from sigpyproc.Filterbank import FilterbankBlock
@@ -34,15 +34,8 @@ from scipy.ndimage import convolve1d
 from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 ext= ".pdf"
-import json
-import os
-import sys
-f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
-dirs = json.load(f)
-f.close()
+DEFAULT_DATADIR = "/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
 
-DEFAULT_DATADIR = dirs["data"] + "testimgs/" #"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/testimgs/"#"/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03/testimgs/" #Users can find datadirectories for all processed FRBs here; to access set datadir = DEFAULT_WDIR + trigname_label
-logfile = dirs["logs"] + "dsapol_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/dsapol_logfile.txt"
 from astropy.time import Time
 from astropy.coordinates import EarthLocation
 import astropy.units as u
@@ -299,7 +292,7 @@ def fix_bad_channels(I,Q,U,V,bad_chans,iters = 100):
     return (Ifix,Qfix,Ufix,Vfix)
 
 #Takes data directory and stokes fil file prefix and returns I Q U V 2D arrays binned in time and frequency
-def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0,verbose=False,fixchansfile='',fixchansfile_overwrite=False):
+def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=True,fixchans=True,dtype=np.float32,alpha=False,start=0,verbose=False):
     """
     This function generates 2D dynamic spectra for each stokes parameter, taken from
     filterbank files in the specified directory. Optionally normalizes by subtracting off-pulse mean, but
@@ -340,20 +333,14 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
     if fixchans == True:
         #bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
         #(I,Q,U,V) = fix_bad_channels(I,Q,U,V,bad_chans)
-        if fixchansfile != '':
-            bad_chans = np.load(fixchansfile)
-            good_chans = np.array(list(set(np.arange(I.shape[0])) - set(bad_chans)))
-        else:
-            bad_idxs = np.all(I==0,axis=1)
-            good_idxs = np.logical_not(bad_idxs)
-            bad_chans = np.arange(I.shape[0])[bad_idxs]
-            good_chans = np.arange(I.shape[0])[good_idxs]
-            if fixchansfile_overwrite:
-                np.save(datadir + "/badchans.npy",bad_chans)
-                print("Saving bad channels to " + datadir + "/badchans.npy")
+        bad_idxs = np.all(I==0,axis=1)
+        good_idxs = np.logical_not(bad_idxs)
+        bad_chans = np.arange(I.shape[0])[bad_idxs]
+        good_chans = np.arange(I.shape[0])[good_idxs]
         if verbose:
             print("Bad Channels: " + str(bad_chans))
         
+
 
 
 
@@ -492,7 +479,7 @@ def write_fil_data_dsa(arr,fn,fobj):
     b.toFile(fn)
     return
 
-def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,verbose=False):
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False):
     """ 
     This function writes the provided Stokes dynamic spectra to 
     filterbank files in the given directory.
@@ -505,33 +492,25 @@ def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,ver
             alpha --> bool, True if desired filterbanks should end with 'I,Q,U,V', False if desired filterbanks should end with '0,1,2,3' (default=False)
     """
     if alpha:
-        sdir = datadir + fn_prefix + suffix
-        if verbose:
-            print("Writing Stokes I to " + sdir + "_I.fil")
+        sdir = datadir + fn_prefix + "_" + suffix
+        print("Writing Stokes I to " + sdir + "_I.fil")
         write_fil_data_dsa(I,sdir + "_I.fil",fobj)
-        if verbose:
-            print("Writing Stokes Q to " + sdir + "_Q.fil")
+        print("Writing Stokes Q to " + sdir + "_Q.fil")
         write_fil_data_dsa(Q,sdir + "_Q.fil",fobj)
-        if verbose:
-            print("Writing Stokes U to " + sdir + "_U.fil")
+        print("Writing Stokes U to " + sdir + "_U.fil")
         write_fil_data_dsa(U,sdir + "_U.fil",fobj)
-        if verbose:
-            print("Writing Stokes V to " + sdir + "_V.fil")
+        print("Writing Stokes V to " + sdir + "_V.fil")
         write_fil_data_dsa(V,sdir + "_V.fil",fobj)
 
     else:
-        sdir = datadir + fn_prefix + suffix
-        if verbose:
-            print("Writing Stokes I to " + sdir + "_0.fil")
+        sdir = datadir + fn_prefix + "_" + suffix
+        print("Writing Stokes I to " + sdir + "_0.fil")
         write_fil_data_dsa(I,sdir + "_0.fil",fobj)
-        if verbose:
-            print("Writing Stokes Q to " + sdir + "_1.fil")
+        print("Writing Stokes Q to " + sdir + "_1.fil")
         write_fil_data_dsa(Q,sdir + "_1.fil",fobj)
-        if verbose:
-            print("Writing Stokes U to " + sdir + "_2.fil")
+        print("Writing Stokes U to " + sdir + "_2.fil")
         write_fil_data_dsa(U,sdir + "_2.fil",fobj)
-        if verbose:
-            print("Writing Stokes V to " + sdir + "_3.fil")
+        print("Writing Stokes V to " + sdir + "_3.fil")
         write_fil_data_dsa(V,sdir + "_3.fil",fobj)
     return
 
@@ -653,7 +632,7 @@ def get_I_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_mean=T
     return (I,fobj,timeaxis,freq_1D,wav_1D)
 
 #Get frequency averaged stokes params vs time; note run get_stokes_2D first to get 2D I Q U V arrays
-def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10,error=False,badchans=[]):
+def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,show=False,normalize=True,buff=0,timeaxis=None,fobj=None,window=10):
     """
     This function calculates the frequency averaged time series for each stokes
     parameter. Outputs plots if specified in region around the pulse.
@@ -692,21 +671,12 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
         Q_t = (np.mean(Q,axis=0) - np.mean(np.mean(Q[:,:n_off],axis=0)))/np.std(np.mean(Q[:,:n_off],axis=0))
         U_t = (np.mean(U,axis=0) - np.mean(np.mean(U[:,:n_off],axis=0)))/np.std(np.mean(U[:,:n_off],axis=0))
         V_t = (np.mean(V,axis=0) - np.mean(np.mean(V[:,:n_off],axis=0)))/np.std(np.mean(V[:,:n_off],axis=0))
-        if error:
-            I_t_err = ((np.nanstd(I,axis=0)/np.sqrt(I.shape[0] - len(badchans))) - np.mean(np.mean(I[:,:n_off],axis=0)))/np.std(np.mean(I[:,:n_off],axis=0))
-            Q_t_err = ((np.nanstd(Q,axis=0)/np.sqrt(Q.shape[0] - len(badchans))) - np.mean(np.mean(Q[:,:n_off],axis=0)))/np.std(np.mean(Q[:,:n_off],axis=0))
-            U_t_err = ((np.nanstd(U,axis=0)/np.sqrt(U.shape[0] - len(badchans))) - np.mean(np.mean(U[:,:n_off],axis=0)))/np.std(np.mean(U[:,:n_off],axis=0))
-            V_t_err = ((np.nanstd(V,axis=0)/np.sqrt(V.shape[0] - len(badchans))) - np.mean(np.mean(V[:,:n_off],axis=0)))/np.std(np.mean(V[:,:n_off],axis=0))
     else:
         I_t = (np.mean(I,axis=0))
         Q_t = (np.mean(Q,axis=0))
         U_t = (np.mean(U,axis=0))
         V_t = (np.mean(V,axis=0))
-        if error:
-            I_t_err = ((np.std(I,axis=0)/np.sqrt(I.shape[0] - len(badchans))))
-            Q_t_err = ((np.std(Q,axis=0)/np.sqrt(Q.shape[0] - len(badchans)))) 
-            U_t_err = ((np.std(U,axis=0)/np.sqrt(U.shape[0] - len(badchans))))
-            V_t_err = ((np.std(V,axis=0)/np.sqrt(V.shape[0] - len(badchans))))
+
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -726,10 +696,8 @@ def get_stokes_vs_time(I,Q,U,V,width_native,t_samp,n_t,n_off=3000,plot=False,dat
             plt.show()
         plt.close(f)
     
-    if error:
-        return (I_t,Q_t,U_t,V_t,I_t_err,Q_t_err,U_t_err,V_t_err)
-    else:
-        return (I_t,Q_t,U_t,V_t)
+    
+    return (I_t,Q_t,U_t,V_t)
 
 
 #Get optimal SNR weights using binning that maximizes SNR
@@ -1164,7 +1132,7 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
 
 
 #Plot dynamic spectra, I Q U V
-def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis',figsize=(25,15),save=False,timestart=-1,timestop=-1,sat=1):
+def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis'):
     """
     This function plots the given dynamic spectra and outputs images in the specified directory. 
     The spectra are normalized by subtracting the time average in each frequency channel.
@@ -1184,13 +1152,12 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
             buff --> int, number of samples to buffer either side of pulse if needed
 
     """
-    if timestop == -1 and timestart == -1:
-        if width_native == -1:
-            timestart = 0
-            timestop = I.shape[1]
-            window = 0
-        else:
-            peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
+    if width_native == -1:
+        timestart = 0
+        timestop = I.shape[1]
+        window = 0
+    else:
+        peak,timestart,timestop = find_peak(I,width_native,t_samp,n_t,buff=buff)    
 
     #optimal weighting
     if weighted:
@@ -1213,69 +1180,40 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
         print("Done weighting!")
 
     #Dynamic Spectra
-    f=plt.figure(figsize=figsize)
+    f=plt.figure(figsize=(25,15))
     pylab.subplot(2,2,1)
-    #plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    im1=plt.imshow(I[:,timestart-window:timestop+window],aspect="auto",cmap=cmap,
-            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
-                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
-                np.min(freq_test[0]),np.max(freq_test[0])])
-    vmin,vmax = plt.gca().get_images()[0].get_clim()
-    #plt.xlim(timestart-window,timestop+window)
-    vmin = -vmax*sat
-    vmax = vmax*sat
-    im1.set_clim(vmin=vmin,vmax=vmax)
-    #plt.title(label + " I")
-    plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"I",fontsize=35,color='red',weight='bold') 
-    plt.xticks([])
-    #plt.colorbar()
-    #plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("Frequency (MHz)")
+    plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.xlim(timestart-window,timestop+window)
+    plt.title(label + " I")
+    plt.colorbar()
+    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,2)
-    #plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.imshow(Q[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
-            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
-                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
-                np.min(freq_test[0]),np.max(freq_test[0])])
-    #plt.xlim(timestart-window,timestop+window)
-    #plt.title(label + " Q")
-    plt.text(32.7*(1e-3)*n_t*(timestart - window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"Q",fontsize=35,color='red',weight='bold')
-    #plt.colorbar()
-    plt.yticks([])
-    plt.xticks([])
-    #plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
-    #plt.ylabel("frequency sample")
+    plt.imshow(Q - np.mean(Q,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.xlim(timestart-window,timestop+window)
+    plt.title(label + " Q")
+    plt.colorbar()
+    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,3)
-    #plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.imshow(U[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
-            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
-                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
-                np.min(freq_test[0]),np.max(freq_test[0])])
-    #plt.xlim(timestart-window,timestop+window)
-    #plt.title(label + " U")
-    plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.max(freq_test[0]) - (np.max(freq_test[0])-np.min(freq_test[0]))*0.9,"U",fontsize=35,color='red',weight='bold')
-    #plt.colorbar()
-    plt.xlabel("Time (ms)")#Sample (" + str(t_samp*n_t) + " s sampling time)")
-    plt.ylabel("Frequency (MHz)")
+    plt.imshow(U - np.mean(U,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.xlim(timestart-window,timestop+window)
+    plt.title(label + " U")
+    plt.colorbar()
+    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("frequency sample")
 
     pylab.subplot(2,2,4)
-    #plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.imshow(V[:,timestart-window:timestop+window],aspect="auto",vmin=vmin,vmax=vmax,cmap=cmap,
-            extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
-                32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
-                np.min(freq_test[0]),np.max(freq_test[0])])
-    #plt.xlim(timestart-window,timestop+window)
-    #plt.title(label + " V")
-    plt.text(32.7*(1e-3)*n_t*(timestart - window*0.8),np.max(freq_test[0]) - (np.max(freq_test[0])-np.min(freq_test[0]))*0.9,"V",fontsize=35,color='red',weight='bold')
-    #plt.colorbar()
-    plt.yticks([])
-    plt.xlabel("Time (ms)")#Sample (" + str(t_samp*n_t) + " s sampling time)")
-    #plt.ylabel("frequency sample")
-    plt.subplots_adjust(hspace=0,wspace=0)
-    if save:
-        plt.savefig(datadir + label + "_freq-time_" + calstr + str(n_f) + "_binned" + ext)
+    plt.imshow(V - np.mean(V,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
+    plt.xlim(timestart-window,timestop+window)
+    plt.title(label + " V")
+    plt.colorbar()
+    plt.xlabel("Time Sample (" + str(t_samp*n_t) + " s sampling time)")
+    plt.ylabel("frequency sample")
+
+    plt.savefig(datadir + label + "_freq-time_" + calstr + str(n_f) + "_binned" + ext)
     if show:
         plt.show()
     plt.close(f)
@@ -3398,7 +3336,7 @@ def get_calmatrix_from_ratio_phasediff(ratio,phase_diff,gyy_mag=1,gyy_phase=0):#
     return [gxx,gyy]
 
 #Takes data products for target and returns calibrated Stokes parameters
-def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False,maxProcesses=100,idx=np.nan,bad_chans=[],verbose=False):
+def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithread=False,maxProcesses=100,idx=np.nan):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3419,15 +3357,12 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
         #print("2D Calibration")
         gxx_cal = np.transpose(np.tile(gxx,(I_obs.shape[1],1)))
         gyy_cal = np.transpose(np.tile(gyy,(I_obs.shape[1],1)))
-        if verbose:
-            print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+        print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
     else:
-        if verbose:
-            print("1D Calibration")
+        print("1D Calibration")
         gxx_cal = gxx
         gyy_cal = gyy
-        if verbose:
-            print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
+        print(gxx_cal.shape,gyy_cal.shape,I_obs.shape)
 
 
     if multithread:
@@ -3446,7 +3381,7 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
             U_obs_i = U_obs[:,i*chunk_size:(i+1)*chunk_size]
             V_obs_i = V_obs[:,i*chunk_size:(i+1)*chunk_size]
 
-            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i,bad_chans,verbose))
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
 
         if I_obs.shape[1]%maxProcesses != 0:
             i = maxProcesses
@@ -3455,7 +3390,7 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
             U_obs_i = U_obs[:,maxProcesses*chunk_size:]
             V_obs_i = V_obs[:,maxProcesses*chunk_size:]
 
-            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i,bad_chans,verbose))
+            task_list.append(executor.submit(calibrate,I_obs_i,Q_obs_i,U_obs_i,V_obs_i,calmatrix,True,False,1,i))
 
         for future in as_completed(task_list):
             I_true_i,Q_true_i,U_true_i,V_true_i,i = future.result()
@@ -3481,17 +3416,6 @@ def calibrate(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True,multithr
         xy_obs = U_obs + 1j*V_obs
         xy_cal = xy_obs / (gxx_cal*np.conj(gyy_cal))#* np.exp(-1j * (np.angle(gxx_cal)-np.angle(gyy_cal)))
         U_true, V_true = xy_cal.real, xy_cal.imag
-
-    #re-mask data
-    
-    mask = np.zeros(I_true.shape)
-    if len(bad_chans) > 0:
-        mask[bad_chans,:] = 1
-    I_true = ma.masked_array(I_true,mask)
-    Q_true = ma.masked_array(Q_true,mask)
-    U_true = ma.masked_array(U_true,mask)
-    V_true = ma.masked_array(V_true,mask)
-
     if ~np.isnan(idx):
         return (I_true,Q_true,U_true,V_true,idx)
     return (I_true,Q_true,U_true,V_true)
@@ -3544,7 +3468,7 @@ def calibrate_matrix(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,calmatrix,stokes=True):
     
 
 #Apply parallactic angle correction
-def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,stokes=True,verbose=False):
+def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeamEW,ibeamNS,RA,DEC,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeamEW=125,centerbeamNS=125,stokes=True,verbose=False):
     #calculate Stokes parameters
     if stokes:
         I_obs = xx_I_obs
@@ -3600,10 +3524,12 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
     HA = (LST*360/24)*np.pi/180 - RA #rad
 
-
+    #apply correction to elevation due to NS beam offset
     elev = np.arcsin(np.sin(Lat*np.pi/180)*np.sin(DEC) + np.cos(Lat*np.pi/180)*np.cos(DEC)*np.cos(HA))
+    elev_corr = (ibeamNS - centerbeamNS)*synth_beamsize
     if verbose:
-        print("elevation est. : " + str(elev*180/np.pi) + " degrees")
+        print("initial elevation est. : " + str(elev*180/np.pi) + " degrees")
+        print("corrected elevation est. : " + str((elev-elev_corr)*180/np.pi) + " degrees")
 
     #apply correction to azimuth due to beam offset
     az = np.arcsin(-np.cos(DEC)*np.sin(HA)/np.cos(elev))
@@ -3613,7 +3539,7 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
         print("initial azimuth est. : " + str(az*180/np.pi) + " degrees")
         print("corrected azimuth est. : " + str((az-az_corr)*180/np.pi) + " degrees")
 
-    ParA = np.arcsin(np.sin(HA)*np.cos(Lat*np.pi/180)/np.cos(elev)) + chi_ant
+    ParA = np.arcsin(np.sin(HA)*np.cos(Lat*np.pi/180)/np.cos((elev-elev_corr))) + chi_ant
     if verbose:
         print("initial parallactic angle est : " + str(ParA*180/np.pi) + " degrees")
 
@@ -3641,7 +3567,7 @@ def calibrate_angle(xx_I_obs,yy_Q_obs,xy_U_obs,yx_V_obs,fobj,ibeam,RA,DEC,beamsi
 
 
 #Estimate RM by maximizing SNR over given trial RM; wav is wavelength array
-def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0,sendtodir='',monitor=False): 
+def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,fit_window=100,err=True,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0): 
     if multithread: assert(numbatch*maxProcesses <= len(trial_RM)) #assert(len(trial_RM)%(maxProcesses*numbatch) == 0)
     #Get wavelength axis
     c = (3e8) #m/s
@@ -3680,9 +3606,9 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
 
         if multithread:
 
-            if monitor: itrf = tqdm(range(numbatch),token=os.environ["RMSYNTHTOKEN"],channel="rmsynthstatus",position=0,desc=str(numbatch) + " Batches")
-            else: itrf = range(numbatch)
-            for j in itrf:
+
+
+            for j in range(numbatch):
 
                 #create executor
                 executor = ProcessPoolExecutor(maxProcesses)
@@ -3695,39 +3621,27 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
                     #start thread
                     task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
                                             False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
-                                            False,False,1,1,i,sendtodir,monitor))
+                                            False,False,1,1,i))
 
                 if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
                     trial_RM_i = trial_RM[numbatch*maxProcesses:]
 
                     task_list.append(executor.submit(faradaycal,I,Q,U,V,freq_test,trial_RM_i,trial_phi,
                                             False,datadir,calstr,label,n_f,n_t,False,fit_window,False,
-                                            False,False,1,1,maxProcesses*numbatch,sendtodir,monitor))
+                                            False,False,1,1,maxProcesses*numbatch))
 
 
                 #wait for tasks to complete
                 #wait(task_list)
-                #print("done submitting tasks")
+
                 for future in as_completed(task_list):
                     tmp,tmp,SNRs_i,tmp,i = future.result()
+
                     if i == maxProcesses*numbatch:
                         SNRs[numbatch*maxProcesses:,0] = SNRs_i
                     else:
                         SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
 
-
-                    if sendtodir != '':
-                        prevSNRs = np.load(sendtodir + "/SNRs.npy")
-                        prevSNRs = np.concatenate([prevSNRs,SNRs_i])
-                        np.save(sendtodir + "/SNRs.npy",prevSNRs)
-
-
-                        prevRMs = np.load(sendtodir + "/trialRM.npy")
-                        if i == maxProcesses*numbatch:
-                            prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
-                        else:
-                            prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
-                        np.save(sendtodir + "/trialRM.npy",prevRMs)
                 executor.shutdown(wait=True)
             
 
@@ -3808,25 +3722,22 @@ def faradaycal(I,Q,U,V,freq_test,trial_RM,trial_phi,plot=False,datadir=DEFAULT_D
         for i in range(len(fit_sample_RM)):
             sigmas[i]=(faraday_error(Q,U,freq_test,fit_sample_RM[i],0))
 
-        try:
-
-            popt,pcov = np.polyfit(fit_sample_RM,fit_sample_SNRs,2,w=1/sigmas,cov=True)
-            fit_RM = np.linspace(trial_RM[max_RM_idx-fit_window],trial_RM[max_RM_idx+fit_window],1000)
-            fit = np.zeros(1000)
-            for i in range(len(popt)):
-                fit += popt[i]*(fit_RM**(len(popt)-1-i))
 
 
-            HWHM_RM = trial_RM[max_RM_idx]
-            step = 0.001
-            while SNR_fit(HWHM_RM,popt) > np.max(SNRs[:,0])/2:
-                HWHM_RM += step
+        popt,pcov = np.polyfit(fit_sample_RM,fit_sample_SNRs,2,w=1/sigmas,cov=True)
+        fit_RM = np.linspace(trial_RM[max_RM_idx-fit_window],trial_RM[max_RM_idx+fit_window],1000)
+        fit = np.zeros(1000)
+        for i in range(len(popt)):
+            fit += popt[i]*(fit_RM**(len(popt)-1-i))
 
 
-            RM_err = (HWHM_RM - trial_RM[max_RM_idx])
+        HWHM_RM = trial_RM[max_RM_idx]
+        step = 0.001
+        while SNR_fit(HWHM_RM,popt) > np.max(SNRs[:,0])/2:
+            HWHM_RM += step
 
-        except TypeError as exc:
-            RM_err = np.nan
+
+        RM_err = (HWHM_RM - trial_RM[max_RM_idx])
 
         if plot:
 
@@ -3887,7 +3798,7 @@ def faraday_error(Q_f,U_f,freq_test,RM,phi=0):
     return method1HWHM
 
 #Specific Faraday calibration to get SNR spectrum in range around peak
-def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0,sendtodir='',monitor=False):
+def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot=False,datadir=DEFAULT_DATADIR,calstr="",label="",n_f=1,n_t=1,show=False,err=True,buff=0,weighted=False,n_t_weight=1,timeaxis=None,sf_window_weights=45,n_off=3000,full=False,input_weights=[],timestart_in=-1,timestop_in=-1,matrixmethod=False,multithread=False,maxProcesses=10,numbatch=1,mt_offset=0):
     if multithread: assert(numbatch*maxProcesses <= len(trial_RM))
     #Get wavelength axis
     c = (3e8) #m/s
@@ -4002,36 +3913,34 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         if multithread:
 
 
-            if monitor: itrf = tqdm(range(numbatch),token=os.environ["RMSYNTHTOKEN"],channel="rmsynthstatus",position=0,desc="2D RM Synthesis;" + str(numbatch) + " Batches")
-            else: itrf = range(numbatch)
-            for j in itrf:
+
+            for j in range(numbatch):
 
                 #create executor
-                #with ProcessPoolExecutor(maxProcesses) as executor:
-                executor = ProcessPoolExecutor(maxProcesses)
+                with ProcessPoolExecutor(maxProcesses) as executor:
 
-                task_list = []
-                trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
-                for i in range(maxProcesses*j,maxProcesses*(j+1)):
-                    trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
+                    task_list = []
+                    trialsize = int(len(trial_RM)//(numbatch*maxProcesses))
+                    for i in range(maxProcesses*j,maxProcesses*(j+1)):
+                        trial_RM_i = trial_RM[i*trialsize:(i+1)*trialsize]
 
-                    #start thread
-                    task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                        #start thread
+                        task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
                                                                                                 t_samp,False,datadir,calstr,label,n_f,n_t,False,
                                                                                                 False,buff,weighted,n_t_weight,timeaxis,
                                                                                                 sf_window_weights,n_off,full,input_weights,
-                                                                                                timestart_in,timestop_in,False,False,1,1,i,sendtodir,monitor))
+                                                                                                timestart_in,timestop_in,False,False,1,1,i))
                         
                         
-                if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
-                    trial_RM_i = trial_RM[numbatch*maxProcesses:]
+                    if j == numbatch-1 and len(trial_RM)%(numbatch*maxProcesses) != 0:
+                        trial_RM_i = trial_RM[numbatch*maxProcesses:]
 
 
-                    task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
+                        task_list.append(executor.submit(faradaycal_SNR,I,Q,U,V,freq_test,trial_RM_i,trial_phi,width_native,
                                                                                                 t_samp,False,datadir,calstr,label,n_f,n_t,False,
                                                                                                 False,buff,weighted,n_t_weight,timeaxis,
                                                                                                 sf_window_weights,n_off,full,input_weights,
-                                                                                                timestart_in,timestop_in,False,False,1,1,numbatch*maxProcesses,sendtodir,monitor))
+                                                                                                timestart_in,timestop_in,False,False,1,1,numbatch*maxProcesses))
 
                     """
 
@@ -4054,46 +3963,29 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
                 
                     
 
-                #wait for tasks to complete
-                #wait(task_list)
-                for future in as_completed(task_list):
+                    #wait for tasks to complete
+                    #wait(task_list)
+                    for future in as_completed(task_list):
                     
-                    if full:
-                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
+                        if full:
+                            tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,SNRs_full_i,tmp,i = future.result()
                             
-                        if i == numbatch*maxProcesses:
-                            SNRs_full[numbatch*maxProcesses:,:] = SNRs_full_i
-                        else:
-                            SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
+                            if i == numbatch*maxProcesses:
+                                SNRs_full[numbatch*maxProcesses:,:] = SNRs_full_i
+                            else:
+                                SNRs_full[i*trialsize:(i+1)*trialsize,:] = SNRs_full_i
                       
-                    else:
-                        tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
+                        else:
+                            tmp,tmp,SNRs_i,tmp,tmp,tmp,tmp,tmp,i = future.result()
                             
                         
                         
-                    if i == numbatch*maxProcesses:
-                        SNRs[numbatch*maxProcesses:,0] = SNRs_i
-                    else:
-                        SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
-
-                    if sendtodir != '':
-                        prevSNRs = np.load(sendtodir + "/SNRs.npy")
-                        prevSNRs = np.concatenate([prevSNRs,SNRs_i])
-                        np.save(sendtodir + "/SNRs.npy",prevSNRs)
-
-                        prevSNRs = np.load(sendtodir + "/SNRs_full.npy")
-                        prevSNRs = np.concatenate([prevSNRs,SNRs_full_i],axis=0)                            
-                        np.save(sendtodir + "/SNRs_full.npy",prevSNRs)
-
-                        prevRMs = np.load(sendtodir + "/trialRM.npy")
-                        if i == maxProcesses*numbatch:
-                            prevRMs = np.concatenate([prevRMs,trial_RM[maxProcesses*numbatch:]])
+                        if i == numbatch*maxProcesses:
+                            SNRs[numbatch*maxProcesses:,0] = SNRs_i
                         else:
-                            prevRMs = np.concatenate([prevRMs,trial_RM[i*trialsize:(i+1)*trialsize]])
-                        np.save(sendtodir + "/trialRM.npy",prevRMs)
+                            SNRs[i*trialsize:(i+1)*trialsize,0] = SNRs_i
 
-
-                executor.shutdown(wait=True)
+                #executor.shutdown(wait=True)
         else:
             for i in range(len(trial_RM)):
                 for j in range(len(trial_phi)):
@@ -4171,21 +4063,12 @@ def faradaycal_SNR(I,Q,U,V,freq_test,trial_RM,trial_phi,width_native,t_samp,plot
         RMerr = None
         upper = None
         lower = None
-    
-    
-    if sendtodir != '':
-        np.save(sendtodir + "/result.npy",np.array([trial_RM[max_RM_idx],RMerr,upper,lower]))
-    
     if full:
         #for full time-dependent analysis, get RM vs time
-        #print(trial_RM,trial_RM.shape)
-        #print(SNRs_full,SNRs_full.shape)
-        peak_RMs = trial_RM[np.argmax(SNRs_full,axis=0)]
+        peak_RMs = trial_RM[np.argmax(SNRs_full,axis=1)]
         return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,SNRs_full,peak_RMs,mt_offset)
     else:
         return (trial_RM[max_RM_idx],trial_phi[max_phi_idx],SNRs[:,0],RMerr,upper,lower,significance,noise,mt_offset)
-
-    
 
 #Calculate Error for SNR method
 def faraday_error_SNR(SNRs,trial_RM_zoom,RMdet):
@@ -4428,8 +4311,9 @@ def get_calibs(gaincal_fn,phasecal_fn,freq_test,use_fit=True):
 
 #find beam for calibrator observation
 #function to get beam of calibrator
-def find_beam(file_suffix,shape=(16,7680,256),path=dirs['data'],plot=False,show=False):
+def find_beam(file_suffix,shape=(16,7680,256),path='/home/ubuntu/sherman/scratch_weights_update_2022-06-03/',plot=False,show=False):
     #file_suffix = ""
+    f=open('/media/ubuntu/ssd/sherman/code/testoutput.txt','a')
     print("Starting find beam process...",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
     d = np.zeros(shape)
     i = 0
@@ -4437,11 +4321,14 @@ def find_beam(file_suffix,shape=(16,7680,256),path=dirs['data'],plot=False,show=
                   'corr08', 'corr10', 'corr11', 'corr12', 'corr14',
                   'corr15', 'corr16', 'corr18', 'corr19', 'corr21',
                   'corr22']:
+        print("Path: " + path + corrs + file_suffix + '.out',end="",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
         data = np.loadtxt(path + corrs + file_suffix + '.out').reshape((7680,256))
+        print("load complete",file=f)#'/media/ubuntu/ssd/sherman/code/testoutput.txt')
         #print(data.sum())
         d[i,:,:] = data
         #print(corrs)
         i += 1
+    f.close()
 
     if plot:
         f=plt.figure(figsize=(12,6))
@@ -4508,9 +4395,8 @@ def RM_error_fit(x,a=35.16852537, b=-0.08341036):
 
 #Plotting Functions
 
-def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False,datadir=None):
-    if datadir is None:
-        datadir = dirs['data'] + ids + "_" + nickname + "/"
+def FRB_quick_analysis(ids,nickname,ibeam,width_native,buff,RA,DEC,caldate,n_t,n_f,beamsize_as=14,Lat=37.23,Lon=-118.2851,centerbeam=125,weighted=True,n_t_weight=2,sf_window_weights=7,RMcal=True,trial_RM=np.linspace(-1e6,1e6,int(2e6)),trial_phi=[0],n_trial_RM_zoom=5000,zoom_window=1000,fit_window=100,plot=True,show=False):
+    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     outdata = dict()
     outdata["inputs"] = dict()
     outdata["inputs"]["n_t"] = n_t
@@ -4653,9 +4539,8 @@ from RMtools_1D.do_RMsynth_1D import run_rmsynth
 from RMtools_1D.do_RMclean_1D import run_rmclean
 from RMtools_1D.do_QUfit_1D_mnest import run_qufit
 #interactive functions
-def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False,datadir=None):
-    if datadir is None:
-        datadir = dirs['data'] + ids + "_" + nickname + "/"
+def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_width_native,t_samp,freq_test_init,timeaxis,fobj,n_off=3000,mask_flag=False):
+    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     #function for tuning the following paramters:
     #n_t
     #n_f
@@ -6080,11 +5965,8 @@ def int_get_downsampling_params(I_init,Q_init,U_init,V_init,ids,nickname,init_wi
 
 
 #plotting functions
-def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title="",figsize=(38,28),datadir=None):
-    if datadir is None:
-        #datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
-        datadir=dirs['data'] +ids + "_" + nickname + "/"
-
+def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM2,trial_RMtools1,trial_RMtools2,threshold=9,suffix="",show=True,title="",figsize=(38,28)):
+    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     #parse results
     RMsynth_snrs, RMtools_snrs = RMsnrs
     if len(RMzoomsnrs) == 3:
@@ -6115,8 +5997,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
     ax4.legend(loc="upper right")
     ax4.set_xlabel(r'$RM\,(rad/m^2)$')
     ax4.set_ylabel(r'$F(\phi)$')
-    if np.all(~np.isnan(trial_RM1)):
-        ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
+    ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
 
     #zoom range plot
     lns = []
@@ -6137,8 +6018,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         l2=ax5_1.plot(trial_RMtools2,RMtools_zoomsnrs,label="RM Tools",color="blue")
         lns.append(l2[0])
         labs.append("RM Tools")
-    if np.all(~np.isnan(trial_RM2)):
-        ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
+    ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
     l6 = ax5.axhline(threshold,color="purple",linestyle="--",label=r'${t}\sigma$ threshold'.format(t=threshold),linewidth=2)
     lns.append(l6)
     ax5_1.set_ylabel(r'$F(\phi)$')
@@ -6159,12 +6039,11 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
 
 
 
-def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True,figsize=(42,36),datadir=None):
+def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,timeaxis,fobj,n_off=3000,buff=0,weighted=True,n_t_weight=2,sf_window_weights=7,show=True,input_weights=[],intL=-1,intR=-1,multipeaks=False,wind=1,suffix="",mask_flag=False,sigflag=True,plot_weights=False,timestart=-1,timestop=-1,short_labels=True,unbias_factor=1,add_title=False,mask_th=0.005,SNRCUT=None,ghostPA=False,showspectrum=True,figsize=(42,36)):
     """
     given calibrated I Q U V, generates plot w/ PA, pol profile and spectrum, Stokes I dynamic spectrum
     """
-    if datadir is None:
-        datadir = dirs['data'] + ids + "_" + nickname + "/"
+    datadir="/media/ubuntu/ssd/sherman/scratch_weights_update_2022-06-03_32-7us/"+ids + "_" + nickname + "/"
     #use full timestream for calibrators
     if width_native == -1:
         timestart = 0

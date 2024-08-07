@@ -5,3 +5,6 @@ os
 sys
 pickle
 argparse
+mercury==2.4.3
+astropy
+astroquery
