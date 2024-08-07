@@ -501,8 +501,10 @@ def plot_RM_2D(I_tcal,Q_tcal,U_tcal,V_tcal,n_off,n_t,timeaxis,timestart,timestop
                  np.min(trial_RM2),np.max(trial_RM2)))
     ax2.set_xlim(((timestart -np.argmax(I_tcal))*32.7*n_t)/1000 - wind,((timestop -np.argmax(I_tcal))*32.7*n_t)/1000 + wind)
     ax0.axhline(RM,color="red",label=r'${{\rm RM}}_{{\rm peak}}={a}\pm{b}$ rad/m$^2$'.format(a=np.around(RM,2),b=np.around(RMerr,2)),linewidth=3,zorder=1)
-    if show_calibrated:
+    if show_calibrated and ~np.isnan(RMcalerr) and ~np.isnan(RMcal):
         ax0.axhline(RMcal,color="magenta",label=r'${{\rm RM}}_{{\rm cal}}={a}\pm{b}$ rad/m$^2$'.format(a=np.around(RMcal,2),b=np.around(RMcalerr,2)),linewidth=3,zorder=1)
+    elif show_calibrated and ~np.isnan(RMcal):
+        ax0.axhline(RMcal,color="magenta",label=r'${{\rm RM}}_{{\rm cal}}={a}$ rad/m$^2$'.format(a=np.around(RMcal,2)),linewidth=3,zorder=1)
     ax0.legend(loc="upper right",fontsize=50,frameon=True,framealpha=1)
 
     fig.tight_layout()
