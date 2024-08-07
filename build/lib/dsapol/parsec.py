@@ -603,7 +603,7 @@ RM_ion_init,RM_ionerr_init = np.nan,np.nan#RMcal.get_rm_ion(RA,DEC,mjd)
 polcalfiles_findbeams = polcal.get_beamfinding_files()
 polcaldates = []
 for k in polcal_dict.keys():
-    if 'polcal' not in str(k):
+    if 'polcal' not in str(k) and 'maxProcesses' not in str(k):
         polcaldates.append(str(k))
 polcalfiles_bf = polcal.get_avail_caldates()
 polcalfiles_findbeams = polcal.get_beamfinding_files()
