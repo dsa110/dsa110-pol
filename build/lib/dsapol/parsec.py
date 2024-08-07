@@ -1351,7 +1351,7 @@ def load_dynspecplot_screen(logwindow_slider_dynspec):
 
     if ~np.all(np.isnan(state_dict['base_I'])):#'base_I' in state_dict.keys():
     
-        dsapol.plot_spectra_2D(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_t'],state_dict['base_n_f'],state_dict['base_freq_test'],n_off=int(NOFFDEF//state_dict['base_n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_dynspec.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['base_time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+        dsapol.plot_spectra_2D(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_t'],state_dict['base_n_f'],state_dict['base_freq_test'],n_off=int(NOFFDEF//state_dict['base_n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_dynspec.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['base_time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
     update_wdict([logwindow_slider_dynspec],['logwindow_slider_dynspec'],param='value')
     return
@@ -1537,7 +1537,7 @@ def dedisp_dynspecplot_screen(logwindow_slider_init):
 
     if 'I' in state_dict.keys() and ~np.all(np.isnan(state_dict['I'])):#'base_I' in state_dict.keys():
 
-        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_init.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_init.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
     update_wdict([logwindow_slider_init],['logwindow_slider_init'],param='value')
     return
@@ -2063,7 +2063,7 @@ def polcal_dynspecplot_screen():
 
     if 'Ical' in state_dict.keys() and ~np.all(np.isnan(state_dict['Ical'])):#'base_I' in state_dict.keys():
 
-        dsapol.plot_spectra_2D(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+        dsapol.plot_spectra_2D(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
     return
 
@@ -3860,7 +3860,7 @@ def RM_dynspecplot_screen():
 
     if 'IcalRM' in state_dict.keys() and ~np.all(np.isnan(state_dict['IcalRM'])):#'base_I' in state_dict.keys():
 
-        dsapol.plot_spectra_2D(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False)
+        dsapol.plot_spectra_2D(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
     return
 

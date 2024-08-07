@@ -1164,7 +1164,7 @@ def get_stokes_vs_freq(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,n_off=3000,
 
 
 #Plot dynamic spectra, I Q U V
-def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis',figsize=(25,15),save=False,timestart=-1,timestop=-1):
+def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,window=10,lim=500,show=False,buff=0,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,cmap='viridis',figsize=(25,15),save=False,timestart=-1,timestop=-1,sat=1):
     """
     This function plots the given dynamic spectra and outputs images in the specified directory. 
     The spectra are normalized by subtracting the time average in each frequency channel.
@@ -1216,12 +1216,15 @@ def plot_spectra_2D(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,dat
     f=plt.figure(figsize=figsize)
     pylab.subplot(2,2,1)
     #plt.imshow(I - np.mean(I,1,keepdims=True),aspect="auto",vmin=-lim,vmax=lim,cmap=cmap)
-    plt.imshow(I[:,timestart-window:timestop+window],aspect="auto",cmap=cmap,
+    im1=plt.imshow(I[:,timestart-window:timestop+window],aspect="auto",cmap=cmap,
             extent=[32.7*n_t*timestart*1e-3 - window*32.7*n_t*1e-3,
                 32.7*n_t*timestop*1e-3 + window*32.7*n_t*1e-3,
                 np.min(freq_test[0]),np.max(freq_test[0])])
     vmin,vmax = plt.gca().get_images()[0].get_clim()
     #plt.xlim(timestart-window,timestop+window)
+    vmin = -vmax*sat
+    vmax = vmax*sat
+    im1.set_clim(vmin=vmin,vmax=vmax)
     #plt.title(label + " I")
     plt.text(32.7*(1e-3)*n_t*(timestop + window*0.8),np.min(freq_test[0]) + (np.max(freq_test[0])-np.min(freq_test[0]))*0.1,"I",fontsize=35,color='red',weight='bold') 
     plt.xticks([])
