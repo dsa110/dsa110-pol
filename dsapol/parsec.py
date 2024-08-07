@@ -2321,8 +2321,6 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
             state_dict['weights'] += state_dict['comps'][i]['weights']
         state_dict['weights'] = state_dict['weights']/np.sum(state_dict['weights'])
 
-        #compute full SNR
-        state_dict['S/N'] = filt.get_SNR(state_dict['I_tcal'],state_dict['weights'],state_dict['timestart'],state_dict['timestop'])
     
         #get edge conditions from first and last components
         ts1 = []
@@ -2349,6 +2347,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
         state_dict['FWHM'] = state_dict['intR'] - state_dict['intL']
         state_dict['intLbuffer'] = 0
         state_dict['intRbuffer'] = 0
+
+        #compute full SNR
+        state_dict['S/N'] = filt.get_SNR(state_dict['I_tcal'],state_dict['weights'],state_dict['timestart'],state_dict['timestop'])
 
         #get spectrum
         (state_dict['I_fcal'],state_dict['Q_fcal'],state_dict['U_fcal'],state_dict['V_fcal']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],
@@ -3649,124 +3650,164 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
     if refresh_button.clicked:
         print("Refreshing...")
         if 'dname_1D' in state_dict["RMcalibrated"].keys():
-            
-            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "result.npy")
-            RM = res[0]
-            RMerr = res[1]
-            state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
-            RMdf.loc['All', '1D-Synth'] = RM
-            RMdf.loc['All', '1D-Synth Error'] = RMerr
+            rmsnrs1_ = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "SNRs.npy")
+            trialrm1_ = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "trialRM.npy")
+            if len(rmsnrs1_) != len(trialrm1_):
+                print("There was an error in the 1D RM Synthesis backgound process (" + dirs['logs'] + "RM_files/" + state_dict['RMcalibrated']['dname_1D'] + "result.npy), please try again")
+            else:
 
-            state_dict["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "SNRs.npy")
-            state_dict["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "trialRM.npy")
+                res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "result.npy")
+                RM = res[0]
+                RMerr = res[1]
+                state_dict["RMcalibrated"]["RM1"] = [RM,RMerr]
+                RMdf.loc['All', '1D-Synth'] = RM
+                RMdf.loc['All', '1D-Synth Error'] = RMerr
 
-            order = state_dict["RMcalibrated"]['trial_RM1'].argsort()
-            state_dict["RMcalibrated"]['RMsnrs1'] = state_dict["RMcalibrated"]['RMsnrs1'][order]
-            state_dict["RMcalibrated"]['trial_RM1'] = state_dict["RMcalibrated"]['trial_RM1'][order]
+                state_dict["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "SNRs.npy")
+                state_dict["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D'] + "trialRM.npy")
+
+                order = state_dict["RMcalibrated"]['trial_RM1'].argsort()
+                state_dict["RMcalibrated"]['RMsnrs1'] = state_dict["RMcalibrated"]['RMsnrs1'][order]
+                state_dict["RMcalibrated"]['trial_RM1'] = state_dict["RMcalibrated"]['trial_RM1'][order]
 
         if 'dname_1D_zoom' in state_dict["RMcalibrated"].keys():
-            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "result.npy")
-            RM = res[0]
-            RMerr = res[1]
-            state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
-            RMdf.loc['All', '1D-Synth'] = RM
-            RMdf.loc['All', '1D-Synth Error'] = RMerr
+            rmsnrs1zoom_ = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
+            trialrm1zoom_ = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
 
-            state_dict["RMcalibrated"]['RMsnrs1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
-            state_dict["RMcalibrated"]['trial_RM1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
+            if len(rmsnrs1zoom_) != len(trialrm1zoom_):
+                print("There was an error in the 1D RM Synthesis backgound process (" + dirs['logs'] + "RM_files/" + state_dict['RMcalibrated']['dname_1D_zoom'] + "result.npy), please try again")
+            else:
+                res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "result.npy")
+                RM = res[0]
+                RMerr = res[1]
+                state_dict["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+                RMdf.loc['All', '1D-Synth'] = RM
+                RMdf.loc['All', '1D-Synth Error'] = RMerr
 
-            order = state_dict["RMcalibrated"]['trial_RM1zoom'].argsort()
-            state_dict["RMcalibrated"]['RMsnrs1zoom'] = state_dict["RMcalibrated"]['RMsnrs1zoom'][order]
-            state_dict["RMcalibrated"]['trial_RM1zoom'] = state_dict["RMcalibrated"]['trial_RM1zoom'][order]
+                state_dict["RMcalibrated"]['RMsnrs1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
+                state_dict["RMcalibrated"]['trial_RM1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
 
-            state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
-            if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+                order = state_dict["RMcalibrated"]['trial_RM1zoom'].argsort()
+                state_dict["RMcalibrated"]['RMsnrs1zoom'] = state_dict["RMcalibrated"]['RMsnrs1zoom'][order]
+                state_dict["RMcalibrated"]['trial_RM1zoom'] = state_dict["RMcalibrated"]['trial_RM1zoom'][order]
+
+                state_dict["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict["RMcalibrated"]['trial_RM1zoom'])
+                if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])): state_dict['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
 
 
         if 'dname_2D' in state_dict["RMcalibrated"].keys():
-            res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "result.npy") 
-            RM2,RMerr2,upp,low = res
+            rmsnrs2_ = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "SNRs.npy")
+            trialrm2_ = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "trialRM.npy")
 
-            state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
-            state_dict['RMcalibrated']['RMerrfit'] = RMerr2
-            state_dict['RMcalibrated']['RMFWHM'] = upp-low
+            if len(rmsnrs2_) != len(trialrm2_):
+                print("There was an error in the 2D RM Synthesis backgound process (" + dirs['logs'] + "RM_files/" + state_dict['RMcalibrated']['dname_2D'] + "result.npy), please try again")
+            else:
 
-            state_dict['RMcalibrated']['RMsnrs2'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "SNRs.npy")
-            state_dict['RMcalibrated']['SNRs_full'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "SNRs_full.npy")
-            state_dict['RMcalibrated']['trial_RM2'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "trialRM.npy")
+                res = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "result.npy") 
+                RM2,RMerr2,upp,low = res
 
-            order = state_dict["RMcalibrated"]['trial_RM2'].argsort()
-            state_dict["RMcalibrated"]['RMsnrs2'] = state_dict["RMcalibrated"]['RMsnrs2'][order]
-            state_dict["RMcalibrated"]['trial_RM2'] = state_dict["RMcalibrated"]['trial_RM2'][order]
-            state_dict["RMcalibrated"]['SNRs_full'] = state_dict["RMcalibrated"]['SNRs_full'][order,:]
+                state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+                state_dict['RMcalibrated']['RMerrfit'] = RMerr2
+                state_dict['RMcalibrated']['RMFWHM'] = upp-low
+
+                state_dict['RMcalibrated']['RMsnrs2'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "SNRs.npy")
+                state_dict['RMcalibrated']['SNRs_full'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "SNRs_full.npy")
+                state_dict['RMcalibrated']['trial_RM2'] = np.load(dirs['logs'] + "RM_files/" + state_dict["RMcalibrated"]['dname_2D'] + "trialRM.npy")
+
+                order = state_dict["RMcalibrated"]['trial_RM2'].argsort()
+                state_dict["RMcalibrated"]['RMsnrs2'] = state_dict["RMcalibrated"]['RMsnrs2'][order]
+                state_dict["RMcalibrated"]['trial_RM2'] = state_dict["RMcalibrated"]['trial_RM2'][order]
+                state_dict["RMcalibrated"]['SNRs_full'] = state_dict["RMcalibrated"]['SNRs_full'][order,:]
 
 
-            #update table
-            RMdf.loc['All', '2D-Synth'] = RM2
-            RMdf.loc['All', '2D-Synth Error'] = RMerr2
+                #update table
+                RMdf.loc['All', '2D-Synth'] = RM2
+                RMdf.loc['All', '2D-Synth Error'] = RMerr2
 
         if state_dict['n_comps'] > 1:
             for i in range(state_dict['n_comps']):
                 if 'dname_1D' in state_dict['comps'][i]['RMcalibrated'].keys():
-                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "result.npy")
-                    RM = res[0]
-                    RMerr = res[1]
-                    state_dict['comps'][i]['RMcalibrated']["RMcalibrated"]["RM1"] = [RM,RMerr]
-                    RMdf.loc[str(i), '1D-Synth'] = RM
-                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
+                    rmsnrs1_ = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "SNRs.npy")
+                    trialrm1_ = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "trialRM.npy")
 
-                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "SNRs.npy")
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "trialRM.npy")
+                    if len(rmsnrs1_) != len(trialrm1_):
+                        print("There was an error in the 1D RM Synthesis backgound process (" + dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "result.npy), please try again") 
+                    else:
+                        res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "result.npy")
+                        RM = res[0]
+                        RMerr = res[1]
+                        state_dict['comps'][i]['RMcalibrated']["RMcalibrated"]["RM1"] = [RM,RMerr]
+                        RMdf.loc[str(i), '1D-Synth'] = RM
+                        RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
-                    order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'].argsort()
-                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'][order]
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'][order]
+                        state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "SNRs.npy")
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "trialRM.npy")
+
+                        order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'].argsort()
+                        state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1'][order]
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM1'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1'][order]
 
                 if 'dname_1D_zoom' in state_dict['comps'][i]["RMcalibrated"].keys():
-                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "result.npy")
-                    RM = res[0]
-                    RMerr = res[1]
-                    state_dict['comps'][i]["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
-                    RMdf.loc[str(i), '1D-Synth'] = RM
-                    RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
-                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
+                    rmsnrs1zoom_ = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
+                    trialrm1zoom_ = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
 
-                    order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'].argsort()
-                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'][order]
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'][order]
+                    if len(rmsnrs1zoom_) != len(trialrm1zoom_):
+                        print("There was an error in the 1D RM Synthesis backgound process (" + dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D_zoom'] + "result.npy), please try again")
+                    else:
+                    
+                        res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "result.npy")
+                        RM = res[0]
+                        RMerr = res[1]
+                        state_dict['comps'][i]["RMcalibrated"]["RM1zoom"] = [RM,RMerr]
+                        RMdf.loc[str(i), '1D-Synth'] = RM
+                        RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
-                    if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
+                        state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "SNRs.npy")
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_1D_zoom'] + "trialRM.npy")
+
+                        order = state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'].argsort()
+                        state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs1zoom'][order]
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'][order]
+
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = copy.deepcopy(state_dict['comps'][i]["RMcalibrated"]['trial_RM1zoom'])
+                        if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs2'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
 
 
 
 
                 if 'dname_2D' in state_dict['comps'][i]['RMcalibrated'].keys():
-                    res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_2D'] + "result.npy")
-                    RM2,RMerr2,upp,low = res
-
-                    state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
-                    state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
-                    state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
-
-                    state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_2D'] + "SNRs.npy")
-                    state_dict['comps'][i]['RMcalibrated']['SNRs_full'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_2D'] + "SNRs_full.npy")
-                    state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_2D'] + "trialRM.npy")
-
-                    order = state_dict['comps'][i]["RMcalibrated"]['trial_RM2'].argsort()
-                    state_dict['comps'][i]["RMcalibrated"]['RMsnrs2'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs2'][order]
-                    state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM2'][order]
-                    state_dict['comps'][i]["RMcalibrated"]['SNRs_full'] = state_dict['comps'][i]["RMcalibrated"]['SNRs_full'][order,:]
 
 
+                    rmsnrs2_ = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_2D'] + "SNRs.npy")
+                    snrsfull_ =np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_2D'] + "SNRs_full.npy")
+                    trialrm2_ = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]["RMcalibrated"]['dname_2D'] + "trialRM.npy")
+                    
+                    #check if there was an error mid-process
+                    if len(rmsnrs2_) != len(trialrm2_):
+                        print("There was an error in the 2D RM Synthesis backgound process (" + dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_2D'] + "result.npy), please try again")
+                    else:
+                        state_dict['comps'][i]['RMcalibrated']['RMsnrs2'] = rmsnrs2_
+                        state_dict['comps'][i]['RMcalibrated']['SNRs_full'] = snrsfull_
+                        state_dict['comps'][i]['RMcalibrated']['trial_RM2'] = trialrm2_
+
+                        res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_2D'] + "result.npy")
+                        RM2,RMerr2,upp,low = res
+    
+                        state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
+                        state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
+                        state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
 
 
+                        order = state_dict['comps'][i]["RMcalibrated"]['trial_RM2'].argsort()
+                        state_dict['comps'][i]["RMcalibrated"]['RMsnrs2'] = state_dict['comps'][i]["RMcalibrated"]['RMsnrs2'][order]
+                        state_dict['comps'][i]["RMcalibrated"]['trial_RM2'] = state_dict['comps'][i]["RMcalibrated"]['trial_RM2'][order]
+                        state_dict['comps'][i]["RMcalibrated"]['SNRs_full'] = state_dict['comps'][i]["RMcalibrated"]['SNRs_full'][order,:]
 
-                    #update table
-                    RMdf.loc[str(i), '2D-Synth'] = RM2
-                    RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
+
+                        #update table
+                        RMdf.loc[str(i), '2D-Synth'] = RM2
+                        RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
 
                     
 
@@ -4145,11 +4186,6 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
 
     #compute PA
     sigflag = state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration"
-    weighted = 'weights' in state_dict.keys()
-    if not weighted:
-        weights_use = np.nan*np.ones(len(I_tuse))
-    else:
-        weights_use = state_dict['weights']
     if state_dict['n_comps'] > 1:
         for i in range(state_dict['n_comps']):
             
@@ -4253,6 +4289,12 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
                         np.around((180/np.pi)*state_dict['comps'][i]['PA_err'],2)]
         
     
+    weighted = 'weights' in state_dict.keys()
+    if not weighted:
+        weights_use = np.nan*np.ones(len(I_tuse))
+    else:
+        weights_use = state_dict['weights']
+
     #compute PA for full burst
     state_dict['PA_f'],state_dict['PA_t'],state_dict['PA_f_errs'],state_dict['PA_t_errs'],state_dict['avg_PA'],state_dict['PA_err'] = dsapol.get_pol_angle(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF/state_dict['n_t']),normalize=True,buff=state_dict['buff'],weighted=weighted,input_weights=weights_use,fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),intL=state_dict['intL']-state_dict['intLbuffer'],intR=state_dict['intR']+state_dict['intRbuffer'])
 
