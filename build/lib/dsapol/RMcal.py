@@ -172,13 +172,33 @@ def get_RM_tools(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,freq_test,n_t,m
     #print("starting RM clean...")
     #run RM-clean
     out=run_rmclean(out[0],out[1],2)
-    RM = float(out[0]["phiPeakPIchan_rm2"])
-    RMerr = float(out[0]["dPhiPeakPIchan_rm2"])
+    #f = open("TEMPRMOUT.txt","w")
+    #print(out,file=f)
+    #f.close()
+    RM = float(out[0]["phiPeakPIfit_rm2"])#phiPeakPIchan_rm2"])
+    RMerr = float(out[0]["dPhiPeakPIfit_rm2"])#dPhiPeakPIchan_rm2"])
     trial_RM = list(np.array(out[1]["phiArr_radm2"],dtype=float))
     RMsnrs = list(np.array(np.abs(out[1]["cleanFDF"]),dtype=float))
     #print("Done")
     return RM,RMerr,RMsnrs,trial_RM
 
+"""
+({'dFDFcorMAD': 0.6207815084903975, 'phiPeakPIfit_rm2': 61245.03644811834, 'dPhiPeakPIfit_rm2': 0.12631275303665265, 'ampPeakPIfit': 1.4021115257009447, 'ampPeakPIfitEff': 1.4021104544111274, 'dAmpPeakPIfit': 0.0011428671900886517, 'snrPIfit': 1226.8367994641471, 'indxPeakPIfit': 5.306225182240592, 'peakFDFimagFit': -1.0782271509030021, 'peakFDFrealFit': -0.06823268139497424, 'polAngleFit_deg': 133.18951019776205, 'dPolAngleFit_deg': 0.023351019279054776, 'polAngle0Fit_deg': 7.794219152390724, 'dPolAngle0Fit_deg': 0.31785899600066175, 'cleanCutoff': 2, 'nIter': 0, 'mom2CCFDF': nan, 'dPhiObserved_rm2': 68.61044052335235, 'dAmpObserved': 0.6207815084903975, 'dPolAngleFitObserved_deg': 12.683784343931983, 'dPolAngleFit0Observed_deg': 172.65434578555704}, {'phiArr_radm2': array([-1000000.,  -800000.,  -600000.,  -400000.,  -200000.,        0.,
+         200000.,   400000.,   600000.,   800000.,  1000000.],
+      dtype=float32), 'freqArr_Hz': array([1.49875000e+09, 1.49871948e+09, 1.49868895e+09, ...,
+       1.31131105e+09, 1.31128052e+09, 1.31125000e+09]), 'cleanFDF': array([ 0.86799802-0.69542937j, -0.05730503+1.04602914j,
+       -0.42681625+0.29265118j, -0.2271483 +0.96929359j,
+        0.05219522-0.09989367j, -0.44523223-1.25458534j,
+        0.78588647-0.6786752j , -0.06387633-0.76372365j,
+       -0.33816105-0.54478307j,  0.36767985-0.81118971j,
+       -0.27790167-0.06274543j]), 'ccArr': array([0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j, 0.+0.j,
+       0.+0.j, 0.+0.j, 0.+0.j], dtype=complex64), 'iterCountArr': array(0), 'residFDF': array([ 0.86799802-0.69542937j, -0.05730503+1.04602914j,
+       -0.42681625+0.29265118j, -0.2271483 +0.96929359j,
+        0.05219522-0.09989367j, -0.44523223-1.25458534j,
+        0.78588647-0.6786752j , -0.06387633-0.76372365j,
+       -0.33816105-0.54478307j,  0.36767985-0.81118971j,
+       -0.27790167-0.06274543j])})
+"""
 
 #helper functions for parabolic fits
 #New significance estimate

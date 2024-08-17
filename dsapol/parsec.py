@@ -3392,7 +3392,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 param='value')
 
     #update RM displays
-    if state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
+    if getRMgal_button.clicked:#state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
         state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=dirs['FRBtables'] + "faraday2020v2.hdf5")
         state_dict['RM_gal'] = np.around(state_dict['RM_gal'],2)
         state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],2)
@@ -3401,7 +3401,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
     RM_gal_display.data = np.around(state_dict['RM_gal'],2)
     RM_galerr_display.data = np.around(state_dict['RM_galerr'],2)
     
-    if state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd'] or getRMion_button.clicked:
+    if getRMion_button.clicked:#state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd'] or getRMion_button.clicked:
         state_dict['RM_ion'],state_dict['RM_ionerr'] = RMcal.get_rm_ion(state_dict['RA'],state_dict['DEC'],state_dict['mjd'])
         state_dict['RM_ion'] = np.around(state_dict['RM_ion'],2)
         state_dict['RM_ionerr'] = np.around(state_dict['RM_ionerr'],2)
@@ -3449,14 +3449,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #STAGE 1: RM-TOOLS
                 if useRMTools.value: #STAGE 1: RM-TOOLS
                     n_off = int(NOFFDEF/state_dict['n_t'])
+                    try:
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                        state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
 
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                    state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
-
-                    #update table
-                    RMdf.loc[str(i), 'RM-Tools'] = RM
-                    RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
-
+                        #update table
+                        RMdf.loc[str(i), 'RM-Tools'] = RM
+                        RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
+                    except MemoryError as e:
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                        f = open(RMcal.logfile,"w")
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                        f.close()
 
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
@@ -3481,14 +3485,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         
             #STAGE 1: RM-TOOLS (Full burst)
             if useRMTools.value: 
-                RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
+                try:
+                    RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
 
-
-                #update table
-                RMdf.loc['All', 'RM-Tools'] = RM
-                RMdf.loc['All', 'RM-Tools Error'] = RMerr
-        
+                    #update table
+                    RMdf.loc['All', 'RM-Tools'] = RM
+                    RMdf.loc['All', 'RM-Tools Error'] = RMerr
+                except MemoryError as e:
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                    f = open(RMcal.logfile,"w")
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                    f.close()
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
@@ -3553,14 +3561,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #STAGE 1: RM-TOOLS
                 if useRMTools.value: #STAGE 1: RM-TOOLS
                     n_off = int(NOFFDEF/state_dict['n_t'])
-
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                    state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'] = [RM,RMerr]
+                    try:
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                        state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'] = [RM,RMerr]
                     
-                    #update table
-                    RMdf.loc[str(i), 'RM-Tools'] = RM
-                    RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
-
+                        #update table
+                        RMdf.loc[str(i), 'RM-Tools'] = RM
+                        RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
+                    except MemoryError as e:
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                        f = open(RMcal.logfile,"w")
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                        f.close()
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
@@ -3603,13 +3615,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
             #STAGE 1: RM-TOOLS (Full burst)
             if useRMTools.value:
-                RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
+                try:
+                    RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
 
-                #update table
-                RMdf.loc['All', 'RM-Tools'] = RM
-                RMdf.loc['All', 'RM-Tools Error'] = RMerr
-
+                    #update table
+                    RMdf.loc['All', 'RM-Tools'] = RM
+                    RMdf.loc['All', 'RM-Tools Error'] = RMerr
+                except MemoryError as e:
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                    f = open(RMcal.logfile,"w")
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                    f.close()
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
@@ -3813,10 +3830,10 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
     #1D plots
 
-    if rmcomp_menu.value == 'All':
+    if rmcomp_menu.value == 'All' and (~np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RM_tools_snrs'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1zoom'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RM_tools_snrszoom']))):
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['RMcalibrated']['RMsnrs1'],state_dict['RMcalibrated']['RM_tools_snrs']],[state_dict['RMcalibrated']['RMsnrs1zoom'],state_dict['RMcalibrated']['RM_tools_snrszoom'],state_dict['RMcalibrated']['RMsnrs2']],state_dict['RMcalibrated']["RM2"][0],state_dict["RMcalibrated"]["RMerrfit"],state_dict["RMcalibrated"]["trial_RM1"],state_dict["RMcalibrated"]["trial_RM2"],state_dict["RMcalibrated"]["trial_RM_tools"],state_dict["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='All Components',figsize=(38,24),datadir=state_dict['datadir'])
     
-    elif rmcomp_menu.value != '':
+    elif rmcomp_menu.value != 'All' and rmcomp_menu.value != '' and (~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RMsnrs1'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RM_tools_snrs'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RMsnrs2'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RMsnrs1zoom'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RM_tools_snrszoom']))):
         i= int(rmcomp_menu.value)
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value,figsize=(38,24),datadir=state_dict['datadir'])
 
@@ -4803,8 +4820,8 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                      'RMcal' in state_dict['RMcalibrated'].keys(),
                      state_dict["RMcalibrated"]["RM1"][0],
                      state_dict["RMcalibrated"]["RM1"][1],
-                     state_dict["RMcalibrated"]['RM_tools'][0],
-                     state_dict["RMcalibrated"]['RM_tools'][1],
+                     "" if 'RM_tools' not in state_dict['RMcalibrated'].keys() else state_dict["RMcalibrated"]['RM_tools'][0],
+                     "" if 'RM_tools' not in state_dict['RMcalibrated'].keys() else state_dict["RMcalibrated"]['RM_tools'][1],
                      state_dict['RMcalibrated']['RM2'][0],
                      state_dict['RMcalibrated']['RM2'][1],
                      state_dict['RMcalibrated']['RMFWHM'],
