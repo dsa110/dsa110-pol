@@ -589,6 +589,7 @@ ids = frbfiles[0][:frbfiles[0].index('_')]
 RA = FRB_RA[FRB_IDS.index(ids)]
 DEC = FRB_DEC[FRB_IDS.index(ids)]
 ibeam = int(FRB_BEAM[FRB_IDS.index(ids)])
+ibox = int(FRB_w[FRB_IDS.index(ids)])
 mjd = FRB_mjd[FRB_IDS.index(ids)]
 DMinit = FRB_DM[FRB_IDS.index(ids)]
 zinit = FRB_z[FRB_IDS.index(ids)]
@@ -626,6 +627,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'RA_display':RA,
          'DEC_display':DEC,
          'ibeam_display':ibeam,
+         'ibox_display':ibox,
          'mjd_display':mjd,
          'DM_init_display':DMinit,
          'z_display':zinit,
@@ -1091,13 +1093,15 @@ def restore_screen(savesessionbutton,restoresessionbutton):
         return "Cached Session: None"
 
 NOFFDEF = 2000
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,z_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_slider_init,buff_R_slider_init,
+                RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display,
+                updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
     #first update state dict
-    state_dict['base_n_t'] = n_t_slider.value
-    state_dict['base_n_f'] = 2**logn_f_slider.value
+    state_dict['base_n_t'] = 1#n_t_slider.value
+    state_dict['base_n_f'] = 1#2**logn_f_slider.value
     state_dict['ids'] = frbfiles_menu.value[:frbfiles_menu.value.index('_')]
     state_dict['nickname'] = frbfiles_menu.value[frbfiles_menu.value.index('_')+1:]
     state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
@@ -1109,8 +1113,9 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['RMinput'] = FRB_RM[FRB_IDS.index(state_dict['ids'])]
     state_dict['RMinputerr'] = FRB_RMerr[FRB_IDS.index(state_dict['ids'])]
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
-    state_dict['buff'] = [buff_L_slider_init.value,buff_R_slider_init.value]
-    state_dict['width_native'] = 2**logibox_slider.value
+    state_dict['buff'] = [0,0]#[buff_L_slider_init.value,buff_R_slider_init.value]
+    state_dict['width_native'] = FRB_w[FRB_IDS.index(state_dict['ids'])]#2**logibox_slider.value
+    wdict['logibox_slider'] = state_dict['width_native']
     state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
     state_dict['heimSNR'] = FRB_heimSNR[FRB_IDS.index(state_dict['ids'])]
     state_dict['RM_gal'] = FRB_RMgal[FRB_IDS.index(state_dict['ids'])]
@@ -1129,6 +1134,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     RA_display.data = state_dict['RA']
     DEC_display.data = state_dict['DEC']
     ibeam_display.data = state_dict['ibeam']
+    ibox_display.data = state_dict['width_native']
     mjd_display.data = state_dict['mjd']
     DM_init_display.data = state_dict['DM0']
     z_display.data = state_dict['z']
@@ -1339,26 +1345,48 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
     
     #update widget dict
-    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
-                    ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
+    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,polcalloadbutton],#logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
+                    ["frbfiles_menu","n_t_slider","logn_f_slider","polcalloadbutton"],#"logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
                     param='value')
-    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,z_display],
-                    ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display","z_display"],
+    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display],
+                 ["RA_display","DEC_display","DM_init_display","ibeam_display","ibox_display","mjd_display","z_display"],
                     param='data')
     return im
 
-def load_dynspecplot_screen(logwindow_slider_dynspec):
+def load_dynspecplot_screen(logwindow_slider_dynspec,n_t_slider,logn_f_slider):
 
     if ~np.all(np.isnan(state_dict['base_I'])):#'base_I' in state_dict.keys():
-    
-        dsapol.plot_spectra_2D(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_t'],state_dict['base_n_f'],state_dict['base_freq_test'],n_off=int(NOFFDEF//state_dict['base_n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_dynspec.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['base_time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
-    update_wdict([logwindow_slider_dynspec],['logwindow_slider_dynspec'],param='value')
+        #update time, freq resolution
+        state_dict['window'] = 2**logwindow_slider_dynspec.value
+        state_dict['rel_n_t'] = n_t_slider.value
+        state_dict['rel_n_f'] = (2**logn_f_slider.value)
+        state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
+        state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
+        state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(2**logn_f_slider.value),(2**logn_f_slider.value)).mean(1)]*4
+        state_dict['freq_min'] = np.nanmin(state_dict['freq_test'][0])
+        state_dict['freq_max'] = np.nanmax(state_dict['freq_test'][0])
+        state_dict['freq_cntr'] = (state_dict['freq_max'] + state_dict['freq_min'])/2
+        state_dict['I'] = dsapol.avg_time(state_dict['base_I'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['I'] = dsapol.avg_freq(state_dict['I'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['Q'] = dsapol.avg_freq(state_dict['Q'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['U'] = dsapol.avg_time(state_dict['base_U'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['U'] = dsapol.avg_freq(state_dict['U'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['V'] = dsapol.avg_time(state_dict['base_V'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['V'] = dsapol.avg_freq(state_dict['V'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,state_dict['I'].shape[1])
+
+
+    
+        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
+
+    update_wdict([logwindow_slider_dynspec,n_t_slider,logn_f_slider],['logwindow_slider_dynspec','n_t_slider','logn_f_slider'],param='value')
     return
 """
 Dedispersion Tuning state
 """
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdonebutton,saveplotbutton,DM_showerrs):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DMdonebutton,saveplotbutton,DM_showerrs):
     """
     This function updates the dedispersion screen when resolution
     or dm,where='post' step are changed
@@ -1419,7 +1447,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
 
 
     #update time, freq resolution
-    state_dict['window'] = 2**logwindow_slider_init.value
+    state_dict['window'] = 2**logwindow_slider.value
     state_dict['rel_n_t'] = n_t_slider.value
     state_dict['rel_n_f'] = (2**logn_f_slider.value)
     state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
@@ -1523,8 +1551,8 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
             print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
     #update widget dict
-    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,DM_showerrs,ddm_num],
-                ["n_t_slider","logn_f_slider","logwindow_slider_init","DM_showerrs","ddm_num"],
+    update_wdict([n_t_slider,logn_f_slider,logwindow_slider,DM_showerrs,ddm_num],
+                ["n_t_slider","logn_f_slider","logwindow_slider","DM_showerrs","ddm_num"],
                 param='value')
     
     #update_wdict([DM_input_display,DM_new_display],
@@ -1533,13 +1561,13 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
 
     return #ddm_num
 
-def dedisp_dynspecplot_screen(logwindow_slider_init):
+def dedisp_dynspecplot_screen(logwindow_slider):
 
     if 'I' in state_dict.keys() and ~np.all(np.isnan(state_dict['I'])):#'base_I' in state_dict.keys():
+        state_dict['window'] = 2**logwindow_slider.value
+        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
-        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_init.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
-
-    update_wdict([logwindow_slider_init],['logwindow_slider_init'],param='value')
+    update_wdict([logwindow_slider],['logwindow_slider'],param='value')
     return
 
 
@@ -2059,12 +2087,12 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
     return #beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 
 
-def polcal_dynspecplot_screen():
+def polcal_dynspecplot_screen(logwindow_slider):
 
     if 'Ical' in state_dict.keys() and ~np.all(np.isnan(state_dict['Ical'])):#'base_I' in state_dict.keys():
-
+        state_dict['window'] = 2**logwindow_slider.value
         dsapol.plot_spectra_2D(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
-
+    update_wdict([logwindow_slider],['logwindow_slider'],param='value')
     return
 
 """
@@ -3914,12 +3942,14 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
     return
 
 
-def RM_dynspecplot_screen():
+def RM_dynspecplot_screen(logwindow_slider):
 
     if 'IcalRM' in state_dict.keys() and ~np.all(np.isnan(state_dict['IcalRM'])):#'base_I' in state_dict.keys():
+        state_dict['window'] = 2**logwindow_slider.value
 
         dsapol.plot_spectra_2D(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
+    update_wdict([logwindow_slider],['logwindow_slider'],param='value')
     return
 
 
