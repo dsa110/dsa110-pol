@@ -175,7 +175,7 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=dirs['FRBtables'
                     FRB_DM.append(-1)
             
                 if row[6] != "":
-                    FRB_w.append(float(row[6]))
+                    FRB_w.append(int(row[6]))
                 else:
                     FRB_w.append(-1)
                 
@@ -1093,9 +1093,162 @@ def restore_screen(savesessionbutton,restoresessionbutton):
         return "Cached Session: None"
 
 NOFFDEF = 2000
+def ADMIN_makefil_screen(frbfiles_menu,
+                RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display,
+                updatebutton,filbutton,path=frbpath):
+    """
+    In ADMIN mode, this function allows the user to make filterbanks using toolkit
+    """
+    #first update state dict
+    state_dict['base_n_t'] = 1#n_t_slider.value
+    state_dict['base_n_f'] = 1#2**logn_f_slider.value
+    state_dict['ids'] = frbfiles_menu.value[:frbfiles_menu.value.index('_')]
+    state_dict['nickname'] = frbfiles_menu.value[frbfiles_menu.value.index('_')+1:]
+    state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
+    state_dict['DEC'] = FRB_DEC[FRB_IDS.index(state_dict['ids'])]
+    state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
+    state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
+    state_dict['DM'] = state_dict['DM0'] + state_dict['dDM']
+    state_dict['z'] = FRB_z[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RMinput'] = FRB_RM[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RMinputerr'] = FRB_RMerr[FRB_IDS.index(state_dict['ids'])]
+    state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
+    state_dict['buff'] = [0,0]#[buff_L_slider_init.value,buff_R_slider_init.value]
+    state_dict['width_native'] = FRB_w[FRB_IDS.index(state_dict['ids'])]#2**logibox_slider.value
+    wdict['logibox_slider'] = state_dict['width_native']
+    state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
+    state_dict['heimSNR'] = FRB_heimSNR[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RM_gal'] = FRB_RMgal[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RM_galerr'] = FRB_RMgalerr[FRB_IDS.index(state_dict['ids'])]
+    if ~np.isnan(state_dict['RM_gal']):
+        state_dict['RM_galRA'] = state_dict['RA']
+        state_dict['RM_galDEC'] = state_dict['DEC']
+    state_dict['RM_ion'] = FRB_RMion[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RM_ionerr'] = FRB_RMionerr[FRB_IDS.index(state_dict['ids'])]
+    if ~np.isnan(state_dict['RM_ion']):
+        state_dict['RM_ionRA'] = state_dict['RA']
+        state_dict['RM_ionDEC'] = state_dict['DEC']
+        state_dict['RM_ionmjd'] = state_dict['mjd']
+    state_dict['suff'] = "_dev"
+
+    #update displays
+    RA_display.data = state_dict['RA']
+    DEC_display.data = state_dict['DEC']
+    ibeam_display.data = state_dict['ibeam']
+    ibox_display.data = state_dict['width_native']
+    mjd_display.data = state_dict['mjd']
+    DM_init_display.data = state_dict['DM0']
+    z_display.data = state_dict['z']
+
+    #see if filterbanks exist
+    state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
+    polcals_available = np.sum([((state_dict['datadir'] in str(f)) and ('polcal' in str(f))) for f in state_dict['fils']])
+
+    #find beamforming weights date
+    state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
+
+    
+    #if update button is clicked, refresh FRB data from csv
+    if updatebutton.clicked:
+        update_FRB_params()
+    
+    
+    #if filbutton is clicked, run the offline beamformer to make fil files
+    if filbutton.clicked:
+        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'],path=state_dict['datadir'])
+        print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
+    
+    #plot filplot
+    pngname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
+    if len(pngname) != 0:
+        #show the existing image
+        im = Image.open(pngname[0])
+    else:
+        #create the image, first find fil file
+        filname = glob.glob(dirs['candidates'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
+        pre_rebin = 1
+        start_time = 0 #seconds
+        stop_time = 4 #seconds
+        fil_dedispersed = False
+        if len(filname) == 0:
+            #couldn't find file on h23, try to copy from dsastorage
+
+            #first try general dir
+            os.system("scp " + dirs['dsastorageFRBDir'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil " + state_dict['datadir'] + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + "_Level2.fil") 
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + "_Level2.fil")
+
+        if len(filname) == 0:
+            #try dsastorage backups
+
+            if state_dict['ibeam'] < 64:
+                corr = "corr01"
+            elif 64 < state_dict['ibeam'] < 128:
+                corr = "corr02"
+            elif 128 < state_dict['ibeam'] < 192:
+                corr = "corr09"
+            else: #192 < state_dict['ibeam'] < 256:
+                corr = "corr13"
+
+
+
+            os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil "+ state_dict['datadir'])
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+        if len(filname) == 0:
+            #try making one from high resolution files
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_0.fil")
+            pre_rebin = 8
+            start_time= 12800*32.7e-6 #seconds
+            stop_time = 7680*32.7e-6 #seconds
+            fil_dedispersed = True
+        if len(filname) == 0:
+            im = mr.Markdown("## No candidate plot for " + str(state_dict['ids']) + "_"+ str(state_dict['nickname']))
+
+        else:
+            c = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs')
+            state_dict['gall'] = c.galactic.l.value
+            state_dict['galb'] = c.galactic.b.value
+
+            cfpf.custom_filplot(filname[0],
+                                state_dict['DM0'],
+                                state_dict['width_native'],
+                                multibeam=None,
+                                figname= state_dict['datadir'] + state_dict['ids'] + "_parsec.png",
+                                ndm=32,
+                                suptitle='candname:%s  DM:%0.1f  boxcar:%d  ibeam:%d \nMJD:%f  Ra/Dec=%0.1f,%0.1f Gal lon/lat=%0.1f,%0.1f' % (state_dict['ids'], state_dict['DM0'], state_dict['width_native'], state_dict['ibeam'], state_dict['mjd'], state_dict['RA'], state_dict['DEC'], state_dict['gall'], state_dict['galb']),
+                                heimsnr=state_dict['heimSNR'],
+                                ibeam=state_dict['ibeam'],
+                                rficlean=False,
+                                nfreq_plot=32,
+                                classify=False,
+                                heim_raw_tres=1,
+                                showplot=False,
+                                save_data=False,
+                                candname=state_dict['ids'],
+                                imjd=state_dict['mjd'],
+                                injected=False,
+                                fast_classify=False,
+                                pre_rebin=pre_rebin,
+                                start_time=start_time,
+                                stop_time=stop_time,fil_dedispersed=fil_dedispersed)
+            im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
+
+    
+
+    #update widget dict
+    update_wdict([frbfiles_menu],
+                    ["frbfiles_menu"],#"logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
+                    param='value')
+    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display],
+                 ["RA_display","DEC_display","DM_init_display","ibeam_display","ibox_display","mjd_display","z_display"],
+                    param='data')
+    return im
+
+
+
 def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_slider_init,buff_R_slider_init,
                 RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display,
-                updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
+                loadbutton,polcalloadbutton,path=frbpath):
     """
     This function updates the FRB loading screen
     """
@@ -1129,6 +1282,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
         state_dict['RM_ionRA'] = state_dict['RA']
         state_dict['RM_ionDEC'] = state_dict['DEC']
         state_dict['RM_ionmjd'] = state_dict['mjd']
+    state_dict['suff'] = "_dev"
 
     #update displays
     RA_display.data = state_dict['RA']
@@ -1146,11 +1300,11 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
     #find beamforming weights date
     state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
 
-
+    """
     #if update button is clicked, refresh FRB data from csv
     if updatebutton.clicked:
         update_FRB_params()
-
+    """
     #if button is clicked, load FRB data and go to next screen
     if loadbutton.clicked:# and (not polcalloadbutton.value):
         if np.isnan(state_dict['z']):wdict['trialz'] = -1
@@ -1276,11 +1430,12 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
 
         #state_dict['current_state'] += 1
 
+    """
     #if filbutton is clicked, run the offline beamformer to make fil files
     if filbutton.clicked:
         status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'],path=state_dict['datadir'])
         print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
-
+    """
 
 
     #plot filplot
@@ -1291,12 +1446,19 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
     else:
         #create the image, first find fil file
         filname = glob.glob(dirs['candidates'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
+        pre_rebin = 1
+        start_time = 0 #seconds
+        stop_time = 4 #seconds
+        fil_dedispersed = False
         if len(filname) == 0:
             #couldn't find file on h23, try to copy from dsastorage
             
             #first try general dir
-            os.system("scp " + dirs['dsastorageFRBDir'] + "/" + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil" + state_dict['datadir'])
-            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+            os.system("scp " + dirs['dsastorageFRBDir'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil " + state_dict['datadir'] + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + "_Level2.fil")
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + "_Level2.fil")
+
+
 
         if len(filname) == 0:
             #try dsastorage backups
@@ -1315,6 +1477,15 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
 
             os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil "+ state_dict['datadir'])
             filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+        if len(filname) == 0:
+            #try making one from high resolution files
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_0.fil")
+            pre_rebin = 8
+            start_time = 12800*32.7e-6 #seconds
+            stop_time = 7680*32.7e-6 #seconds
+            fil_dedispersed=True
+        
         if len(filname) == 0:
             im = mr.Markdown("## No candidate plot for " + str(state_dict['ids']) + "_"+ str(state_dict['nickname']))
 
@@ -1341,7 +1512,11 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
                                 candname=state_dict['ids'],
                                 imjd=state_dict['mjd'],
                                 injected=False,
-                                fast_classify=False)
+                                fast_classify=False,
+                                pre_rebin=pre_rebin,
+                                start_time=start_time,
+                                stop_time=stop_time,
+                                fil_dedispersed=fil_dedispersed)
             im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
     
     #update widget dict

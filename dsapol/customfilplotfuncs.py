@@ -1,4 +1,5 @@
 import numpy as np
+from dsapol import dsapol
 import mercury as mr
 from sigpyproc import FilReader
 from sigpyproc.Filterbank import FilterbankBlock
@@ -84,7 +85,7 @@ def custom_proc_cand_fil(fnfil, dm, ibox, snrheim=-1,
                   pre_rebin=1, nfreq_plot=64,
                   heim_raw_tres=1,
                   rficlean=False, ndm=64,
-                  norm=True, freq_ref=None):
+                  norm=True, freq_ref=None,start_time=0,stop_time=4):
 
     """ Take filterbank file path, preprocess, and
     plot trigger
@@ -109,9 +110,11 @@ def custom_proc_cand_fil(fnfil, dm, ibox, snrheim=-1,
 
     header = custom_read_fil_data_dsa(fnfil, 0, 1)[-1]
     # read in 4 seconds of data
-    nsamp = int(4.0/header['tsamp'])
-    data, freq, delta_t_raw, header = custom_read_fil_data_dsa(fnfil, start=0,
-                                                       stop=nsamp)
+    #nsamp = int(4.0/header['tsamp'])
+    start = int(start_time/header['tsamp'])
+    stop = int(stop_time/header['tsamp'])
+    data, freq, delta_t_raw, header = custom_read_fil_data_dsa(fnfil, start=start,
+                                                       stop=stop)
 
     nfreq0, ntime0 = data.shape
 
@@ -130,9 +133,9 @@ def custom_proc_cand_fil(fnfil, dm, ibox, snrheim=-1,
     dm_err = ibox / 1.0 * 25.
     dm_err = 250.0
     datadm, dms = custom_dm_transform(data, dm_max=dm+dm_err,
-                               dm_min=dm-dm_err, dm0=dm, ndm=ndm,
+                               dm_min=dm-dm_err, dm0=dm, ndm=int(ndm),
                                freq_ref=freq_ref,
-                               downsample=heim_raw_tres*ibox//pre_rebin)
+                               downsample=int(heim_raw_tres*ibox//pre_rebin))
     data = data.dedisperse(dm)
     data = data.downsample(heim_raw_tres*ibox//pre_rebin)
     data = data.reshape(nfreq_plot, data.shape[0]//nfreq_plot,
@@ -149,7 +152,7 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
              ibeam=-1, rficlean=True, nfreq_plot=32,
              classify=False, heim_raw_tres=1,
              showplot=True, save_data=True, candname=None,
-             fnT2clust=None, imjd=0, injected=False, fast_classify=False):
+             fnT2clust=None, imjd=0, injected=False, fast_classify=False,pre_rebin=1,start_time=0,stop_time=4,fil_dedispersed=False):
     """
     This is a modified version of the filplot function found in https://github.com/dsa110/dsa110-T3/blob/main/dsaT3/filplot_funcs.py,
     that displays the dynamic spectrum, DM transform, and power and intensity vs time plots.
@@ -161,17 +164,30 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
     """
 
     #read data and pre-process
-    dataft, datadm, tsdm0, dms, datadm0 = custom_proc_cand_fil(fn, dm, ibox, snrheim=-1,
+    #if dedispersed, use DMs around 0
+    if fil_dedispersed:
+        dataft, datadm, tsdm0, dms, datadm0 = custom_proc_cand_fil(fn, 0, ibox, snrheim=-1,
                                                pre_rebin=1, nfreq_plot=nfreq_plot,
                                                ndm=ndm, rficlean=rficlean,
-                                               heim_raw_tres=heim_raw_tres)
+                                               heim_raw_tres=heim_raw_tres,start_time=start_time,stop_time=stop_time)
+        dms = np.array(dms) + dm
+    else:
+        dataft, datadm, tsdm0, dms, datadm0 = custom_proc_cand_fil(fn, dm, ibox, snrheim=-1,
+                                               pre_rebin=1, nfreq_plot=nfreq_plot,
+                                               ndm=ndm, rficlean=rficlean,
+                                               heim_raw_tres=heim_raw_tres,start_time=start_time,stop_time=stop_time)
 
-
+    #if data is read from high res filterbanks, use pre_rebin = 1 and bin the data
+    if pre_rebin != 1:
+        dataft = dsapol.avg_time(dataft,pre_rebin)
+        datadm0 = dsapol.avg_time(datadm0,pre_rebin)
     beam_time_arr = None
     multibeam_dm0ts = None
 
     datats = dataft.mean(0)
     datadmt = datadm
+    if pre_rebin != 1:
+        datadmt = dsapol.avg_time(datadmt,pre_rebin)
     dms = [dms[0],dms[-1]]
 
     #plotting
@@ -180,13 +196,20 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
                            'snr_dm0_allbeam' : []}
     datats /= np.std(datats[datats!=np.max(datats)])
     nfreq, ntime = dataft.shape
-    xminplot,xmaxplot = 500.-300*ibox/16.,500.+300*ibox/16 # milliseconds
-    if xminplot<0:
-        xmaxplot=xminplot+500+300*ibox/16
-        xminplot=0
+    if start_time == 0 and stop_time == 4:
+        xminplot,xmaxplot = 500.-300*ibox/16.,500.+300*ibox/16 # milliseconds
+        if xminplot<0:
+            xmaxplot=xminplot+500+300*ibox/16
+            xminplot=0
+    else:
+        xminplot,xmaxplot = -start_time*1e3 + 500.-300*ibox/16.,-start_time*1e3 + 500.+300*ibox/16 # milliseconds
+        if xminplot<0:
+            xmaxplot=xminplot+500+169*ibox/32
+            xminplot=0
+
 #    xminplot,xmaxplot = 0, 1000.
     dm_min, dm_max = dms[0], dms[1]
-    tmin, tmax = 0., 1e3*dataft.header['tsamp']*ntime
+    tmin, tmax = 0., 1e3*dataft.header['tsamp']*ntime*pre_rebin
     freqmax = dataft.header['fch1']
     freqmin = freqmax + dataft.header['nchans']*dataft.header['foff']
     freqs = np.linspace(freqmin, freqmax, nfreq)
@@ -215,7 +238,7 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
     axs[1][0].set_xlabel('Time (ms)')
     axs[1][0].set_ylabel(r'Power ($\sigma$)')
     axs[1][0].set_xlim(xminplot,xmaxplot)
-    axs[1][0].text(0.501*(xminplot+xmaxplot), 0.5*(max(datats)+np.median(datats)),
+    axs[1][0].text(-start_time + 0.501*(xminplot+xmaxplot), -start_time + 0.5*(max(datats)+np.median(datats)),
             'Heimdall S/N : %0.1f\nHeimdall DM : %d\
             \nHeimdall ibox : %d\nibeam : %d' % (heimsnr,dm,ibox,ibeam),
             fontsize=24, verticalalignment='center')
@@ -230,7 +253,10 @@ def custom_filplot(fn, dm, ibox, multibeam=None, figname=None,
     axs[1][1].set_xlabel('Time (ms)')
     axs[1][1].set_ylabel(r'Power ($\sigma$)')
     axs[1][1].legend(['DM=0 Timestream'], loc=2, fontsize=24)
-    fig.suptitle(suptitle, color='C1',fontsize=24)
+    pre_suptitle = ''
+    if pre_rebin > 1:
+        pre_suptitle += '\n[Plots made from high resolution dedispersed Level3 filterbanks]'
+    fig.suptitle(suptitle+pre_suptitle, color='C1',fontsize=24)
     if figname is not None:
         plt.savefig(figname)
     if showplot:
