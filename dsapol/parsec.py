@@ -127,6 +127,14 @@ dsastorageFRBDir = dirs["dsastorageFRBDir"]
 dsastorageCALDir = dirs["dsastorageCALDir"]
 
 """
+admin mode
+"""
+unauthorized = "This device is not authorized to use PARSEC in ADMIN mode. Please contact the system administrator or submit an issue on https://github.com/dsa110/dsa110-pol"
+incorrect = "Incorrect ADMIN password"
+dsapoladminkey = "DSAPOLADMIN"
+
+
+"""
 Read FRB parameters
 """
 FRB_RA = []
@@ -2026,7 +2034,139 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     return beam_dict_3C48,beam_dict_3C286
 
 
-def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
+
+
+
+def polcal_screen_USER(polcaldate_menu,
+        polcalbutton,ParA_display,
+        saveplotbutton,polcalprocs):
+
+    if polcaldate_menu.value != "":
+        #update polcal parameters in state dict
+        state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = polcal.read_polcal(polcaldate_menu.value)
+
+        #needd to downsample to base resolution
+        state_dict['gxx'] = np.nanmean(state_dict['gxx'].reshape((len(state_dict['gxx'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+        state_dict['gyy'] = np.nanmean(state_dict['gyy'].reshape((len(state_dict['gyy'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+        state_dict['cal_freq_axis'] = np.nanmean(state_dict['cal_freq_axis'].reshape((len(state_dict['cal_freq_axis'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+
+    state_dict['polcalfile'] = polcaldate_menu.value
+    polcal_dict['maxProcesses'] = int(polcalprocs.value)
+
+    if polcalbutton.clicked and (state_dict['polcalfile'] != ""):
+
+
+        f = open(polcal.logfile,"w")
+        print("start",file=f)
+
+        #calibrate at native resolution
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=int(polcalprocs.value),bad_chans=state_dict['badchans'])
+        print("done calibrating...",file=f)
+
+        #parallactic angle calibration
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
+        ParA_display.data = np.around(state_dict['ParA']*180/np.pi,2)
+        print("done ParA calibrating...",file=f)
+        #get downsampled versions
+        state_dict['Ical'] = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
+        state_dict['Ical'] = dsapol.avg_freq(state_dict['Ical'],state_dict['rel_n_f'])
+        state_dict['Qcal'] = dsapol.avg_time(state_dict['base_Qcal'],state_dict['rel_n_t'])
+        state_dict['Qcal'] = dsapol.avg_freq(state_dict['Qcal'],state_dict['rel_n_f'])
+        state_dict['Ucal'] = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
+        state_dict['Ucal'] = dsapol.avg_freq(state_dict['Ucal'],state_dict['rel_n_f'])
+        state_dict['Vcal'] = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
+        state_dict['Vcal'] = dsapol.avg_freq(state_dict['Vcal'],state_dict['rel_n_f'])
+
+
+        #default case: not RM calibrated
+        state_dict['IcalRM'] = copy.deepcopy(state_dict['Ical'])
+        state_dict['QcalRM'] = copy.deepcopy(state_dict['Qcal'])
+        state_dict['UcalRM'] = copy.deepcopy(state_dict['Ucal'])
+        state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
+
+        print("done downsampling...",file=f)
+        f.close()
+        #get time series
+        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],state_dict['I_tcal_err'],state_dict['Q_tcal_err'],state_dict['U_tcal_err'],state_dict['V_tcal_err']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
+
+        state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
+        state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
+        state_dict['U_tcalRM'] = copy.deepcopy(state_dict['U_tcal'])
+        state_dict['V_tcalRM'] = copy.deepcopy(state_dict['V_tcal'])
+
+        state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
+
+        #get timestart, timestop
+        (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['tsamp'],n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+
+
+        #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
+        (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
+
+        state_dict['I_fcalRM_unweighted'] = copy.deepcopy(state_dict['I_fcal_unweighted'])
+        state_dict['Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['Q_fcal_unweighted'])
+        state_dict['U_fcalRM_unweighted'] = copy.deepcopy(state_dict['U_fcal_unweighted'])
+        state_dict['V_fcalRM_unweighted'] = copy.deepcopy(state_dict['V_fcal_unweighted'])
+
+
+    fig = plt.figure(figsize=(18,12))
+
+    plt.subplot(311)
+    plt.ylabel(r'$|g_{yy}|$')
+    plt.xticks([])
+
+    plt.subplot(312)
+    plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+    plt.xticks([])
+
+    plt.subplot(313)
+    plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+    plt.xlabel(r'Frequency (MHz)')
+
+    plt.subplots_adjust(hspace=0)
+
+    #if using current cal solution, display
+    #fig=plt.figure(figsize=(18,14))
+    if polcaldate_menu.value != "":
+        plt.subplot(312)
+        #plt.xticks([])
+        #plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+        plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gxx'])/np.abs(state_dict['gyy']),color='magenta',linewidth=4)
+
+        plt.subplot(313)
+        #plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+        plt.plot(state_dict['cal_freq_axis'],np.angle(state_dict['gxx'])-np.angle(state_dict['gyy']),color='magenta',linewidth=4)
+        #plt.xlabel("Frequency (MHz)")
+
+        plt.subplot(311)
+        plt.title(state_dict['polcalfile'])
+        #plt.xticks([])
+        #plt.ylabel(r'$|g_{yy}|$')
+        plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']),color='magenta',linewidth=4)
+        
+    if saveplotbutton.clicked:
+        try:
+            plt.savefig(polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+            print("Saved Figure to h24: " + polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+        except Exception as ex:
+            print("Save Failed: " + str(ex))
+    plt.show()
+
+    update_wdict([polcaldate_menu,polcalprocs],
+        ['polcaldate_menu','polcalprocs'],param='value')
+    update_wdict([ParA_display],
+        ['ParA_display'],param='data')
+
+    return
+
+
+
+
+def polcal_screen_ADMIN(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
         polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display,
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,

@@ -11,6 +11,7 @@ setup.py
 .ipynb_checkpoints/Mark_RM_Testing-V2-checkpoint.ipynb
 .ipynb_checkpoints/Mark_RM_Testing-checkpoint.ipynb
 .ipynb_checkpoints/dsapol_unit_testing-checkpoint.ipynb
+custom_widgets/password.py
 dist/dsa_110_pol_dev-1.0.0-py3.6.egg
 dist/dsa_110_pol_dev-1.0.0-py3.8.egg
 dist/dsa_110_pol_dev-1.0.0-py3.9.egg
