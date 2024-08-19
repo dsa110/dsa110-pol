@@ -296,6 +296,7 @@ state_map = {'load':0,
              'pol':5,
              'summarize':6
              }
+state_dict['polcaldataloaded'] = False
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
@@ -627,6 +628,8 @@ polcalfiles = [polcalfiles[i][polcalfiles[i].index('POLCAL'):] for i in range(le
 
 wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##################
          'frbfiles_menu':frbfiles[0],
+         'restore_menu':"",
+         
          'base_n_t_slider':1,
          'base_logn_f_slider':0,
          'logibox_slider_init':0,
@@ -1086,15 +1089,26 @@ class StopExecution(Exception):
 """
 Load data state
 """
-def restore_screen(savesessionbutton,restoresessionbutton):
-    #if save/restore session button clicked
+def save_screen(savesessionbutton):
+    retstr = ""
     if savesessionbutton.clicked:
-        savestate(Time.now())
+        t = Time.now()
+        cachedir = savestate(t,state_dict['nickname'])
+        retstr ="Saved Session " + cachedir
+    return retstr
+def restore_screen(restoresessionbutton,restore_menu):
+    retstr = "" 
 
-    if restoresessionbutton.clicked:
+    if restoresessionbutton.clicked and restore_menu.value != "":
         try:
-            restorestate()
+            restorestate(restore_menu.value)
+            retstr =  "Restored Session " +restore_menu.value
         except OSError as ex:
+            print("Error restoring from cache: " + str(ex))
+            retstr = ""
+    update_wdict([restore_menu],['restore_menu'],param='value')
+    return retstr
+"""
             print("No cached state available")
     
     if len(glob.glob(dirs['cwd'] + '/interface/.current_state/cache_time.pkl')) > 0:
@@ -1103,8 +1117,8 @@ def restore_screen(savesessionbutton,restoresessionbutton):
         f.close()
         return "Cached Session: " + str(cache['frb']) + " (" + str(cache['cache_time']) + ")"
     else:
-        return "Cached Session: None"
-
+        return ""
+"""
 NOFFDEF = 2000
 def ADMIN_makefil_screen(frbfiles_menu,
                 RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display,
@@ -1268,6 +1282,10 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
     #first update state dict
     state_dict['base_n_t'] = 1#n_t_slider.value
     state_dict['base_n_f'] = 1#2**logn_f_slider.value
+    state_dict['rel_n_t'] = n_t_slider.value
+    state_dict['rel_n_f'] = (2**logn_f_slider.value)
+    state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
+    state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
     state_dict['ids'] = frbfiles_menu.value[:frbfiles_menu.value.index('_')]
     state_dict['nickname'] = frbfiles_menu.value[frbfiles_menu.value.index('_')+1:]
     state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
@@ -1366,6 +1384,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
         state_dict['base_wav_test'] = wav_test
         state_dict['base_time_axis'] = np.arange(I.shape[1])*32.7*state_dict['base_n_t']
         state_dict['badchans'] = badchans
+        state_dict['polcaldataloaded'] = False
 
         if polcalloadbutton.value and (polcals_available > 0):
 
@@ -1427,7 +1446,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
             state_dict['U_fcalRM_unweighted'] = copy.deepcopy(state_dict['U_fcal_unweighted'])
             state_dict['V_fcalRM_unweighted'] = copy.deepcopy(state_dict['V_fcal_unweighted'])
 
-
+            state_dict['polcaldataloaded'] = True
             """#get UNWEIGHTED spectrum at max resolution -- at this point, haven't gotten ideal filter weights yet
             (state_dict['base_I_fcal_unweighted'],state_dict['base_Q_fcal_unweighted'],state_dict['base_U_fcal_unweighted'],state_dict['base_V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
                                                         state_dict['base_n_f'],state_dict['n_t'],state_dict['freq_test'],
@@ -5338,64 +5357,71 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
     return
 
 
-def savestate(tsave):
-    f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','wb')
+def savestate(tsave,frbname):
+    #make cache dir with timestamp
+    cachedir = dirs['cache'] + tsave.isot + "_" + frbname + "/"
+    os.system("mkdir " + cachedir)
+
+    
+
+
+    f = open(cachedir + 'cache_time.pkl','wb')
     pkl.dump({"cache_time":tsave.isot,"frb":state_dict['ids']+"_"+state_dict['nickname']},f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','wb')
+    f = open(cachedir + 'state_dict.pkl','wb')
     pkl.dump(state_dict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/wdict.pkl','wb')
+    f = open(cachedir + 'wdict.pkl','wb')
     pkl.dump(wdict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/polcal_dict.pkl','wb')
+    f = open(cachedir + 'polcal_dict.pkl','wb')
     pkl.dump(polcal_dict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/RMcaldict.pkl','wb')
+    f = open(cachedir + 'RMcaldict.pkl','wb')
     pkl.dump(RMcaldict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df.pkl','wb')
+    f = open(cachedir + 'df.pkl','wb')
     df.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_polcal.pkl','wb')
+    f = open(cachedir + 'df_polcal.pkl','wb')
     df_polcal.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_beams.pkl','wb')
+    f = open(cachedir + 'df_beams.pkl','wb')
     df_beams.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scint.pkl','wb')
+    f = open(cachedir + 'df_scint.pkl','wb')
     df_scint.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scat.pkl','wb')
+    f = open(cachedir + 'df_scat.pkl','wb')
     df_scat.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/RMdf.pkl','wb')
+    f = open(cachedir + 'RMdf.pkl','wb')
     RMdf.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/poldf.pkl','wb')
+    f = open(cachedir + 'poldf.pkl','wb')
     poldf.to_pickle(f)
     f.close()
 
 
-    RMtable_archive_df.write_tsv(dirs['cwd'] + '/interface/.current_state/RMtable_archive_df.tsv',overwrite=True)
+    RMtable_archive_df.write_tsv(cachedir + 'RMtable_archive_df.tsv',overwrite=True)
 
-    polspec_archive_df.write_FITS(dirs['cwd'] + '/interface/.current_state/polspec_archive_df.fits',overwrite=True)
+    polspec_archive_df.write_FITS(cachedir + 'polspec_archive_df.fits',overwrite=True)
 
-    return
+    return cachedir
 
 
-def restorestate():
+def restorestate(tsave_isot_frbname):
     global state_dict
     global df
     global df_polcal
@@ -5410,59 +5436,60 @@ def restorestate():
     global RMtable_archive_df
     global polspec_archive_df
     
-    
+    """
     f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','rb')
     cache = pkl.load(f)
     print("Restoring session for FRB " + str(cache['frb']) + " from " + str(cache['cache_time']))
     f.close()
+    """
+    cachedir = dirs['cache'] + tsave_isot_frbname + "/"
 
 
-
-    f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','rb')
+    f = open(cachedir + 'state_dict.pkl','rb')
     state_dict = pkl.load(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/wdict.pkl','rb')
+    f = open(cachedir + 'wdict.pkl','rb')
     wdict = pkl.load(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/polcal_dict.pkl','rb')
+    f = open(cachedir + 'polcal_dict.pkl','rb')
     polcal_dict = pkl.load(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/RMcaldict.pkl','rb')
+    f = open(cachedir + 'RMcaldict.pkl','rb')
     RMcaldict = pkl.load(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df.pkl','rb')
+    f = open(cachedir + 'df.pkl','rb')
     df = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_polcal.pkl','rb')
+    f = open(cachedir + 'df_polcal.pkl','rb')
     df_polcal = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_beams.pkl','rb')
+    f = open(cachedir + 'df_beams.pkl','rb')
     df_beams = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scint.pkl','rb')
+    f = open(cachedir + 'df_scint.pkl','rb')
     df_scint = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scat.pkl','rb')
+    f = open(cachedir + 'df_scat.pkl','rb')
     df_scat = pd.read_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/RMdf.pkl','rb')
+    f = open(cachedir + 'RMdf.pkl','rb')
     RMdf = pd.read_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/poldf.pkl','rb')
+    f = open(cachedir + 'poldf.pkl','rb')
     poldf = pd.read_pickle(f)
     f.close()
 
-    RMtable_archive_df = rmtable.RMTable.read_tsv(dirs['cwd'] + '/interface/.current_state/RMtable_archive_df.tsv')
-    polspec_archive_df.read_FITS(dirs['cwd'] + '/interface/.current_state/polspec_archive_df.fits')
+    RMtable_archive_df = rmtable.RMTable.read_tsv(cachedir + 'RMtable_archive_df.tsv')
+    polspec_archive_df.read_FITS(cachedir + 'polspec_archive_df.fits')
 
     return
