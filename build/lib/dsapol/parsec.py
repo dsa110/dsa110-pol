@@ -708,7 +708,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'filt_showerrs':False,
 
         'scattermenu':['Component 0'],
-        'scatfitmenu':'Nested Sampling',
+        'scatfitmenu':'LMFIT Non-Linear Least Squares',
         'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares','Nested Sampling','EMCEE Markov-Chain Monte Carlo'],
         'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
@@ -723,28 +723,33 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scatter_nsteps':5000,
         'scatter_nburn':100,
         'scatter_nthin':15,
-        'scatter_sliderrange':1,
+        'scatter_sliderrange':0.5,
         'x0_guess':80,
         'amp_guess':10,
         'sigma_guess':1,
         'tau_guess':1,
         'x0_guess_0':0.35e-3,
+        'x0_guess_shift_0':0,
         'amp_guess_0':1,
         'sigma_guess_0':1,
         'tau_guess_0':1,
         'x0_guess_1':0.35e-3,
+        'x0_guess_shift_1':0,
         'amp_guess_1':1,
         'sigma_guess_1':1,
         'tau_guess_1':1,
         'x0_guess_2':0.35e-3,
+        'x0_guess_shift_2':0,
         'amp_guess_2':1,
         'sigma_guess_2':1,
         'tau_guess_2':1,
         'x0_guess_3':0.35e-3,
+        'x0_guess_shift_3':0,
         'amp_guess_3':1,
         'sigma_guess_3':1,
         'tau_guess_3':1,
         'x0_guess_4':0.35e-3,
+        'x0_guess_shift_4':0,
         'amp_guess_4':1,
         'sigma_guess_4':1,
         'tau_guess_4':1,
@@ -788,14 +793,14 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'F0_guess':1,
 
 
-        'useRMTools':True, ################ (5) RM Synthesis ################
+        'useRMTools':False, ################ (5) RM Synthesis ################
         'maxRM_num_tools':1e6,
         'dRM_tools':200,
         'useRMsynth':True,
         'nRM_num':int(2e6),
         'minRM_num':-1e6,
         'maxRM_num':1e6,
-        'useRM2D':True,
+        'useRM2D':False,
         'nRM_num_zoom':5000,
         'RM_window_zoom':1000,
         'dRM_tools_zoom':0.4,
@@ -975,17 +980,17 @@ state_dict['RMcalibrated']['RMFWHM'] = np.nan
 #archive dict
 RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
 polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
-def update_wdict(objects,labels,param='value'):
+def update_wdict(objects,labels,param='value',skipdict=False):
     """
     This function takes a list of widget objects and a list of their names as strings and updates the wdict with their curent values
     """
-
-    assert(len(objects)==len(labels))
-    for i in range(len(objects)):
-        if param == 'value':
-            wdict[labels[i]] = objects[i].value
-        elif param == 'data':
-            wdict[labels[i]] = objects[i].data
+    if not skipdict:
+        assert(len(objects)==len(labels))
+        for i in range(len(objects)):
+            if param == 'value':
+                wdict[labels[i]] = objects[i].value
+            elif param == 'data':
+                wdict[labels[i]] = objects[i].data
     """
     if 'DM_init_display' in labels and not wdict['DMINITIALIZED']:
         wdict['DM_input_display'] = wdict['DM_init_display']
@@ -2593,7 +2598,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     #update initial parameters for scattering analysis
     if not state_dict['scatter_init']:
         scatter_reset_initvals(state_dict['current_comp'])
-
+        for i in range(state_dict['current_comp']+1,5):
+            scatter_reset_initvals(i,nocomp=True)
+    
     #display masked dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     c1=a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
@@ -2800,23 +2807,52 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_reset_initvals(comp_num):#,x0_guess,sigma_guess,tau_guess,amp_guess,x0_range,sigma_range,tau_range,amp_range):
-    wdict['x0_guess_' + str(comp_num)]  = np.around(state_dict['comps'][comp_num]['peak']*32.7e-3,2) #ms
-    wdict['amp_guess_' + str(comp_num)] = np.around(state_dict['I_tcal'][state_dict['comps'][comp_num]['peak']],2) 
-    wdict['sigma_guess_' + str(comp_num)] = np.around(state_dict['comps'][comp_num]['FWHM']*32.7e-3/2,2)  #ms
-    wdict['tau_guess_' + str(comp_num)]  = np.around((state_dict['comps'][comp_num]['intR'] - state_dict['comps'][comp_num]['peak'])*32.7e-3,2)  #ms
+def scatter_reset_initvals(comp_num,startfactor=wdict['scatter_sliderrange'],window=int(2**wdict['logwindow_slider']),nocomp=False):#,x0_guess,sigma_guess,tau_guess,amp_guess,x0_range,sigma_range,tau_range,amp_range):
+    if nocomp:
+        comp_num_val = 0 #if there's no component, we still need to initialize, so set to values for first component
+    else:
+        comp_num_val = comp_num
+    wdict['x0_guess_' + str(comp_num)]  = np.around(state_dict['comps'][comp_num_val]['peak']*state_dict['n_t']*32.7e-3,2) #ms
+    wdict['amp_guess_' + str(comp_num)] = np.around(state_dict['I_tcal'][state_dict['comps'][comp_num_val]['peak']],2) 
+    wdict['sigma_guess_' + str(comp_num)] = np.around(state_dict['comps'][comp_num_val]['FWHM']*state_dict['n_t']*32.7e-3/2,2)  #ms
+    wdict['tau_guess_' + str(comp_num)]  = np.around((state_dict['comps'][comp_num_val]['intR'] - state_dict['comps'][comp_num_val]['peak'])*state_dict['n_t']*32.7e-3,2)  #ms
 
-    wdict['x0_range_' + str(comp_num)] =  [np.around(wdict['x0_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['x0_guess_' + str(comp_num)],2)]
-    wdict['amp_range_' + str(comp_num)] = [np.around(wdict['amp_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['amp_guess_' + str(comp_num)],2)]
-    wdict['sigma_range_' + str(comp_num)]  = [np.around(wdict['sigma_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['sigma_guess_' + str(comp_num)],2)]
-    wdict['tau_range_' + str(comp_num)] = [np.around(wdict['tau_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['tau_guess_' + str(comp_num)],2)]
+    #shift x0 guess
+    guesscurve = scat.exp_gauss(state_dict['time_axis']*1e-3, wdict['x0_guess_' + str(comp_num)], wdict['amp_guess_' + str(comp_num)], wdict['sigma_guess_' + str(comp_num)], wdict['tau_guess_' + str(comp_num)])
+    wdict['x0_guess_' + str(comp_num)] -= np.around(((np.argmax(guesscurve) - np.argmax(state_dict['I_tcal'])-1)*state_dict['n_t']*32.7e-3),2)
+    wdict['x0_guess_shift_' + str(comp_num)] = np.around(((np.argmax(guesscurve) - np.argmax(state_dict['I_tcal'])-1)*state_dict['n_t']*32.7e-3),2)
+
+    x0min = np.around(np.nanmax([np.around(wdict['x0_guess_' + str(comp_num)]*startfactor,2),state_dict['time_axis'][state_dict['timestart']-window]*1e-3]),2)
+    x0max = np.around(np.nanmin([np.around(wdict['x0_guess_' + str(comp_num)]*(1+startfactor),2),state_dict['time_axis'][state_dict['timestop']+window]*1e-3]),2)
+    wdict['x0_range_' + str(comp_num)] =  [x0min,x0max]#[np.around(wdict['x0_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['x0_guess_' + str(comp_num)],2)]
+
+    ampmin = np.around(np.nanmax([np.around(wdict['amp_guess_' + str(comp_num)]*startfactor,2),0]),2)
+    ampmax = np.around(np.nanmin([np.around(wdict['amp_guess_' + str(comp_num)]*(1+startfactor),2),500]),2)
+    wdict['amp_range_' + str(comp_num)] = [ampmin,ampmax]#[np.around(wdict['amp_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['amp_guess_' + str(comp_num)],2)]
+
+    sigmamin = np.around(np.nanmax([np.around(wdict['sigma_guess_' + str(comp_num)]*startfactor,2),0]))
+    sigmamax = np.around(np.nanmin([np.around(wdict['sigma_guess_' + str(comp_num)]*(1+startfactor),2),(state_dict['time_axis'][state_dict['timestop']+window]-state_dict['time_axis'][state_dict['timestart']-window])*1e-3]),2)
+    wdict['sigma_range_' + str(comp_num)]  = [sigmamin,sigmamax]#[np.around(wdict['sigma_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['sigma_guess_' + str(comp_num)],2)]
+
+    taumin = np.around(np.nanmax([np.around(wdict['tau_guess_' + str(comp_num)]*startfactor,2),0]),2)
+    taumax = np.around(np.nanmin([np.around(wdict['tau_guess_' + str(comp_num)]*(1+startfactor),2),(state_dict['time_axis'][state_dict['timestop']+window]-state_dict['time_axis'][state_dict['timestart']-window])*1e-3]),2)
+    wdict['tau_range_' + str(comp_num)] = [taumin,taumax]#[np.around(wdict['tau_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['tau_guess_' + str(comp_num)],2)]
     return
 
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin,logwindow_slider):
+    """
+    if state_dict['window'] != 2**logwindow_slider.value:
+        #if window changes, need to reset slider ranges
+        state_dict['window'] = 2**logwindow_slider.value
+        for i in range(state_dict['n_comps']):
+            scatter_reset_initvals(i,startfactor=scatter_sliderrange.value,nocomp=False)
+        for i in range(state_dict['n_comps']+1,5):
+            scatter_reset_initvals(i,startfactor=scatter_sliderrange.value,nocomp=True)
+    """
     state_dict['scatter_init'] = True
-    if scatter_init.clicked:
-        state_dict['scatter_init'] = False
-
+    #if scatter_init.clicked or state_dict['window'] != 2**logwindow_slider.value:
+    #    state_dict['scatter_init'] = False
+    state_dict['window'] = 2**logwindow_slider.value
     state_dict['scatter_fit_comps'] = scatfitmenu.value
 
 
@@ -3258,7 +3294,7 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             ax1.axvline(state_dict['comps'][k]['peak']*32.7e-3,color='purple',linestyle='--')
             ax1.axvspan(state_dict['comps'][k]['intL']*32.7e-3,state_dict['comps'][k]['intR']*32.7e-3,color='purple',alpha=0.1)
             ax1.text((state_dict['comps'][k]['peak'] + 5)*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
-                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3,
+                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3 - wdict['x0_guess_shift_' + str(k)],
                                                                                                         b=state_dict['comps'][k]['FWHM']*32.7e-3,
                                                                                                         c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
                                                                                                         d=I_tcal_p[state_dict['comps'][k]['peak']]),
@@ -3341,8 +3377,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
     #update wdict
-    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin],
-            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps','scatter_nwalkers','scatter_nsteps','scatter_nburn','scatter_nthin'])
+    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin,logwindow_slider],
+            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps','scatter_nwalkers','scatter_nsteps','scatter_nburn','scatter_nthin','logwindow_slider'])
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i],
                       x0_range_sliders[i],amp_range_sliders[i],sigma_range_sliders[i],tau_range_sliders[i]],
@@ -3932,6 +3968,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         RMdf.loc[str(i), '1D-Synth'] = RM
                         RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
+
                 #STAGE 3: 2D RM synthesis
                 if useRM2D.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
@@ -3943,6 +3980,8 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                         state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
                         state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
+
+                        if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
                         #update table
                         RMdf.loc[str(i), '2D-Synth'] = RM2
                         RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
@@ -3993,6 +4032,8 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'],background=True)
                 else:
                     RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'])
+                    if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1zoom'])): state_dict['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+
                     state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                     state_dict['RMcalibrated']['RMerrfit'] = RMerr2
                     state_dict['RMcalibrated']['RMFWHM'] = upp-low
@@ -4083,6 +4124,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #update table
                 RMdf.loc['All', '2D-Synth'] = RM2
                 RMdf.loc['All', '2D-Synth Error'] = RMerr2
+                if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1zoom'])): state_dict['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
 
         if state_dict['n_comps'] > 1:
             for i in range(state_dict['n_comps']):
@@ -4168,7 +4210,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         #update table
                         RMdf.loc[str(i), '2D-Synth'] = RM2
                         RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
-
+                        if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
                     
 
     #1D plots
