@@ -21,7 +21,7 @@ def main():
         alllogs = glob.glob(dirs['logs']+"*T*")
 
         #check which ones older than 1 week
-        lim = 1/60/24 #days
+        lim = 7 #days
         now = Time.now()
         print("Scanning Cache...",file=f)
         for cache in allcaches:
