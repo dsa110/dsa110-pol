@@ -22,3 +22,7 @@ interface/casa*
 
 #directories
 directories.json
+
+#jupyter notebook checkpoints
+interface/.ipynb_checkpoints
+interface/.ipynb_checkpoints/*

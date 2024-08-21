@@ -127,6 +127,14 @@ dsastorageFRBDir = dirs["dsastorageFRBDir"]
 dsastorageCALDir = dirs["dsastorageCALDir"]
 
 """
+admin mode
+"""
+unauthorized = "This device is not authorized to use PARSEC in ADMIN mode. Please contact the system administrator or submit an issue on https://github.com/dsa110/dsa110-pol"
+incorrect = "Incorrect ADMIN password"
+dsapoladminkey = "DSAPOLADMIN"
+
+
+"""
 Read FRB parameters
 """
 FRB_RA = []
@@ -175,7 +183,7 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=dirs['FRBtables'
                     FRB_DM.append(-1)
             
                 if row[6] != "":
-                    FRB_w.append(float(row[6]))
+                    FRB_w.append(int(row[6]))
                 else:
                     FRB_w.append(-1)
                 
@@ -288,6 +296,7 @@ state_map = {'load':0,
              'pol':5,
              'summarize':6
              }
+state_dict['polcaldataloaded'] = False
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
@@ -589,6 +598,7 @@ ids = frbfiles[0][:frbfiles[0].index('_')]
 RA = FRB_RA[FRB_IDS.index(ids)]
 DEC = FRB_DEC[FRB_IDS.index(ids)]
 ibeam = int(FRB_BEAM[FRB_IDS.index(ids)])
+ibox = int(FRB_w[FRB_IDS.index(ids)])
 mjd = FRB_mjd[FRB_IDS.index(ids)]
 DMinit = FRB_DM[FRB_IDS.index(ids)]
 zinit = FRB_z[FRB_IDS.index(ids)]
@@ -618,6 +628,8 @@ polcalfiles = [polcalfiles[i][polcalfiles[i].index('POLCAL'):] for i in range(le
 
 wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##################
          'frbfiles_menu':frbfiles[0],
+         'restore_menu':"",
+         
          'base_n_t_slider':1,
          'base_logn_f_slider':0,
          'logibox_slider_init':0,
@@ -626,6 +638,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'RA_display':RA,
          'DEC_display':DEC,
          'ibeam_display':ibeam,
+         'ibox_display':ibox,
          'mjd_display':mjd,
          'DM_init_display':DMinit,
          'z_display':zinit,
@@ -698,7 +711,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'filt_showerrs':False,
 
         'scattermenu':['Component 0'],
-        'scatfitmenu':'Nested Sampling',
+        'scatfitmenu':'LMFIT Non-Linear Least Squares',
         'scatfitmenu_choices':['LMFIT Non-Linear Least Squares','Scipy Non-Linear Least Squares','Nested Sampling','EMCEE Markov-Chain Monte Carlo'],
         'scattermenu_choices':['Component 0'],
         'scatterLbuffer_slider':0,
@@ -713,28 +726,33 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'scatter_nsteps':5000,
         'scatter_nburn':100,
         'scatter_nthin':15,
-        'scatter_sliderrange':1,
+        'scatter_sliderrange':0.5,
         'x0_guess':80,
         'amp_guess':10,
         'sigma_guess':1,
         'tau_guess':1,
         'x0_guess_0':0.35e-3,
+        'x0_guess_shift_0':0,
         'amp_guess_0':1,
         'sigma_guess_0':1,
         'tau_guess_0':1,
         'x0_guess_1':0.35e-3,
+        'x0_guess_shift_1':0,
         'amp_guess_1':1,
         'sigma_guess_1':1,
         'tau_guess_1':1,
         'x0_guess_2':0.35e-3,
+        'x0_guess_shift_2':0,
         'amp_guess_2':1,
         'sigma_guess_2':1,
         'tau_guess_2':1,
         'x0_guess_3':0.35e-3,
+        'x0_guess_shift_3':0,
         'amp_guess_3':1,
         'sigma_guess_3':1,
         'tau_guess_3':1,
         'x0_guess_4':0.35e-3,
+        'x0_guess_shift_4':0,
         'amp_guess_4':1,
         'sigma_guess_4':1,
         'tau_guess_4':1,
@@ -778,14 +796,14 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'F0_guess':1,
 
 
-        'useRMTools':True, ################ (5) RM Synthesis ################
+        'useRMTools':False, ################ (5) RM Synthesis ################
         'maxRM_num_tools':1e6,
         'dRM_tools':200,
         'useRMsynth':True,
         'nRM_num':int(2e6),
         'minRM_num':-1e6,
         'maxRM_num':1e6,
-        'useRM2D':True,
+        'useRM2D':False,
         'nRM_num_zoom':5000,
         'RM_window_zoom':1000,
         'dRM_tools_zoom':0.4,
@@ -965,17 +983,17 @@ state_dict['RMcalibrated']['RMFWHM'] = np.nan
 #archive dict
 RMtable_archive_df = (rmtablefuncs.make_FRB_RMTable(state_dict))#.to_pandas()#rmtable.RMTable({})
 polspec_archive_df = (rmtablefuncs.make_FRB_polSpectra(state_dict))
-def update_wdict(objects,labels,param='value'):
+def update_wdict(objects,labels,param='value',skipdict=False):
     """
     This function takes a list of widget objects and a list of their names as strings and updates the wdict with their curent values
     """
-
-    assert(len(objects)==len(labels))
-    for i in range(len(objects)):
-        if param == 'value':
-            wdict[labels[i]] = objects[i].value
-        elif param == 'data':
-            wdict[labels[i]] = objects[i].data
+    if not skipdict:
+        assert(len(objects)==len(labels))
+        for i in range(len(objects)):
+            if param == 'value':
+                wdict[labels[i]] = objects[i].value
+            elif param == 'data':
+                wdict[labels[i]] = objects[i].data
     """
     if 'DM_init_display' in labels and not wdict['DMINITIALIZED']:
         wdict['DM_input_display'] = wdict['DM_init_display']
@@ -1071,15 +1089,26 @@ class StopExecution(Exception):
 """
 Load data state
 """
-def restore_screen(savesessionbutton,restoresessionbutton):
-    #if save/restore session button clicked
+def save_screen(savesessionbutton):
+    retstr = ""
     if savesessionbutton.clicked:
-        savestate(Time.now())
+        t = Time.now()
+        cachedir = savestate(t,state_dict['nickname'])
+        retstr ="Saved Session " + cachedir
+    return retstr
+def restore_screen(restoresessionbutton,restore_menu):
+    retstr = "" 
 
-    if restoresessionbutton.clicked:
+    if restoresessionbutton.clicked and restore_menu.value != "":
         try:
-            restorestate()
+            restorestate(restore_menu.value)
+            retstr =  "Restored Session " +restore_menu.value
         except OSError as ex:
+            print("Error restoring from cache: " + str(ex))
+            retstr = ""
+    update_wdict([restore_menu],['restore_menu'],param='value')
+    return retstr
+"""
             print("No cached state available")
     
     if len(glob.glob(dirs['cwd'] + '/interface/.current_state/cache_time.pkl')) > 0:
@@ -1088,16 +1117,18 @@ def restore_screen(savesessionbutton,restoresessionbutton):
         f.close()
         return "Cached Session: " + str(cache['frb']) + " (" + str(cache['cache_time']) + ")"
     else:
-        return "Cached Session: None"
-
+        return ""
+"""
 NOFFDEF = 2000
-def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,z_display,updatebutton,filbutton,loadbutton,polcalloadbutton,path=frbpath):
+def ADMIN_makefil_screen(frbfiles_menu,
+                RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display,
+                updatebutton,filbutton,path=frbpath):
     """
-    This function updates the FRB loading screen
+    In ADMIN mode, this function allows the user to make filterbanks using toolkit
     """
     #first update state dict
-    state_dict['base_n_t'] = n_t_slider.value
-    state_dict['base_n_f'] = 2**logn_f_slider.value
+    state_dict['base_n_t'] = 1#n_t_slider.value
+    state_dict['base_n_f'] = 1#2**logn_f_slider.value
     state_dict['ids'] = frbfiles_menu.value[:frbfiles_menu.value.index('_')]
     state_dict['nickname'] = frbfiles_menu.value[frbfiles_menu.value.index('_')+1:]
     state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
@@ -1109,8 +1140,166 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     state_dict['RMinput'] = FRB_RM[FRB_IDS.index(state_dict['ids'])]
     state_dict['RMinputerr'] = FRB_RMerr[FRB_IDS.index(state_dict['ids'])]
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
-    state_dict['buff'] = [buff_L_slider_init.value,buff_R_slider_init.value]
-    state_dict['width_native'] = 2**logibox_slider.value
+    state_dict['buff'] = [0,0]#[buff_L_slider_init.value,buff_R_slider_init.value]
+    state_dict['width_native'] = FRB_w[FRB_IDS.index(state_dict['ids'])]#2**logibox_slider.value
+    wdict['logibox_slider'] = state_dict['width_native']
+    state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
+    state_dict['heimSNR'] = FRB_heimSNR[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RM_gal'] = FRB_RMgal[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RM_galerr'] = FRB_RMgalerr[FRB_IDS.index(state_dict['ids'])]
+    if ~np.isnan(state_dict['RM_gal']):
+        state_dict['RM_galRA'] = state_dict['RA']
+        state_dict['RM_galDEC'] = state_dict['DEC']
+    state_dict['RM_ion'] = FRB_RMion[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RM_ionerr'] = FRB_RMionerr[FRB_IDS.index(state_dict['ids'])]
+    if ~np.isnan(state_dict['RM_ion']):
+        state_dict['RM_ionRA'] = state_dict['RA']
+        state_dict['RM_ionDEC'] = state_dict['DEC']
+        state_dict['RM_ionmjd'] = state_dict['mjd']
+    state_dict['suff'] = "_dev"
+
+    #update displays
+    RA_display.data = state_dict['RA']
+    DEC_display.data = state_dict['DEC']
+    ibeam_display.data = state_dict['ibeam']
+    ibox_display.data = state_dict['width_native']
+    mjd_display.data = state_dict['mjd']
+    DM_init_display.data = state_dict['DM0']
+    z_display.data = state_dict['z']
+
+    #see if filterbanks exist
+    state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
+    polcals_available = np.sum([((state_dict['datadir'] in str(f)) and ('polcal' in str(f))) for f in state_dict['fils']])
+
+    #find beamforming weights date
+    state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
+
+    
+    #if update button is clicked, refresh FRB data from csv
+    if updatebutton.clicked:
+        update_FRB_params()
+    
+    
+    #if filbutton is clicked, run the offline beamformer to make fil files
+    if filbutton.clicked:
+        status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'],path=state_dict['datadir'])
+        print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
+    
+    #plot filplot
+    pngname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
+    if len(pngname) != 0:
+        #show the existing image
+        im = Image.open(pngname[0])
+    else:
+        #create the image, first find fil file
+        filname = glob.glob(dirs['candidates'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
+        pre_rebin = 1
+        start_time = 0 #seconds
+        stop_time = 4 #seconds
+        fil_dedispersed = False
+        if len(filname) == 0:
+            #couldn't find file on h23, try to copy from dsastorage
+
+            #first try general dir
+            os.system("scp " + dirs['dsastorageFRBDir'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil " + state_dict['datadir'] + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + "_Level2.fil") 
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + "_Level2.fil")
+
+        if len(filname) == 0:
+            #try dsastorage backups
+
+            if state_dict['ibeam'] < 64:
+                corr = "corr01"
+            elif 64 < state_dict['ibeam'] < 128:
+                corr = "corr02"
+            elif 128 < state_dict['ibeam'] < 192:
+                corr = "corr09"
+            else: #192 < state_dict['ibeam'] < 256:
+                corr = "corr13"
+
+
+
+            os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil "+ state_dict['datadir'])
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+        if len(filname) == 0:
+            #try making one from high resolution files
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_0.fil")
+            pre_rebin = 8
+            start_time= 12800*32.7e-6 #seconds
+            stop_time = 7680*32.7e-6 #seconds
+            fil_dedispersed = True
+        if len(filname) == 0:
+            im = mr.Markdown("## No candidate plot for " + str(state_dict['ids']) + "_"+ str(state_dict['nickname']))
+
+        else:
+            c = SkyCoord(ra=state_dict['RA']*u.deg,dec=state_dict['DEC']*u.deg,frame='icrs')
+            state_dict['gall'] = c.galactic.l.value
+            state_dict['galb'] = c.galactic.b.value
+
+            cfpf.custom_filplot(filname[0],
+                                state_dict['DM0'],
+                                state_dict['width_native'],
+                                multibeam=None,
+                                figname= state_dict['datadir'] + state_dict['ids'] + "_parsec.png",
+                                ndm=32,
+                                suptitle='candname:%s  DM:%0.1f  boxcar:%d  ibeam:%d \nMJD:%f  Ra/Dec=%0.1f,%0.1f Gal lon/lat=%0.1f,%0.1f' % (state_dict['ids'], state_dict['DM0'], state_dict['width_native'], state_dict['ibeam'], state_dict['mjd'], state_dict['RA'], state_dict['DEC'], state_dict['gall'], state_dict['galb']),
+                                heimsnr=state_dict['heimSNR'],
+                                ibeam=state_dict['ibeam'],
+                                rficlean=False,
+                                nfreq_plot=32,
+                                classify=False,
+                                heim_raw_tres=1,
+                                showplot=False,
+                                save_data=False,
+                                candname=state_dict['ids'],
+                                imjd=state_dict['mjd'],
+                                injected=False,
+                                fast_classify=False,
+                                pre_rebin=pre_rebin,
+                                start_time=start_time,
+                                stop_time=stop_time,fil_dedispersed=fil_dedispersed)
+            im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
+
+    
+
+    #update widget dict
+    update_wdict([frbfiles_menu],
+                    ["frbfiles_menu"],#"logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
+                    param='value')
+    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display],
+                 ["RA_display","DEC_display","DM_init_display","ibeam_display","ibox_display","mjd_display","z_display"],
+                    param='data')
+    return im
+
+
+
+def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_slider_init,buff_R_slider_init,
+                RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display,
+                loadbutton,polcalloadbutton,path=frbpath):
+    """
+    This function updates the FRB loading screen
+    """
+    #first update state dict
+    state_dict['base_n_t'] = 1#n_t_slider.value
+    state_dict['base_n_f'] = 1#2**logn_f_slider.value
+    state_dict['rel_n_t'] = n_t_slider.value
+    state_dict['rel_n_f'] = (2**logn_f_slider.value)
+    state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
+    state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
+    state_dict['ids'] = frbfiles_menu.value[:frbfiles_menu.value.index('_')]
+    state_dict['nickname'] = frbfiles_menu.value[frbfiles_menu.value.index('_')+1:]
+    state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
+    state_dict['DEC'] = FRB_DEC[FRB_IDS.index(state_dict['ids'])]
+    state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
+    state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
+    state_dict['DM'] = state_dict['DM0'] + state_dict['dDM']
+    state_dict['z'] = FRB_z[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RMinput'] = FRB_RM[FRB_IDS.index(state_dict['ids'])]
+    state_dict['RMinputerr'] = FRB_RMerr[FRB_IDS.index(state_dict['ids'])]
+    state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
+    state_dict['buff'] = [0,0]#[buff_L_slider_init.value,buff_R_slider_init.value]
+    state_dict['width_native'] = FRB_w[FRB_IDS.index(state_dict['ids'])]#2**logibox_slider.value
+    wdict['logibox_slider'] = int(np.log2(state_dict['width_native']))
     state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
     state_dict['heimSNR'] = FRB_heimSNR[FRB_IDS.index(state_dict['ids'])]
     state_dict['RM_gal'] = FRB_RMgal[FRB_IDS.index(state_dict['ids'])]
@@ -1124,11 +1313,13 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['RM_ionRA'] = state_dict['RA']
         state_dict['RM_ionDEC'] = state_dict['DEC']
         state_dict['RM_ionmjd'] = state_dict['mjd']
+    state_dict['suff'] = "_dev"
 
     #update displays
     RA_display.data = state_dict['RA']
     DEC_display.data = state_dict['DEC']
     ibeam_display.data = state_dict['ibeam']
+    ibox_display.data = state_dict['width_native']
     mjd_display.data = state_dict['mjd']
     DM_init_display.data = state_dict['DM0']
     z_display.data = state_dict['z']
@@ -1140,11 +1331,11 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     #find beamforming weights date
     state_dict['bfweights'] = polbeamform.get_bfweights(state_dict['ids'])
 
-
+    """
     #if update button is clicked, refresh FRB data from csv
     if updatebutton.clicked:
         update_FRB_params()
-
+    """
     #if button is clicked, load FRB data and go to next screen
     if loadbutton.clicked:# and (not polcalloadbutton.value):
         if np.isnan(state_dict['z']):wdict['trialz'] = -1
@@ -1193,6 +1384,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
         state_dict['base_wav_test'] = wav_test
         state_dict['base_time_axis'] = np.arange(I.shape[1])*32.7*state_dict['base_n_t']
         state_dict['badchans'] = badchans
+        state_dict['polcaldataloaded'] = False
 
         if polcalloadbutton.value and (polcals_available > 0):
 
@@ -1254,7 +1446,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
             state_dict['U_fcalRM_unweighted'] = copy.deepcopy(state_dict['U_fcal_unweighted'])
             state_dict['V_fcalRM_unweighted'] = copy.deepcopy(state_dict['V_fcal_unweighted'])
 
-
+            state_dict['polcaldataloaded'] = True
             """#get UNWEIGHTED spectrum at max resolution -- at this point, haven't gotten ideal filter weights yet
             (state_dict['base_I_fcal_unweighted'],state_dict['base_Q_fcal_unweighted'],state_dict['base_U_fcal_unweighted'],state_dict['base_V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['width_native'],state_dict['fobj'].header.tsamp,
                                                         state_dict['base_n_f'],state_dict['n_t'],state_dict['freq_test'],
@@ -1270,11 +1462,12 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
         #state_dict['current_state'] += 1
 
+    """
     #if filbutton is clicked, run the offline beamformer to make fil files
     if filbutton.clicked:
         status = polbeamform.make_filterbanks(state_dict['ids'],state_dict['nickname'],state_dict['bfweights'],state_dict['ibeam'],state_dict['mjd'],state_dict['DM0'],path=state_dict['datadir'])
         print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
-
+    """
 
 
     #plot filplot
@@ -1285,12 +1478,19 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
     else:
         #create the image, first find fil file
         filname = glob.glob(dirs['candidates'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil")
+        pre_rebin = 1
+        start_time = 0 #seconds
+        stop_time = 4 #seconds
+        fil_dedispersed = False
         if len(filname) == 0:
             #couldn't find file on h23, try to copy from dsastorage
             
             #first try general dir
-            os.system("scp " + dirs['dsastorageFRBDir'] + "/" + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil" + state_dict['datadir'])
-            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+            os.system("scp " + dirs['dsastorageFRBDir'] + str(state_dict['ids']) + "/Level2/filterbank/" + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + ".fil " + state_dict['datadir'] + str(state_dict['ids']) + "_" + str(state_dict['ibeam']) + "_Level2.fil")
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + "_Level2.fil")
+
+
 
         if len(filname) == 0:
             #try dsastorage backups
@@ -1309,6 +1509,15 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
 
             os.system("scp " + dirs['dsastorageFILDir'] + corr + "/20" + state_dict['ids'][:2] + "_" + str(int(state_dict['ids'][2:4])) + "_" + str(int(state_dict['ids'][4:6])) + "_*/fil_" + state_dict['ids'] + "/" + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil "+ state_dict['datadir'])
             filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + "_" + str(state_dict['ibeam']) + ".fil")
+
+        if len(filname) == 0:
+            #try making one from high resolution files
+            filname = glob.glob(state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_0.fil")
+            pre_rebin = 8
+            start_time = 12800*32.7e-6 #seconds
+            stop_time = 7680*32.7e-6 #seconds
+            fil_dedispersed=True
+        
         if len(filname) == 0:
             im = mr.Markdown("## No candidate plot for " + str(state_dict['ids']) + "_"+ str(state_dict['nickname']))
 
@@ -1335,30 +1544,56 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_sli
                                 candname=state_dict['ids'],
                                 imjd=state_dict['mjd'],
                                 injected=False,
-                                fast_classify=False)
+                                fast_classify=False,
+                                pre_rebin=pre_rebin,
+                                start_time=start_time,
+                                stop_time=stop_time,
+                                fil_dedispersed=fil_dedispersed)
             im = Image.open(state_dict['datadir'] + state_dict['ids'] + "_parsec.png")
     
     #update widget dict
-    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
-                    ["frbfiles_menu","n_t_slider","logn_f_slider","logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
+    update_wdict([frbfiles_menu,n_t_slider,logn_f_slider,polcalloadbutton],#logibox_slider,buff_L_slider_init,buff_R_slider_init,polcalloadbutton],
+                    ["frbfiles_menu","n_t_slider","logn_f_slider","polcalloadbutton"],#"logibox_slider","buff_L_slider_init","buff_R_slider_init","polcalloadbutton"],
                     param='value')
-    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,mjd_display,z_display],
-                    ["RA_display","DEC_display","DM_init_display","ibeam_display","mjd_display","z_display"],
+    update_wdict([RA_display,DEC_display,DM_init_display,ibeam_display,ibox_display,mjd_display,z_display],
+                 ["RA_display","DEC_display","DM_init_display","ibeam_display","ibox_display","mjd_display","z_display"],
                     param='data')
     return im
 
-def load_dynspecplot_screen(logwindow_slider_dynspec):
+def load_dynspecplot_screen(logwindow_slider_dynspec,n_t_slider,logn_f_slider):
 
     if ~np.all(np.isnan(state_dict['base_I'])):#'base_I' in state_dict.keys():
-    
-        dsapol.plot_spectra_2D(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],state_dict['width_native'],state_dict['tsamp'],state_dict['base_n_t'],state_dict['base_n_f'],state_dict['base_freq_test'],n_off=int(NOFFDEF//state_dict['base_n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_dynspec.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['base_time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
-    update_wdict([logwindow_slider_dynspec],['logwindow_slider_dynspec'],param='value')
+        #update time, freq resolution
+        state_dict['window'] = 2**logwindow_slider_dynspec.value
+        state_dict['rel_n_t'] = n_t_slider.value
+        state_dict['rel_n_f'] = (2**logn_f_slider.value)
+        state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
+        state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
+        state_dict['freq_test'] = [state_dict['base_freq_test'][0].reshape(len(state_dict['base_freq_test'][0])//(2**logn_f_slider.value),(2**logn_f_slider.value)).mean(1)]*4
+        state_dict['freq_min'] = np.nanmin(state_dict['freq_test'][0])
+        state_dict['freq_max'] = np.nanmax(state_dict['freq_test'][0])
+        state_dict['freq_cntr'] = (state_dict['freq_max'] + state_dict['freq_min'])/2
+        state_dict['I'] = dsapol.avg_time(state_dict['base_I'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['I'] = dsapol.avg_freq(state_dict['I'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['Q'] = dsapol.avg_time(state_dict['base_Q'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['Q'] = dsapol.avg_freq(state_dict['Q'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['U'] = dsapol.avg_time(state_dict['base_U'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['U'] = dsapol.avg_freq(state_dict['U'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['V'] = dsapol.avg_time(state_dict['base_V'],n_t_slider.value)#state_dict['n_t'])
+        state_dict['V'] = dsapol.avg_freq(state_dict['V'],2**logn_f_slider.value)#state_dict['n_f'])
+        state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,state_dict['I'].shape[1])
+
+
+    
+        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
+
+    update_wdict([logwindow_slider_dynspec,n_t_slider,logn_f_slider],['logwindow_slider_dynspec','n_t_slider','logn_f_slider'],param='value')
     return
 """
 Dedispersion Tuning state
 """
-def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdonebutton,saveplotbutton,DM_showerrs):
+def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider,ddm_num,DMdonebutton,saveplotbutton,DM_showerrs):
     """
     This function updates the dedispersion screen when resolution
     or dm,where='post' step are changed
@@ -1419,7 +1654,7 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
 
 
     #update time, freq resolution
-    state_dict['window'] = 2**logwindow_slider_init.value
+    state_dict['window'] = 2**logwindow_slider.value
     state_dict['rel_n_t'] = n_t_slider.value
     state_dict['rel_n_f'] = (2**logn_f_slider.value)
     state_dict['n_t'] = n_t_slider.value*state_dict['base_n_t']
@@ -1523,8 +1758,8 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
             print("Submitted Job, status: " + str(status))#bfstatus_display.data = status
 
     #update widget dict
-    update_wdict([n_t_slider,logn_f_slider,logwindow_slider_init,DM_showerrs,ddm_num],
-                ["n_t_slider","logn_f_slider","logwindow_slider_init","DM_showerrs","ddm_num"],
+    update_wdict([n_t_slider,logn_f_slider,logwindow_slider,DM_showerrs,ddm_num],
+                ["n_t_slider","logn_f_slider","logwindow_slider","DM_showerrs","ddm_num"],
                 param='value')
     
     #update_wdict([DM_input_display,DM_new_display],
@@ -1533,13 +1768,13 @@ def dedisp_screen(n_t_slider,logn_f_slider,logwindow_slider_init,ddm_num,DMdoneb
 
     return #ddm_num
 
-def dedisp_dynspecplot_screen(logwindow_slider_init):
+def dedisp_dynspecplot_screen(logwindow_slider):
 
     if 'I' in state_dict.keys() and ~np.all(np.isnan(state_dict['I'])):#'base_I' in state_dict.keys():
+        state_dict['window'] = 2**logwindow_slider.value
+        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
-        dsapol.plot_spectra_2D(state_dict['I'],state_dict['Q'],state_dict['U'],state_dict['V'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(2**(logwindow_slider_init.value)),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
-
-    update_wdict([logwindow_slider_init],['logwindow_slider_init'],param='value')
+    update_wdict([logwindow_slider],['logwindow_slider'],param='value')
     return
 
 
@@ -1823,7 +2058,139 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
     return beam_dict_3C48,beam_dict_3C286
 
 
-def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
+
+
+
+def polcal_screen_USER(polcaldate_menu,
+        polcalbutton,ParA_display,
+        saveplotbutton,polcalprocs):
+
+    if polcaldate_menu.value != "":
+        #update polcal parameters in state dict
+        state_dict['gxx'],state_dict['gyy'],state_dict['cal_freq_axis'] = polcal.read_polcal(polcaldate_menu.value)
+
+        #needd to downsample to base resolution
+        state_dict['gxx'] = np.nanmean(state_dict['gxx'].reshape((len(state_dict['gxx'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+        state_dict['gyy'] = np.nanmean(state_dict['gyy'].reshape((len(state_dict['gyy'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+        state_dict['cal_freq_axis'] = np.nanmean(state_dict['cal_freq_axis'].reshape((len(state_dict['cal_freq_axis'])//state_dict['base_n_f'],state_dict['base_n_f'])),axis=1)
+
+    state_dict['polcalfile'] = polcaldate_menu.value
+    polcal_dict['maxProcesses'] = int(polcalprocs.value)
+
+    if polcalbutton.clicked and (state_dict['polcalfile'] != ""):
+
+
+        f = open(polcal.logfile,"w")
+        print("start",file=f)
+
+        #calibrate at native resolution
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'] = dsapol.calibrate(state_dict['base_I'],state_dict['base_Q'],state_dict['base_U'],state_dict['base_V'],(state_dict['gxx'],state_dict['gyy']),stokes=True,multithread=True,maxProcesses=int(polcalprocs.value),bad_chans=state_dict['badchans'])
+        print("done calibrating...",file=f)
+
+        #parallactic angle calibration
+        state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
+        ParA_display.data = np.around(state_dict['ParA']*180/np.pi,2)
+        print("done ParA calibrating...",file=f)
+        #get downsampled versions
+        state_dict['Ical'] = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
+        state_dict['Ical'] = dsapol.avg_freq(state_dict['Ical'],state_dict['rel_n_f'])
+        state_dict['Qcal'] = dsapol.avg_time(state_dict['base_Qcal'],state_dict['rel_n_t'])
+        state_dict['Qcal'] = dsapol.avg_freq(state_dict['Qcal'],state_dict['rel_n_f'])
+        state_dict['Ucal'] = dsapol.avg_time(state_dict['base_Ucal'],state_dict['rel_n_t'])
+        state_dict['Ucal'] = dsapol.avg_freq(state_dict['Ucal'],state_dict['rel_n_f'])
+        state_dict['Vcal'] = dsapol.avg_time(state_dict['base_Vcal'],state_dict['rel_n_t'])
+        state_dict['Vcal'] = dsapol.avg_freq(state_dict['Vcal'],state_dict['rel_n_f'])
+
+
+        #default case: not RM calibrated
+        state_dict['IcalRM'] = copy.deepcopy(state_dict['Ical'])
+        state_dict['QcalRM'] = copy.deepcopy(state_dict['Qcal'])
+        state_dict['UcalRM'] = copy.deepcopy(state_dict['Ucal'])
+        state_dict['VcalRM'] = copy.deepcopy(state_dict['Vcal'])
+
+        print("done downsampling...",file=f)
+        f.close()
+        #get time series
+        (state_dict['I_tcal'],state_dict['Q_tcal'],state_dict['U_tcal'],state_dict['V_tcal'],state_dict['I_tcal_err'],state_dict['Q_tcal_err'],state_dict['U_tcal_err'],state_dict['V_tcal_err']) = dsapol.get_stokes_vs_time(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],n_off=int(NOFFDEF//state_dict['n_t']),plot=False,show=False,normalize=True,buff=state_dict['buff'],window=30,error=True,badchans=state_dict['badchans'])
+
+        state_dict['I_tcalRM'] = copy.deepcopy(state_dict['I_tcal'])
+        state_dict['Q_tcalRM'] = copy.deepcopy(state_dict['Q_tcal'])
+        state_dict['U_tcalRM'] = copy.deepcopy(state_dict['U_tcal'])
+        state_dict['V_tcalRM'] = copy.deepcopy(state_dict['V_tcal'])
+
+        state_dict['time_axis'] = 32.7*state_dict['n_t']*np.arange(0,len(state_dict['I_tcal']))
+
+        #get timestart, timestop
+        (state_dict['peak'],state_dict['timestart'],state_dict['timestop']) = dsapol.find_peak(state_dict['Ical'],state_dict['width_native'],state_dict['tsamp'],n_t=state_dict['rel_n_t'],peak_range=None,pre_calc_tf=False,buff=state_dict['buff'])
+
+
+        #get UNWEIGHTED spectrum -- at this point, haven't gotten ideal filter weights yet
+        (state_dict['I_fcal_unweighted'],state_dict['Q_fcal_unweighted'],state_dict['U_fcal_unweighted'],state_dict['V_fcal_unweighted']) = dsapol.get_stokes_vs_freq(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],
+                                                        state_dict['n_f'],state_dict['n_t'],state_dict['freq_test'],
+                                                        n_off=int(NOFFDEF//state_dict['n_t']),plot=False,
+                                                        normalize=True,buff=state_dict['buff'],weighted=False,
+                                                        fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"))
+
+        state_dict['I_fcalRM_unweighted'] = copy.deepcopy(state_dict['I_fcal_unweighted'])
+        state_dict['Q_fcalRM_unweighted'] = copy.deepcopy(state_dict['Q_fcal_unweighted'])
+        state_dict['U_fcalRM_unweighted'] = copy.deepcopy(state_dict['U_fcal_unweighted'])
+        state_dict['V_fcalRM_unweighted'] = copy.deepcopy(state_dict['V_fcal_unweighted'])
+
+
+    fig = plt.figure(figsize=(18,12))
+
+    plt.subplot(311)
+    plt.ylabel(r'$|g_{yy}|$')
+    plt.xticks([])
+
+    plt.subplot(312)
+    plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+    plt.xticks([])
+
+    plt.subplot(313)
+    plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+    plt.xlabel(r'Frequency (MHz)')
+
+    plt.subplots_adjust(hspace=0)
+
+    #if using current cal solution, display
+    #fig=plt.figure(figsize=(18,14))
+    if polcaldate_menu.value != "":
+        plt.subplot(312)
+        #plt.xticks([])
+        #plt.ylabel(r'$|g_{xx}|/|g_{yy}|$')
+        plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gxx'])/np.abs(state_dict['gyy']),color='magenta',linewidth=4)
+
+        plt.subplot(313)
+        #plt.ylabel(r'$\angle g_{xx} - \angle g_{yy}$')
+        plt.plot(state_dict['cal_freq_axis'],np.angle(state_dict['gxx'])-np.angle(state_dict['gyy']),color='magenta',linewidth=4)
+        #plt.xlabel("Frequency (MHz)")
+
+        plt.subplot(311)
+        plt.title(state_dict['polcalfile'])
+        #plt.xticks([])
+        #plt.ylabel(r'$|g_{yy}|$')
+        plt.plot(state_dict['cal_freq_axis'],np.abs(state_dict['gyy']),color='magenta',linewidth=4)
+        
+    if saveplotbutton.clicked:
+        try:
+            plt.savefig(polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+            print("Saved Figure to h24: " + polcal.default_path + "POLCAL_PARAMETERS_" + state_dict['polcalfile'] + ".pdf")
+        except Exception as ex:
+            print("Save Failed: " + str(ex))
+    plt.show()
+
+    update_wdict([polcaldate_menu,polcalprocs],
+        ['polcaldate_menu','polcalprocs'],param='value')
+    update_wdict([ParA_display],
+        ['ParA_display'],param='data')
+
+    return
+
+
+
+
+def polcal_screen_ADMIN(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polcaldate_findbeams_menu,obsid3C48_menu,obsid3C286_menu,
         polcalbutton,polcopybutton,bfcal_button,findbeams_button,filcalbutton,ParA_display,
         edgefreq_slider,breakfreq_slider,sf_window_weight_cals,sf_order_cals,peakheight_slider,peakwidth_slider,polyfitorder_slider,
         ratio_edgefreq_slider,ratio_breakfreq_slider,ratio_sf_window_weight_cals,ratio_sf_order_cals,ratio_peakheight_slider,ratio_peakwidth_slider,ratio_polyfitorder_slider,
@@ -2059,12 +2426,12 @@ def polcal_screen2(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,pol
     return #beam_dict_3C48,beam_dict_3C286 #return these to prevent recalculating the beamformer weights isot
 
 
-def polcal_dynspecplot_screen():
+def polcal_dynspecplot_screen(logwindow_slider):
 
     if 'Ical' in state_dict.keys() and ~np.all(np.isnan(state_dict['Ical'])):#'base_I' in state_dict.keys():
-
+        state_dict['window'] = 2**logwindow_slider.value
         dsapol.plot_spectra_2D(state_dict['Ical'],state_dict['Qcal'],state_dict['Ucal'],state_dict['Vcal'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
-
+    update_wdict([logwindow_slider],['logwindow_slider'],param='value')
     return
 
 """
@@ -2250,7 +2617,9 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
     #update initial parameters for scattering analysis
     if not state_dict['scatter_init']:
         scatter_reset_initvals(state_dict['current_comp'])
-
+        for i in range(state_dict['current_comp']+1,5):
+            scatter_reset_initvals(i,nocomp=True)
+    
     #display masked dynamic spectrum
     fig, (a0, a1) = plt.subplots(2, 1, gridspec_kw={'height_ratios': [1, 2]},figsize=(18,12))
     c1=a0.step(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['timestart']-state_dict['window']:state_dict['comps'][state_dict['current_comp']]['timestop']+state_dict['window']]*1e-3,
@@ -2457,23 +2826,52 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
 """
 Scattering Analysis State
 """
-def scatter_reset_initvals(comp_num):#,x0_guess,sigma_guess,tau_guess,amp_guess,x0_range,sigma_range,tau_range,amp_range):
-    wdict['x0_guess_' + str(comp_num)]  = np.around(state_dict['comps'][comp_num]['peak']*32.7e-3,2) #ms
-    wdict['amp_guess_' + str(comp_num)] = np.around(state_dict['I_tcal'][state_dict['comps'][comp_num]['peak']],2) 
-    wdict['sigma_guess_' + str(comp_num)] = np.around(state_dict['comps'][comp_num]['FWHM']*32.7e-3/2,2)  #ms
-    wdict['tau_guess_' + str(comp_num)]  = np.around((state_dict['comps'][comp_num]['intR'] - state_dict['comps'][comp_num]['peak'])*32.7e-3,2)  #ms
+def scatter_reset_initvals(comp_num,startfactor=wdict['scatter_sliderrange'],window=int(2**wdict['logwindow_slider']),nocomp=False):#,x0_guess,sigma_guess,tau_guess,amp_guess,x0_range,sigma_range,tau_range,amp_range):
+    if nocomp:
+        comp_num_val = 0 #if there's no component, we still need to initialize, so set to values for first component
+    else:
+        comp_num_val = comp_num
+    wdict['x0_guess_' + str(comp_num)]  = np.around(state_dict['comps'][comp_num_val]['peak']*state_dict['n_t']*32.7e-3,2) #ms
+    wdict['amp_guess_' + str(comp_num)] = np.around(state_dict['I_tcal'][state_dict['comps'][comp_num_val]['peak']],2) 
+    wdict['sigma_guess_' + str(comp_num)] = np.around(state_dict['comps'][comp_num_val]['FWHM']*state_dict['n_t']*32.7e-3/2,2)  #ms
+    wdict['tau_guess_' + str(comp_num)]  = np.around((state_dict['comps'][comp_num_val]['intR'] - state_dict['comps'][comp_num_val]['peak'])*state_dict['n_t']*32.7e-3,2)  #ms
 
-    wdict['x0_range_' + str(comp_num)] =  [np.around(wdict['x0_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['x0_guess_' + str(comp_num)],2)]
-    wdict['amp_range_' + str(comp_num)] = [np.around(wdict['amp_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['amp_guess_' + str(comp_num)],2)]
-    wdict['sigma_range_' + str(comp_num)]  = [np.around(wdict['sigma_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['sigma_guess_' + str(comp_num)],2)]
-    wdict['tau_range_' + str(comp_num)] = [np.around(wdict['tau_guess_' + str(comp_num)]/2,2),np.around((3/2)*wdict['tau_guess_' + str(comp_num)],2)]
+    #shift x0 guess
+    guesscurve = scat.exp_gauss(state_dict['time_axis']*1e-3, wdict['x0_guess_' + str(comp_num)], wdict['amp_guess_' + str(comp_num)], wdict['sigma_guess_' + str(comp_num)], wdict['tau_guess_' + str(comp_num)])
+    wdict['x0_guess_' + str(comp_num)] -= np.around(((np.argmax(guesscurve) - np.argmax(state_dict['I_tcal'])-1)*state_dict['n_t']*32.7e-3),2)
+    wdict['x0_guess_shift_' + str(comp_num)] = np.around(((np.argmax(guesscurve) - np.argmax(state_dict['I_tcal'])-1)*state_dict['n_t']*32.7e-3),2)
+
+    x0min = np.around(np.nanmax([np.around(wdict['x0_guess_' + str(comp_num)]*startfactor,2),state_dict['time_axis'][state_dict['timestart']-window]*1e-3]),2)
+    x0max = np.around(np.nanmin([np.around(wdict['x0_guess_' + str(comp_num)]*(1+startfactor),2),state_dict['time_axis'][state_dict['timestop']+window]*1e-3]),2)
+    wdict['x0_range_' + str(comp_num)] =  [x0min,x0max]#[np.around(wdict['x0_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['x0_guess_' + str(comp_num)],2)]
+
+    ampmin = np.around(np.nanmax([np.around(wdict['amp_guess_' + str(comp_num)]*startfactor,2),0]),2)
+    ampmax = np.around(np.nanmin([np.around(wdict['amp_guess_' + str(comp_num)]*(1+startfactor),2),500]),2)
+    wdict['amp_range_' + str(comp_num)] = [ampmin,ampmax]#[np.around(wdict['amp_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['amp_guess_' + str(comp_num)],2)]
+
+    sigmamin = np.around(np.nanmax([np.around(wdict['sigma_guess_' + str(comp_num)]*startfactor,2),0]))
+    sigmamax = np.around(np.nanmin([np.around(wdict['sigma_guess_' + str(comp_num)]*(1+startfactor),2),(state_dict['time_axis'][state_dict['timestop']+window]-state_dict['time_axis'][state_dict['timestart']-window])*1e-3]),2)
+    wdict['sigma_range_' + str(comp_num)]  = [sigmamin,sigmamax]#[np.around(wdict['sigma_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['sigma_guess_' + str(comp_num)],2)]
+
+    taumin = np.around(np.nanmax([np.around(wdict['tau_guess_' + str(comp_num)]*startfactor,2),0]),2)
+    taumax = np.around(np.nanmin([np.around(wdict['tau_guess_' + str(comp_num)]*(1+startfactor),2),(state_dict['time_axis'][state_dict['timestop']+window]-state_dict['time_axis'][state_dict['timestart']-window])*1e-3]),2)
+    wdict['tau_range_' + str(comp_num)] = [taumin,taumax]#[np.around(wdict['tau_guess_' + str(comp_num)]*startfactor,2),np.around((1+startfactor)*wdict['tau_guess_' + str(comp_num)],2)]
     return
 
-def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_init,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin):
+def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_guess_comps,amp_guess_comps,x0_range_sliders,sigma_range_sliders,tau_range_sliders,amp_range_sliders,calc_scat_button,save_scat_button,scatterbackground,refresh_button,scatterresume,scatterweights,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin,logwindow_slider):
+    """
+    if state_dict['window'] != 2**logwindow_slider.value:
+        #if window changes, need to reset slider ranges
+        state_dict['window'] = 2**logwindow_slider.value
+        for i in range(state_dict['n_comps']):
+            scatter_reset_initvals(i,startfactor=scatter_sliderrange.value,nocomp=False)
+        for i in range(state_dict['n_comps']+1,5):
+            scatter_reset_initvals(i,startfactor=scatter_sliderrange.value,nocomp=True)
+    """
     state_dict['scatter_init'] = True
-    if scatter_init.clicked:
-        state_dict['scatter_init'] = False
-
+    #if scatter_init.clicked or state_dict['window'] != 2**logwindow_slider.value:
+    #    state_dict['scatter_init'] = False
+    state_dict['window'] = 2**logwindow_slider.value
     state_dict['scatter_fit_comps'] = scatfitmenu.value
 
 
@@ -2912,12 +3310,12 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             #initial_fit_full += scat.exp_gauss_1(state_dict['time_axis']*1e-3,x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)
             #indicate proposed values
-            ax1.axvline(state_dict['comps'][k]['peak']*32.7e-3,color='purple',linestyle='--')
-            ax1.axvspan(state_dict['comps'][k]['intL']*32.7e-3,state_dict['comps'][k]['intR']*32.7e-3,color='purple',alpha=0.1)
-            ax1.text((state_dict['comps'][k]['peak'] + 5)*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
-                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3,
-                                                                                                        b=state_dict['comps'][k]['FWHM']*32.7e-3,
-                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
+            ax1.axvline(state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3,color='purple',linestyle='--')
+            ax1.axvspan(state_dict['comps'][k]['intL']*state_dict['n_t']*32.7e-3,state_dict['comps'][k]['intR']*state_dict['n_t']*32.7e-3,color='purple',alpha=0.1)
+            ax1.text((state_dict['comps'][k]['peak'] + 5)*state_dict['n_t']*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
+                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3 - wdict['x0_guess_shift_' + str(k)],
+                                                                                                        b=state_dict['comps'][k]['FWHM']*state_dict['n_t']*32.7e-3,
+                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*state_dict['n_t']*32.7e-3,
                                                                                                         d=I_tcal_p[state_dict['comps'][k]['peak']]),
                 backgroundcolor='thistle',fontsize=18)
         ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
@@ -2998,8 +3396,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
     #update wdict
-    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin],
-            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps','scatter_nwalkers','scatter_nsteps','scatter_nburn','scatter_nthin'])
+    update_wdict([scattermenu,scatfitmenu,scatterbackground,scatterweights,scatterresume,scatter_nlive,scatter_sliderrange,scattersamps,scatter_nwalkers,scatter_nsteps,scatter_nburn,scatter_nthin,logwindow_slider],
+            ['scattermenu','scatfitmenu','scatterbackground','scatterweights','scatterresume','scatter_nlive','scatter_sliderrange','scattersamps','scatter_nwalkers','scatter_nsteps','scatter_nburn','scatter_nthin','logwindow_slider'])
     for i in range(len(x0_guess_comps)):
         update_wdict([x0_guess_comps[i],amp_guess_comps[i],sigma_guess_comps[i],tau_guess_comps[i],
                       x0_range_sliders[i],amp_range_sliders[i],sigma_range_sliders[i],tau_range_sliders[i]],
@@ -3392,7 +3790,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 param='value')
 
     #update RM displays
-    if state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
+    if getRMgal_button.clicked:#state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
         state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=dirs['FRBtables'] + "faraday2020v2.hdf5")
         state_dict['RM_gal'] = np.around(state_dict['RM_gal'],2)
         state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],2)
@@ -3401,7 +3799,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
     RM_gal_display.data = np.around(state_dict['RM_gal'],2)
     RM_galerr_display.data = np.around(state_dict['RM_galerr'],2)
     
-    if state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd'] or getRMion_button.clicked:
+    if getRMion_button.clicked:#state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd'] or getRMion_button.clicked:
         state_dict['RM_ion'],state_dict['RM_ionerr'] = RMcal.get_rm_ion(state_dict['RA'],state_dict['DEC'],state_dict['mjd'])
         state_dict['RM_ion'] = np.around(state_dict['RM_ion'],2)
         state_dict['RM_ionerr'] = np.around(state_dict['RM_ionerr'],2)
@@ -3449,14 +3847,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #STAGE 1: RM-TOOLS
                 if useRMTools.value: #STAGE 1: RM-TOOLS
                     n_off = int(NOFFDEF/state_dict['n_t'])
+                    try:
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                        state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
 
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs'],state_dict['comps'][i]['RMcalibrated']['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                    state_dict['comps'][i]['RMcalibrated']['RM_tools'] = [RM,RMerr]
-
-                    #update table
-                    RMdf.loc[str(i), 'RM-Tools'] = RM
-                    RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
-
+                        #update table
+                        RMdf.loc[str(i), 'RM-Tools'] = RM
+                        RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
+                    except MemoryError as e:
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                        f = open(RMcal.logfile,"w")
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                        f.close()
 
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
@@ -3481,14 +3883,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
         
             #STAGE 1: RM-TOOLS (Full burst)
             if useRMTools.value: 
-                RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
+                try:
+                    RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrs'],state_dict["RMcalibrated"]['trial_RM_tools'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=maxRM_num_tools.value,dRM_tools=dRM_tools.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict["RMcalibrated"]['RM_tools'] = [RM,RMerr]
 
-
-                #update table
-                RMdf.loc['All', 'RM-Tools'] = RM
-                RMdf.loc['All', 'RM-Tools Error'] = RMerr
-        
+                    #update table
+                    RMdf.loc['All', 'RM-Tools'] = RM
+                    RMdf.loc['All', 'RM-Tools Error'] = RMerr
+                except MemoryError as e:
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                    f = open(RMcal.logfile,"w")
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                    f.close()
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
@@ -3553,14 +3959,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #STAGE 1: RM-TOOLS
                 if useRMTools.value: #STAGE 1: RM-TOOLS
                     n_off = int(NOFFDEF/state_dict['n_t'])
-
-                    RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                    state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'] = [RM,RMerr]
+                    try:
+                        RM,RMerr,state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip,Qp,Up,Vp,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                        state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'] = [RM,RMerr]
                     
-                    #update table
-                    RMdf.loc[str(i), 'RM-Tools'] = RM
-                    RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
-
+                        #update table
+                        RMdf.loc[str(i), 'RM-Tools'] = RM
+                        RMdf.loc[str(i), 'RM-Tools Error'] = RMerr
+                    except MemoryError as e:
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                        f = open(RMcal.logfile,"w")
+                        print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                        f.close()
                 #STAGE 2: 1D RM synthesis
                 if useRMsynth.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
@@ -3577,6 +3987,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         RMdf.loc[str(i), '1D-Synth'] = RM
                         RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
+
                 #STAGE 3: 2D RM synthesis
                 if useRM2D.value:
                     n_off = int(NOFFDEF/state_dict['n_t'])
@@ -3588,6 +3999,8 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         state_dict['comps'][i]['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                         state_dict['comps'][i]['RMcalibrated']['RMerrfit'] = RMerr2
                         state_dict['comps'][i]['RMcalibrated']['RMFWHM'] = upp-low
+
+                        if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
                         #update table
                         RMdf.loc[str(i), '2D-Synth'] = RM2
                         RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
@@ -3603,13 +4016,18 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
 
             #STAGE 1: RM-TOOLS (Full burst)
             if useRMTools.value:
-                RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
-                state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
+                try:
+                    RM,RMerr,state_dict["RMcalibrated"]['RM_tools_snrszoom'],state_dict["RMcalibrated"]['trial_RM_toolszoom'] = RMcal.get_RM_tools(If,Qf,Uf,Vf,Ip_full,Qp_full,Up_full,Vp_full,state_dict['base_freq_test'],state_dict['n_t'],maxRM_num_tools=np.abs(RMcenter)+RM_window_zoom.value,dRM_tools=dRM_tools_zoom.value,n_off=int(NOFFDEF/state_dict['n_t']))
+                    state_dict["RMcalibrated"]['RM_toolszoom'] = [RM,RMerr]
 
-                #update table
-                RMdf.loc['All', 'RM-Tools'] = RM
-                RMdf.loc['All', 'RM-Tools Error'] = RMerr
-
+                    #update table
+                    RMdf.loc['All', 'RM-Tools'] = RM
+                    RMdf.loc['All', 'RM-Tools Error'] = RMerr
+                except MemoryError as e:
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method")
+                    f = open(RMcal.logfile,"w")
+                    print("RM-Tools Memory Error, please increase the trial RM spacing or select a different RM synthesis method",file=f)
+                    f.close()
             #STAGE 2: 1D RM synthesis
             if useRMsynth.value:
                 if RMsynthbackground.value:
@@ -3633,6 +4051,8 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                     state_dict["RMcalibrated"]['dname_2D'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'],background=True)
                 else:
                     RM2,RMerr2,upp,low,state_dict['RMcalibrated']['RMsnrs2'],state_dict['RMcalibrated']['SNRs_full'],state_dict['RMcalibrated']['trial_RM2'] = RMcal.get_RM_2D(Ip_full,Qp_full,Up_full,Vp_full,state_dict['timestart'],state_dict['timestop'],state_dict['width_native'],state_dict['tsamp'],state_dict['buff'],1,state_dict['n_t'],state_dict['base_freq_test'],state_dict['time_axis'],nRM_num=nRM_num_zoom.value,minRM_num=RMcenter-RM_window_zoom.value,maxRM_num=RMcenter+RM_window_zoom.value,n_off=n_off,fit=True,maxthreads=int(maxthreads.value),maxbatches=int(maxbatches.value),maxtrials_per_thread=int(maxtrials_per_thread.value),weights=state_dict['weights'])
+                    if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1zoom'])): state_dict['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
+
                     state_dict['RMcalibrated']['RM2'] = [RM2,RMerr2,upp,low]
                     state_dict['RMcalibrated']['RMerrfit'] = RMerr2
                     state_dict['RMcalibrated']['RMFWHM'] = upp-low
@@ -3723,6 +4143,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                 #update table
                 RMdf.loc['All', '2D-Synth'] = RM2
                 RMdf.loc['All', '2D-Synth Error'] = RMerr2
+                if np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1zoom'])): state_dict['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict["RMcalibrated"]['trial_RM2']))
 
         if state_dict['n_comps'] > 1:
             for i in range(state_dict['n_comps']):
@@ -3808,15 +4229,15 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         #update table
                         RMdf.loc[str(i), '2D-Synth'] = RM2
                         RMdf.loc[str(i), '2D-Synth Error'] = RMerr2
-
+                        if np.all(np.isnan(state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'])): state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'] = np.nan*np.ones(len(state_dict['comps'][i]["RMcalibrated"]['trial_RM2']))
                     
 
     #1D plots
 
-    if rmcomp_menu.value == 'All':
+    if rmcomp_menu.value == 'All' and (~np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RM_tools_snrs'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs2'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RMsnrs1zoom'])) or ~np.all(np.isnan(state_dict['RMcalibrated']['RM_tools_snrszoom']))):
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['RMcalibrated']['RMsnrs1'],state_dict['RMcalibrated']['RM_tools_snrs']],[state_dict['RMcalibrated']['RMsnrs1zoom'],state_dict['RMcalibrated']['RM_tools_snrszoom'],state_dict['RMcalibrated']['RMsnrs2']],state_dict['RMcalibrated']["RM2"][0],state_dict["RMcalibrated"]["RMerrfit"],state_dict["RMcalibrated"]["trial_RM1"],state_dict["RMcalibrated"]["trial_RM2"],state_dict["RMcalibrated"]["trial_RM_tools"],state_dict["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='All Components',figsize=(38,24),datadir=state_dict['datadir'])
     
-    elif rmcomp_menu.value != '':
+    elif rmcomp_menu.value != 'All' and rmcomp_menu.value != '' and (~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RMsnrs1'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RM_tools_snrs'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RMsnrs2'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RMsnrs1zoom'])) or ~np.all(np.isnan(state_dict['comps'][int(rmcomp_menu.value)]['RMcalibrated']['RM_tools_snrszoom']))):
         i= int(rmcomp_menu.value)
         dsapol.RM_summary_plot(state_dict['ids'],state_dict['nickname'],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrs']],[state_dict['comps'][i]['RMcalibrated']['RMsnrs1zoom'],state_dict['comps'][i]['RMcalibrated']['RM_tools_snrszoom'],state_dict['comps'][i]['RMcalibrated']['RMsnrs2']],state_dict['comps'][i]['RMcalibrated']["RM2"][0],state_dict['comps'][i]["RMcalibrated"]["RMerrfit"],state_dict['comps'][i]["RMcalibrated"]["trial_RM1"],state_dict['comps'][i]["RMcalibrated"]["trial_RM2"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_tools"],state_dict['comps'][i]["RMcalibrated"]["trial_RM_toolszoom"],threshold=9,suffix="_FORMAT_UPDATE_PARSEC",show=True,title='Component ' + rmcomp_menu.value,figsize=(38,24),datadir=state_dict['datadir'])
 
@@ -3897,12 +4318,14 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
     return
 
 
-def RM_dynspecplot_screen():
+def RM_dynspecplot_screen(logwindow_slider):
 
     if 'IcalRM' in state_dict.keys() and ~np.all(np.isnan(state_dict['IcalRM'])):#'base_I' in state_dict.keys():
+        state_dict['window'] = 2**logwindow_slider.value
 
         dsapol.plot_spectra_2D(state_dict['IcalRM'],state_dict['QcalRM'],state_dict['UcalRM'],state_dict['VcalRM'],state_dict['width_native'],state_dict['tsamp'],state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],n_off=int(NOFFDEF//state_dict['n_t']),datadir=state_dict['datadir'],label=state_dict['ids'] + "_" + state_dict['nickname'],calstr='',ext='.pdf',window=int(state_dict['window']),show=True,buff=state_dict['buff'],weighted=False,timeaxis=state_dict['time_axis'],fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),figsize=(18,12),save=False,cmap='seismic',sat=0.25)
 
+    update_wdict([logwindow_slider],['logwindow_slider'],param='value')
     return
 
 
@@ -4803,8 +5226,8 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                      'RMcal' in state_dict['RMcalibrated'].keys(),
                      state_dict["RMcalibrated"]["RM1"][0],
                      state_dict["RMcalibrated"]["RM1"][1],
-                     state_dict["RMcalibrated"]['RM_tools'][0],
-                     state_dict["RMcalibrated"]['RM_tools'][1],
+                     "" if 'RM_tools' not in state_dict['RMcalibrated'].keys() else state_dict["RMcalibrated"]['RM_tools'][0],
+                     "" if 'RM_tools' not in state_dict['RMcalibrated'].keys() else state_dict["RMcalibrated"]['RM_tools'][1],
                      state_dict['RMcalibrated']['RM2'][0],
                      state_dict['RMcalibrated']['RM2'][1],
                      state_dict['RMcalibrated']['RMFWHM'],
@@ -4934,64 +5357,71 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
     return
 
 
-def savestate(tsave):
-    f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','wb')
+def savestate(tsave,frbname):
+    #make cache dir with timestamp
+    cachedir = dirs['cache'] + tsave.isot + "_" + frbname + "/"
+    os.system("mkdir " + cachedir)
+
+    
+
+
+    f = open(cachedir + 'cache_time.pkl','wb')
     pkl.dump({"cache_time":tsave.isot,"frb":state_dict['ids']+"_"+state_dict['nickname']},f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','wb')
+    f = open(cachedir + 'state_dict.pkl','wb')
     pkl.dump(state_dict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/wdict.pkl','wb')
+    f = open(cachedir + 'wdict.pkl','wb')
     pkl.dump(wdict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/polcal_dict.pkl','wb')
+    f = open(cachedir + 'polcal_dict.pkl','wb')
     pkl.dump(polcal_dict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/RMcaldict.pkl','wb')
+    f = open(cachedir + 'RMcaldict.pkl','wb')
     pkl.dump(RMcaldict,f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df.pkl','wb')
+    f = open(cachedir + 'df.pkl','wb')
     df.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_polcal.pkl','wb')
+    f = open(cachedir + 'df_polcal.pkl','wb')
     df_polcal.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_beams.pkl','wb')
+    f = open(cachedir + 'df_beams.pkl','wb')
     df_beams.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scint.pkl','wb')
+    f = open(cachedir + 'df_scint.pkl','wb')
     df_scint.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scat.pkl','wb')
+    f = open(cachedir + 'df_scat.pkl','wb')
     df_scat.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/RMdf.pkl','wb')
+    f = open(cachedir + 'RMdf.pkl','wb')
     RMdf.to_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/poldf.pkl','wb')
+    f = open(cachedir + 'poldf.pkl','wb')
     poldf.to_pickle(f)
     f.close()
 
 
-    RMtable_archive_df.write_tsv(dirs['cwd'] + '/interface/.current_state/RMtable_archive_df.tsv',overwrite=True)
+    RMtable_archive_df.write_tsv(cachedir + 'RMtable_archive_df.tsv',overwrite=True)
 
-    polspec_archive_df.write_FITS(dirs['cwd'] + '/interface/.current_state/polspec_archive_df.fits',overwrite=True)
+    polspec_archive_df.write_FITS(cachedir + 'polspec_archive_df.fits',overwrite=True)
 
-    return
+    return cachedir
 
 
-def restorestate():
+def restorestate(tsave_isot_frbname):
     global state_dict
     global df
     global df_polcal
@@ -5006,59 +5436,60 @@ def restorestate():
     global RMtable_archive_df
     global polspec_archive_df
     
-    
+    """
     f = open(dirs['cwd'] + '/interface/.current_state/cache_time.pkl','rb')
     cache = pkl.load(f)
     print("Restoring session for FRB " + str(cache['frb']) + " from " + str(cache['cache_time']))
     f.close()
+    """
+    cachedir = dirs['cache'] + tsave_isot_frbname + "/"
 
 
-
-    f = open(dirs['cwd'] + '/interface/.current_state/state_dict.pkl','rb')
+    f = open(cachedir + 'state_dict.pkl','rb')
     state_dict = pkl.load(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/wdict.pkl','rb')
+    f = open(cachedir + 'wdict.pkl','rb')
     wdict = pkl.load(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/polcal_dict.pkl','rb')
+    f = open(cachedir + 'polcal_dict.pkl','rb')
     polcal_dict = pkl.load(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/RMcaldict.pkl','rb')
+    f = open(cachedir + 'RMcaldict.pkl','rb')
     RMcaldict = pkl.load(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df.pkl','rb')
+    f = open(cachedir + 'df.pkl','rb')
     df = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_polcal.pkl','rb')
+    f = open(cachedir + 'df_polcal.pkl','rb')
     df_polcal = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_beams.pkl','rb')
+    f = open(cachedir + 'df_beams.pkl','rb')
     df_beams = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scint.pkl','rb')
+    f = open(cachedir + 'df_scint.pkl','rb')
     df_scint = pd.read_pickle(f)
     f.close()
     
-    f = open(dirs['cwd'] + '/interface/.current_state/df_scat.pkl','rb')
+    f = open(cachedir + 'df_scat.pkl','rb')
     df_scat = pd.read_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/RMdf.pkl','rb')
+    f = open(cachedir + 'RMdf.pkl','rb')
     RMdf = pd.read_pickle(f)
     f.close()
 
-    f = open(dirs['cwd'] + '/interface/.current_state/poldf.pkl','rb')
+    f = open(cachedir + 'poldf.pkl','rb')
     poldf = pd.read_pickle(f)
     f.close()
 
-    RMtable_archive_df = rmtable.RMTable.read_tsv(dirs['cwd'] + '/interface/.current_state/RMtable_archive_df.tsv')
-    polspec_archive_df.read_FITS(dirs['cwd'] + '/interface/.current_state/polspec_archive_df.fits')
+    RMtable_archive_df = rmtable.RMTable.read_tsv(cachedir + 'RMtable_archive_df.tsv')
+    polspec_archive_df.read_FITS(cachedir + 'polspec_archive_df.fits')
 
     return

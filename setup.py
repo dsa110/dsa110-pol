@@ -17,7 +17,7 @@ except (AttributeError, AssertionError):
 setup(name='dsa-110_pol-dev',
       version='1.0.0',
       description='DSA-110 Polarization Utilities',
-      packages=['dsapol','dsapol96'],
+      packages=['dsapol','dsapol96','custom_widgets'],
       install_requires=[
           'numpy',
           'matplotlib',
@@ -60,8 +60,8 @@ os.system("mkdir ../dsapol_logfiles/scat_files")
 os.system("mkdir ../dsapol_polcal")
 os.system("mkdir ../dsapol_polcal/polcal_bfweights")
 
-os.system("mkdir interface/.current_state")
-
+#os.system("mkdir interface/.current_state")
+os.system("mkdir ../dsapol_cache")
 os.system("mkdir ../dsapol_tables")
 import numpy as np
 #np.save("../dsapol_logfiles/RM_files/input_spectrum.npy",np.zeros((0,0)))
@@ -76,11 +76,12 @@ f = open("cwdpath.txt","r")
 cwd = f.read()[:-1] + "/"
 f.close()
 """
+#cwddev = os.environ["DSAPOLDIRDEV"]
 cwd = os.environ["DSAPOLDIR"]
 print("path to dsapol: ",cwd)
 
 dirs = {"cwd":cwd,
-        "polcal":cwd[:cwd.index("dsa110-pol")] + "dsapol_polcal/",#"/media/ubuntu/ssd/sherman/code/",
+        "polcal":"/home/ubuntu/msherman_nsfrb/DSA110-DSAPOL-PROJECT/dsapol_polcal/",#cwd[:cwd.index("dsa110-pol")] + "dsapol_polcal/",#"/media/ubuntu/ssd/sherman/code/",
         "candidates":os.environ["DSA110DIR"] + "candidates/", #"/mnt/dsa110/candidates/",
         "T3":os.environ["DSA110DIR"] + "T3/", #"/mnt/dsa110/T3/",#"/dataz/dsa110/T3/",
         "polcal_voltages":os.environ["DSACALDIR"], #"/mnt/polcal_voltages/",#"/media/ubuntu/ssd/sherman/polcal_voltages/",
@@ -90,7 +91,8 @@ dirs = {"cwd":cwd,
         "FRBtables":cwd[:cwd.index("dsa110-pol")] + "dsapol_tables/",
         "dsastorageFRBDir":"user@dsa-storage.ovro.pvt:/home/user/data/candidates/candidates/",
         "dsastorageCALDir":"user@dsa-storage.ovro.pvt:/mnt/data/sherman_oldpolcal_voltages/",
-        "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/"}
+        "dsastorageFILDir":"user@dsa-storage.ovro.pvt:/mnt/data/dsa110/T1/",
+        "cache":cwd[:cwd.index("dsa110-pol")] + "dsapol_cache/"}
 
 
 f = open(cwd + "directories.json","w")
