@@ -81,7 +81,7 @@ cwd = os.environ["DSAPOLDIR"]
 print("path to dsapol: ",cwd)
 
 dirs = {"cwd":cwd,
-        "polcal":"/home/ubuntu/msherman_nsfrb/DSA110-DSAPOL-PROJECT/dsapol_polcal/",#cwd[:cwd.index("dsa110-pol")] + "dsapol_polcal/",#"/media/ubuntu/ssd/sherman/code/",
+        "polcal":cwd[:cwd.index("dsa110-pol")] + "dsapol_polcal/",#"/media/ubuntu/ssd/sherman/code/",
         "candidates":os.environ["DSA110DIR"] + "candidates/", #"/mnt/dsa110/candidates/",
         "T3":os.environ["DSA110DIR"] + "T3/", #"/mnt/dsa110/T3/",#"/dataz/dsa110/T3/",
         "polcal_voltages":os.environ["DSACALDIR"], #"/mnt/polcal_voltages/",#"/media/ubuntu/ssd/sherman/polcal_voltages/",
