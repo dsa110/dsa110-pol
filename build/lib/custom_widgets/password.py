@@ -104,6 +104,7 @@ class customPassword:
         bcryptfile = glob.glob(os.environ[self.key])#'DSAPOLADMIN'])
         if len(bcryptfile) == 0:
             print(self.unauthorized)
+            return False
 
         #read hash table
         f = open(bcryptfile[0],"rb")

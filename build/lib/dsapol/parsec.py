@@ -1299,7 +1299,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
     state_dict['datadir'] = path + state_dict['ids'] + "_" + state_dict['nickname'] + "/"
     state_dict['buff'] = [0,0]#[buff_L_slider_init.value,buff_R_slider_init.value]
     state_dict['width_native'] = FRB_w[FRB_IDS.index(state_dict['ids'])]#2**logibox_slider.value
-    wdict['logibox_slider'] = state_dict['width_native']
+    wdict['logibox_slider'] = int(np.log2(state_dict['width_native']))
     state_dict['mjd'] = FRB_mjd[FRB_IDS.index(state_dict['ids'])]
     state_dict['heimSNR'] = FRB_heimSNR[FRB_IDS.index(state_dict['ids'])]
     state_dict['RM_gal'] = FRB_RMgal[FRB_IDS.index(state_dict['ids'])]
@@ -3310,12 +3310,12 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             #initial_fit_full += scat.exp_gauss_1(state_dict['time_axis']*1e-3,x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)
             #indicate proposed values
-            ax1.axvline(state_dict['comps'][k]['peak']*32.7e-3,color='purple',linestyle='--')
-            ax1.axvspan(state_dict['comps'][k]['intL']*32.7e-3,state_dict['comps'][k]['intR']*32.7e-3,color='purple',alpha=0.1)
-            ax1.text((state_dict['comps'][k]['peak'] + 5)*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
-                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*32.7e-3 - wdict['x0_guess_shift_' + str(k)],
-                                                                                                        b=state_dict['comps'][k]['FWHM']*32.7e-3,
-                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*32.7e-3,
+            ax1.axvline(state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3,color='purple',linestyle='--')
+            ax1.axvspan(state_dict['comps'][k]['intL']*state_dict['n_t']*32.7e-3,state_dict['comps'][k]['intR']*state_dict['n_t']*32.7e-3,color='purple',alpha=0.1)
+            ax1.text((state_dict['comps'][k]['peak'] + 5)*state_dict['n_t']*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
+                'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3 - wdict['x0_guess_shift_' + str(k)],
+                                                                                                        b=state_dict['comps'][k]['FWHM']*state_dict['n_t']*32.7e-3,
+                                                                                                        c=(state_dict['comps'][k]['intR'] - state_dict['comps'][k]['peak'])*state_dict['n_t']*32.7e-3,
                                                                                                         d=I_tcal_p[state_dict['comps'][k]['peak']]),
                 backgroundcolor='thistle',fontsize=18)
         ax1.plot(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
