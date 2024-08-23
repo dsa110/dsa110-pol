@@ -504,6 +504,24 @@ def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,ver
             suffix --> str, suffix to be appended to end of filterbank file name (before 0/1/2/3)
             alpha --> bool, True if desired filterbanks should end with 'I,Q,U,V', False if desired filterbanks should end with '0,1,2,3' (default=False)
     """
+    #set masked values to nan
+    if type(I) == np.ma.MaskedArray:
+        Im = I.data
+        Im[I.mask] = np.nan
+        I = Im
+    if type(Q) == np.ma.MaskedArray:
+        Qm = Q.data
+        Qm[Q.mask] = np.nan
+        Q = Qm
+    if type(U) == np.ma.MaskedArray:
+        Um = U.data
+        Um[U.mask] = np.nan
+        U = Um
+    if type(V) == np.ma.MaskedArray:
+        Vm = V.data
+        Vm[V.mask] = np.nan
+        V = Vm
+
     if alpha:
         sdir = datadir + fn_prefix + suffix
         if verbose:
