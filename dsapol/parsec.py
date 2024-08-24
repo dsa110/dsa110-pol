@@ -5354,23 +5354,23 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
 
     #save txt file
     if txtfilebutton.clicked:
-        print("Saving summary file to " + datadir + nickname + "_summary" + ".txt...")
+        print("Saving summary file to " + state_dict['datadir'] + state_dict['nickname'] + "_summary" + ".txt...")
 
-        with open(datadir + nickname + "_summary" + ".txt","w") as f:
+        with open(state_dict['datadir'] + state_dict['nickname'] + "_summary" + ".txt","w") as f:
         
             #write basic info
             f.write(state_dict['nickname'] + "\n")
             f.write("n_t: " + str(state_dict['n_t']) + "\n")
             f.write("n_f: " + str(state_dict['n_f']) + "\n")
-            f.write("ncomps: " + str(state_dict['ncomps']) + "\n")
+            f.write("ncomps: " + str(state_dict['n_comps']) + "\n")
             f.write("RA: " + str(state_dict['RA']) + "\n" )
             f.write("DEC: " + str(state_dict['DEC']) + "\n" )
             f.write("ibeam: " + str(state_dict['ibeam']) + "\n" )
-            f.write("width: " + str((state_dict['intRcal']-state_dict['intLcal'])*n_t*32.7e-3) + "ms\n")
             
-            for i in range(state_dict['ncomps']):
-                if state_dict['ncomps']>1:
+            for i in range(state_dict['n_comps']):
+                if state_dict['n_comps']>1:
                     f.write("\nComponent " + str(i)+":")
+                f.write("width: " + str((state_dict['comps'][i]['intR']-state_dict['comps'][i]['intL'])*state_dict['n_t']*32.7e-3) + "ms\n")
                 f.write("buff: " + str(state_dict['comps'][i]['buff']) + "\n")
                 f.write("sf_window_weights:" + str(state_dict['comps'][i]['sf_window_weights']) + "\n")
                 f.write("avger_w" + str(state_dict['comps'][i]['avger_w']))
@@ -5380,10 +5380,10 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             #writeRM info
             f.write("\n")
 
-            if state_dict['ncomps']>1:
+            if state_dict['n_comps']>1:
                 f.write("All Components Results:\n")
             f.write("RM Threshold: 9sigma " + "\n")
-            f.write("Ionospheric RM: " + str((state_dict['RM_ion'])) "+-" + str((state_dict['RM_ionerr'])) + "\n")
+            f.write("Ionospheric RM: " + str((state_dict['RM_ion'])) +"+-" + str((state_dict['RM_ionerr'])) + "\n")
             f.write("Galactic RM: " + str((state_dict['RM_gal'])) + "+-" + str((state_dict['RM_galerr'])) + "\n")
             f.write("RM synthesis: " + str(state_dict['RMcalibrated']["RM1"][0]) + "+-" + str(state_dict['RMcalibrated']["RM1"][1]) + "\n")
             f.write("RM synthesis, zoom: " + str(state_dict['RMcalibrated']["RM1zoom"][0]) + "+-" + str(state_dict['RMcalibrated']["RM1zoom"][1]) + "\n")
@@ -5391,18 +5391,18 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             f.write("1sigma peak width: " + str(state_dict['RMcalibrated']['RMFWHM']) + "\n")
             f.write("RM Tools: " + str(state_dict['RMcalibrated']["RM_tools"][0]) + "+-" + str(state_dict['RMcalibrated']["RM_tools"][1]) + "\n")
             f.write("RM Tools, zoom:  " + str(state_dict['RMcalibrated']["RM_toolszoom"][0]) + "+-" + str(state_dict['RMcalibrated']["RM_toolszoom"][1]) + "\n")
-            f.write("LinSNR: " + str(np.max(state_dict["RMsnrs2"])) + "\n")
-            if ~np.isnan(state_dict['RMcal']):
+            f.write("LinSNR: " + str(np.max(state_dict['RMcalibrated']["RMsnrs2"])) + "\n")
+            if ~np.isnan(state_dict['RMcalibrated']['RMcal']):
                 f.write("RM Not Applied\n")
             else:
                 f.write("Applied RM:  " + str(state_dict['RMcalibrated']["RMcal"]) + "+-" + str(state_dict['RMcalibrated']["RMcalerr"]) + "\n")
 
             #write pol info
             f.write("\n")
-            f.write("Total Polarization: " + str(state_dict['Tpol']) + str(state_dict['Tpol_err']) + "\n")
-            f.write("Linear Polarization: " + str(state_dict['Lpol']) + str(state_dict['Lpol_err']) + "\n")
-            f.write("|Circular| Polarization: " + str(state_dict['absVpol']) + str(state_dict['absVpol_err']) + "\n")
-            f.write("Circular Polarization: " + str(state_dict['Vpol']) + str(state_dict['Vpol_err']) + "\n")
+            f.write("Total Polarization: " + str(state_dict['Tpol']) + str(state_dict['Tpol_err']) + "(" + state_dict['Tclass'] + ")\n")
+            f.write("Linear Polarization: " + str(state_dict['Lpol']) + str(state_dict['Lpol_err']) + "(" + state_dict['Lclass'] + ")\n")
+            f.write("|Circular| Polarization: " + str(state_dict['absVpol']) + str(state_dict['absVpol_err']) + "(" + state_dict['Vclass'] + ")\n")
+            f.write("Circular Polarization: " + str(state_dict['Vpol']) + str(state_dict['Vpol_err']) + "(" + state_dict['Vclass'] + ")\n")
             f.write("PA: " + str(state_dict['avg_PA']) + str(state_dict['PA_err']) + " degrees\n")
 
             f.write("\n")
@@ -5410,14 +5410,15 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             f.write("Total Pol S/N:" + str(state_dict['Tsnr']) + "\n")
             f.write("Linear Pol S/N:" + str(state_dict['Lsnr']) + "\n")
             f.write("Circular Pol S/N:" + str(state_dict['Vsnr']) + "\n")
-        
+            
+
             f.write("\n")
-            if state_dict['ncomps']>1:
-                for i in range(state_dict['ncomps']):
+            if state_dict['n_comps']>1:
+                for i in range(state_dict['n_comps']):
                     f.write("Component " + str(i) + " Results:\n")
 
                     f.write("RM Threshold: 9sigma " + "\n")
-                    f.write("Ionospheric RM: " + str((state_dict['comps'][i]['RM_ion'])) "+-" + str((state_dict['comps'][i]['RM_ionerr'])) + "\n")
+                    f.write("Ionospheric RM: " + str((state_dict['comps'][i]['RM_ion'])) +"+-" + str((state_dict['comps'][i]['RM_ionerr'])) + "\n")
                     f.write("Galactic RM: " + str((state_dict['comps'][i]['RM_gal'])) + "+-" + str((state_dict['comps'][i]['RM_galerr'])) + "\n")
                     f.write("RM synthesis: " + str(state_dict['comps'][i]['RMcalibrated']["RM1"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM1"][1]) + "\n")
                     f.write("RM synthesis, zoom: " + str(state_dict['comps'][i]['RMcalibrated']["RM1zoom"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM1zoom"][1]) + "\n")
@@ -5425,8 +5426,8 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                     f.write("1sigma peak width: " + str(state_dict['comps'][i]['RMcalibrated']['RMFWHM']) + "\n")
                     f.write("RM Tools: " + str(state_dict['comps'][i]['RMcalibrated']['comps'][i]["RM_tools"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_tools"][1]) + "\n")
                     f.write("RM Tools, zoom:  " + str(state_dict['comps'][i]['RMcalibrated']["RM_toolszoom"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_toolszoom"][1]) + "\n")
-                    f.write("LinSNR: " + str(np.max(state_dict['comps'][i]["RMsnrs2"])) + "\n")
-                    if ~np.isnan(state_dict['comps'][i]['RMcal']):
+                    f.write("LinSNR: " + str(np.max(state_dict['comps'][i]['RMcalibrated']["RMsnrs2"])) + "\n")
+                    if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RMcal']):
                         f.write("RM Not Applied\n")
                     else:
                         f.write("Applied RM:  " + str(state_dict['comps'][i]['RMcalibrated']["RMcal"]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RMcalerr"]) + "\n")
@@ -5449,8 +5450,13 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             f.write("Scattering Analysis:\n")
             f.write(df_scat.to_string())
             f.write("\n")
+            f.write("\n")
             f.write("Scintillation Analysis:\n")
             f.write(df_scint.to_string())
+            f.write("\n")
+            f.write("\n")
+            f.write("Spectral Index Analysis\n")
+            f.write(df_specidx.to_string())
 
 
     update_wdict([notesinput,overwritefils],["notesinput","overwritefils"],param="value")
