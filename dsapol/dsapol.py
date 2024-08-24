@@ -330,12 +330,14 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
         print("Binning by " + str(n_t)  + " in time")
         print("Binning by " + str(n_f) + " in frequency")
     #timeaxis = np.arange(fobj.header.tstart*86400, fobj.header.tstart*86400 + fobj.header.tsamp*fobj.header.nsamples/n_t, fobj.header.tsamp*n_t)
-    if fobj.header.nsamples == 5120:
-        timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//n_t)
-    else:
-        timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//n_t)
+    #if fobj.header.nsamples == 5120:
+    #    timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples),(fobj.header.nsamples)//n_t)
+    #else:
+    #    timeaxis = np.linspace(0,fobj.header.tsamp*(fobj.header.nsamples//4),(fobj.header.nsamples//4)//n_t)
+    
     I,Q,U,V = avg_time(sarr[0],n_t),avg_time(sarr[1],n_t),avg_time(sarr[2],n_t),avg_time(sarr[3],n_t)
     I,Q,U,V = avg_freq(I,n_f),avg_freq(Q,n_f),avg_freq(U,n_f),avg_freq(V,n_f)
+    timeaxis = fobj.header.tsamp*np.arange(I.shape[1])
 
     if fixchans == True:
         #bad_chans = np.arange(I.shape[0])[np.all(I==0,axis=1)]#find_bad_channels(I)
@@ -492,7 +494,7 @@ def write_fil_data_dsa(arr,fn,fobj):
     b.toFile(fn)
     return
 
-def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,verbose=False):
+def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,verbose=False,mask=False,maskval=np.nan):
     """ 
     This function writes the provided Stokes dynamic spectra to 
     filterbank files in the given directory.
@@ -505,19 +507,19 @@ def put_stokes_2D(I,Q,U,V,fobj,datadir,fn_prefix,suffix="polcal",alpha=False,ver
             alpha --> bool, True if desired filterbanks should end with 'I,Q,U,V', False if desired filterbanks should end with '0,1,2,3' (default=False)
     """
     #set masked values to nan
-    if type(I) == np.ma.MaskedArray:
+    if mask and type(I) == np.ma.MaskedArray:
         Im = I.data
         Im[I.mask] = np.nan
         I = Im
-    if type(Q) == np.ma.MaskedArray:
+    if mask and type(Q) == np.ma.MaskedArray:
         Qm = Q.data
         Qm[Q.mask] = np.nan
         Q = Qm
-    if type(U) == np.ma.MaskedArray:
+    if mask and type(U) == np.ma.MaskedArray:
         Um = U.data
         Um[U.mask] = np.nan
         U = Um
-    if type(V) == np.ma.MaskedArray:
+    if mask and type(V) == np.ma.MaskedArray:
         Vm = V.data
         Vm[V.mask] = np.nan
         V = Vm

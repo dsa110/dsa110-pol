@@ -677,7 +677,7 @@ def read_polcal(polcaldate,path=default_path):
     return gxx,gyy,freq_axis
 
 
-def make_polcal_filterbanks(datadir,outputdirs,ids,polcalfile,init_suffix,new_suffix,nsamps,n_off,sub_offpulse_mean,maxProcesses,fixchans,fixchansfile,fixchansfile_overwrite,verbose,background):
+def make_polcal_filterbanks(datadir,outputdirs,ids,ibeam,RA,DEC,polcalfile,init_suffix,new_suffix,nsamps,n_off,sub_offpulse_mean,maxProcesses,fixchans,fixchansfile,fixchansfile_overwrite,verbose,background):
     """
     This function reads a filterbank file, applies pol calbration, and re-saves it, all at native resolution.
     This is needed because I cannot save filterbanks at low resolution
@@ -693,15 +693,18 @@ def make_polcal_filterbanks(datadir,outputdirs,ids,polcalfile,init_suffix,new_su
         #read data
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(datadir,ids + init_suffix,nsamps,start=0,n_t=1,n_f=1,n_off=n_off,sub_offpulse_mean=sub_offpulse_mean,fixchans=fixchans,verbose=verbose,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
 
-        #calibrate
+        #calibrate, note we have to unmask before cal
         gxx,gyy,cal_freq_axis = read_polcal(polcalfile)
-        Ical,Qcal,Ucal,Vcal = dsapol.calibrate(I,Q,U,V,(gxx,gyy),stokes=True,multithread=True,maxProcesses=maxProcesses,bad_chans=badchans,verbose=verbose)
+        Ical,Qcal,Ucal,Vcal = dsapol.calibrate(I.data,Q.data,U.data,V.data,(gxx,gyy),stokes=True,multithread=True,maxProcesses=maxProcesses,bad_chans=badchans,verbose=verbose)
+        Ical,Qcal,Ucal,Vcal = dsapol.calibrate_angle(I,Q,U,V,FilReader(datadir+ids+init_suffix+"_0.fil"),ibeam,RA,DEC)
+                
+
 
         #save
         if type(outputdirs) == str:
-            dsapol.put_stokes_2D(Ical.astype(np.float32),Qcal.astype(np.float32),Ucal.astype(np.float32),Vcal.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs,ids,suffix=new_suffix,alpha=True,verbose=verbose)
+            dsapol.put_stokes_2D(Ical.data.astype(np.float32),Qcal.data.astype(np.float32),Ucal.data.astype(np.float32),Vcal.data.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs,ids,suffix=new_suffix,alpha=True,verbose=verbose)
         else:
-            dsapol.put_stokes_2D(Ical.astype(np.float32),Qcal.astype(np.float32),Ucal.astype(np.float32),Vcal.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs[0],ids,suffix=new_suffix,alpha=True,verbose=verbose)
+            dsapol.put_stokes_2D(Ical.data.astype(np.float32),Qcal.data.astype(np.float32),Ucal.data.astype(np.float32),Vcal.data.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs[0],ids,suffix=new_suffix,alpha=True,verbose=verbose)
             for i in range(1,len(outputdirs)):
                 os.system("cp " + outputdirs[0] + "*" + ids + new_suffix + "*.fil " + outputdirs[i])
 

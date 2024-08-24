@@ -2203,11 +2203,11 @@ def polcal_screen_ADMIN(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_men
 
         #make 3C48 filterbanks
         for k in beam_dict_3C48.keys():
-            make_cal_filterbanks('3C48',polcal_dict['polcal_findbeams_file'],str(k)[4:],beam_dict_3C48[k]['bf_weights'],beam_dict_3C48[k]['beam'],beam_dict_3C48[k]['mjd'])
+            polcal.make_cal_filterbanks('3C48',polcal_dict['polcal_findbeams_file'],str(k)[4:],beam_dict_3C48[k]['bf_weights'],beam_dict_3C48[k]['beam'],beam_dict_3C48[k]['mjd'])
 
         #make 3C286 filterbanks
         for k in beam_dict_3C286.keys():
-            make_cal_filterbanks('3C286',polcal_dict['polcal_findbeams_file'],str(k)[5:],beam_dict_3C286[k]['bf_weights'],beam_dict_3C286[k]['beam'],beam_dict_3C286[k]['mjd'])
+            polcal.make_cal_filterbanks('3C286',polcal_dict['polcal_findbeams_file'],str(k)[5:],beam_dict_3C286[k]['bf_weights'],beam_dict_3C286[k]['beam'],beam_dict_3C286[k]['mjd'])
 
 
     #if make solution button pushed, make solution and plot
@@ -5161,7 +5161,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                     fixchansfile = ""
                     fixchansfile_overwrite = True
 
-                polcal.make_polcal_filterbanks(state_dict['datadir'],[state_dict['Level3Dir'],state_dict['datadir']],state_dict['ids'],state_dict['polcalfile'],state_dict['suff'],state_dict['suff']+"_polcal",20480,int(NOFFDEF)+12800,True,maxProcesses=polcal_dict['maxProcesses'],fixchans=True,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite,verbose=False,background=True)
+                polcal.make_polcal_filterbanks(state_dict['datadir'],[state_dict['Level3Dir'],state_dict['datadir']],state_dict['ids'],state_dict['ibeam'],state_dict['RA'],state_dict['DEC'],state_dict['polcalfile'],state_dict['suff'],state_dict['suff']+"_polcal",20480,int(NOFFDEF)+12800,True,maxProcesses=polcal_dict['maxProcesses'],fixchans=True,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite,verbose=False,background=True)
             
             #dsapol.put_stokes_2D(state_dict['base_Ical'].astype(np.float32),state_dict['base_Qcal'].astype(np.float32),state_dict['base_Ucal'].astype(np.float32),state_dict['base_Vcal'].astype(np.float32),FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_0.fil"),state_dict['Level3Dir'],state_dict['ids'],suffix="dev_polcal",alpha=True)
     
