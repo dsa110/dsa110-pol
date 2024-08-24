@@ -5129,7 +5129,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     return fig,fig_time,fig_freq
 
 
-def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutton,notesinput,overwritefils):
+def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutton,txtfilebutton,notesinput,overwritefils):
 
     """
     screen for RM table and archiving data
@@ -5351,6 +5351,106 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             wr = csv.writer(csvfile,delimiter=',')
             for r in rows:
                 wr.writerow(r)
+
+    #save txt file
+    if txtfilebutton.clicked:
+        print("Saving summary file to " + datadir + nickname + "_summary" + ".txt...")
+
+        with open(datadir + nickname + "_summary" + ".txt","w") as f:
+        
+            #write basic info
+            f.write(state_dict['nickname'] + "\n")
+            f.write("n_t: " + str(state_dict['n_t']) + "\n")
+            f.write("n_f: " + str(state_dict['n_f']) + "\n")
+            f.write("ncomps: " + str(state_dict['ncomps']) + "\n")
+            f.write("RA: " + str(state_dict['RA']) + "\n" )
+            f.write("DEC: " + str(state_dict['DEC']) + "\n" )
+            f.write("ibeam: " + str(state_dict['ibeam']) + "\n" )
+            f.write("width: " + str((state_dict['intRcal']-state_dict['intLcal'])*n_t*32.7e-3) + "ms\n")
+            
+            for i in range(state_dict['ncomps']):
+                if state_dict['ncomps']>1:
+                    f.write("\nComponent " + str(i)+":")
+                f.write("buff: " + str(state_dict['comps'][i]['buff']) + "\n")
+                f.write("sf_window_weights:" + str(state_dict['comps'][i]['sf_window_weights']) + "\n")
+                f.write("avger_w" + str(state_dict['comps'][i]['avger_w']))
+            
+            f.write("\nbad channels:" + str(state_dict['badchans']) + "\n")
+        
+            #writeRM info
+            f.write("\n")
+
+            if state_dict['ncomps']>1:
+                f.write("All Components Results:\n")
+            f.write("RM Threshold: 9sigma " + "\n")
+            f.write("Ionospheric RM: " + str((state_dict['RM_ion'])) "+-" + str((state_dict['RM_ionerr'])) + "\n")
+            f.write("Galactic RM: " + str((state_dict['RM_gal'])) + "+-" + str((state_dict['RM_galerr'])) + "\n")
+            f.write("RM synthesis: " + str(state_dict['RMcalibrated']["RM1"][0]) + "+-" + str(state_dict['RMcalibrated']["RM1"][1]) + "\n")
+            f.write("RM synthesis, zoom: " + str(state_dict['RMcalibrated']["RM1zoom"][0]) + "+-" + str(state_dict['RMcalibrated']["RM1zoom"][1]) + "\n")
+            f.write("Fine synthesis: " + str(state_dict['RMcalibrated']["RM2"][0]) + "+-" + str(state_dict['RMcalibrated']["RM2"][1]) + "\n")
+            f.write("1sigma peak width: " + str(state_dict['RMcalibrated']['RMFWHM']) + "\n")
+            f.write("RM Tools: " + str(state_dict['RMcalibrated']["RM_tools"][0]) + "+-" + str(state_dict['RMcalibrated']["RM_tools"][1]) + "\n")
+            f.write("RM Tools, zoom:  " + str(state_dict['RMcalibrated']["RM_toolszoom"][0]) + "+-" + str(state_dict['RMcalibrated']["RM_toolszoom"][1]) + "\n")
+            f.write("LinSNR: " + str(np.max(state_dict["RMsnrs2"])) + "\n")
+            if ~np.isnan(state_dict['RMcal']):
+                f.write("RM Not Applied\n")
+            else:
+                f.write("Applied RM:  " + str(state_dict['RMcalibrated']["RMcal"]) + "+-" + str(state_dict['RMcalibrated']["RMcalerr"]) + "\n")
+
+            #write pol info
+            f.write("\n")
+            f.write("Total Polarization: " + str(state_dict['Tpol']) + str(state_dict['Tpol_err']) + "\n")
+            f.write("Linear Polarization: " + str(state_dict['Lpol']) + str(state_dict['Lpol_err']) + "\n")
+            f.write("|Circular| Polarization: " + str(state_dict['absVpol']) + str(state_dict['absVpol_err']) + "\n")
+            f.write("Circular Polarization: " + str(state_dict['Vpol']) + str(state_dict['Vpol_err']) + "\n")
+            f.write("PA: " + str(state_dict['avg_PA']) + str(state_dict['PA_err']) + " degrees\n")
+
+            f.write("\n")
+            f.write("S/N:" + str(state_dict['snr']) + "\n")
+            f.write("Total Pol S/N:" + str(state_dict['Tsnr']) + "\n")
+            f.write("Linear Pol S/N:" + str(state_dict['Lsnr']) + "\n")
+            f.write("Circular Pol S/N:" + str(state_dict['Vsnr']) + "\n")
+        
+            f.write("\n")
+            if state_dict['ncomps']>1:
+                for i in range(state_dict['ncomps']):
+                    f.write("Component " + str(i) + " Results:\n")
+
+                    f.write("RM Threshold: 9sigma " + "\n")
+                    f.write("Ionospheric RM: " + str((state_dict['comps'][i]['RM_ion'])) "+-" + str((state_dict['comps'][i]['RM_ionerr'])) + "\n")
+                    f.write("Galactic RM: " + str((state_dict['comps'][i]['RM_gal'])) + "+-" + str((state_dict['comps'][i]['RM_galerr'])) + "\n")
+                    f.write("RM synthesis: " + str(state_dict['comps'][i]['RMcalibrated']["RM1"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM1"][1]) + "\n")
+                    f.write("RM synthesis, zoom: " + str(state_dict['comps'][i]['RMcalibrated']["RM1zoom"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM1zoom"][1]) + "\n")
+                    f.write("Fine synthesis: " + str(state_dict['comps'][i]['RMcalibrated']["RM2"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM2"][1]) + "\n")
+                    f.write("1sigma peak width: " + str(state_dict['comps'][i]['RMcalibrated']['RMFWHM']) + "\n")
+                    f.write("RM Tools: " + str(state_dict['comps'][i]['RMcalibrated']['comps'][i]["RM_tools"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_tools"][1]) + "\n")
+                    f.write("RM Tools, zoom:  " + str(state_dict['comps'][i]['RMcalibrated']["RM_toolszoom"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_toolszoom"][1]) + "\n")
+                    f.write("LinSNR: " + str(np.max(state_dict['comps'][i]["RMsnrs2"])) + "\n")
+                    if ~np.isnan(state_dict['comps'][i]['RMcal']):
+                        f.write("RM Not Applied\n")
+                    else:
+                        f.write("Applied RM:  " + str(state_dict['comps'][i]['RMcalibrated']["RMcal"]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RMcalerr"]) + "\n")
+
+                    #write pol info
+                    f.write("\n")
+                    f.write("Total Polarization: " + str(state_dict['comps'][i]['Tpol']) + str(state_dict['comps'][i]['Tpol_err']) + "\n")
+                    f.write("Linear Polarization: " + str(state_dict['comps'][i]['Lpol']) + str(state_dict['comps'][i]['Lpol_err']) + "\n")
+                    f.write("|Circular| Polarization: " + str(state_dict['comps'][i]['absVpol']) + str(state_dict['comps'][i]['absVpol_err']) + "\n")
+                    f.write("Circular Polarization: " + str(state_dict['comps'][i]['Vpol']) + str(state_dict['comps'][i]['Vpol_err']) + "\n")
+                    f.write("PA: " + str(state_dict['comps'][i]['avg_PA']) + str(state_dict['comps'][i]['PA_err']) + " degrees\n")
+
+                    f.write("\n")
+                    f.write("S/N:" + str(state_dict['comps'][i]['snr']) + "\n")
+                    f.write("Total Pol S/N:" + str(state_dict['comps'][i]['Tsnr']) + "\n")
+                    f.write("Linear Pol S/N:" + str(state_dict['comps'][i]['Lsnr']) + "\n")
+                    f.write("Circular Pol S/N:" + str(state_dict['comps'][i]['Vsnr']) + "\n")
+                    f.write("\n")
+                    
+            f.write("Scattering Analysis:\n")
+            f.write(df_scat.to_string())
+            f.write("\n")
+            f.write("Scintillation Analysis:\n")
+            f.write(df_scint.to_string())
 
 
     update_wdict([notesinput,overwritefils],["notesinput","overwritefils"],param="value")
