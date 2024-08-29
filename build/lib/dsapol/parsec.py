@@ -153,6 +153,7 @@ FRB_RMgal = []
 FRB_RMgalerr = []
 FRB_RMion = []
 FRB_RMionerr = []
+FRB_loc = []
 def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=dirs['FRBtables']):
     """
     This function updates the global FRB parameters from the provided file. File is a copy
@@ -241,6 +242,12 @@ def update_FRB_params(fname="DSA110-FRBs-PARSEC_TABLE.csv",path=dirs['FRBtables'
                     FRB_RMionerr.append(float(row[17]))
                 else:
                     FRB_RMionerr.append(np.nan)
+
+                if row[18] != "":
+                    FRB_loc.append(SkyCoord(row[18],unit=(u.hourangle,u.deg),frame='icrs'))
+                else:
+                    FRB_loc.append(None)
+                    
                 #if no directory exists, make one
                 if len(glob.glob(dirs['data']+FRB_IDS[-1] + "_" + FRBs[-1])) == 0:
                     os.system("mkdir " + dirs['data']+FRB_IDS[-1] + "_" + FRBs[-1])
@@ -595,8 +602,12 @@ def get_frbfiles(path=frbpath):
 
 frbfiles = get_frbfiles()
 ids = frbfiles[0][:frbfiles[0].index('_')]
-RA = FRB_RA[FRB_IDS.index(ids)]
-DEC = FRB_DEC[FRB_IDS.index(ids)]
+if not (FRB_loc[FRB_IDS.index(ids)] is None):
+    RA = FRB_loc[FRB_IDS.index(ids)].ra.value
+    DEC = FRB_loc[FRB_IDS.index(ids)].dec.value
+else:
+    RA = FRB_RA[FRB_IDS.index(ids)]
+    DEC = FRB_DEC[FRB_IDS.index(ids)]
 ibeam = int(FRB_BEAM[FRB_IDS.index(ids)])
 ibox = int(FRB_w[FRB_IDS.index(ids)])
 mjd = FRB_mjd[FRB_IDS.index(ids)]
@@ -1288,8 +1299,12 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
     state_dict['n_f'] = (2**logn_f_slider.value)*state_dict['base_n_f']
     state_dict['ids'] = frbfiles_menu.value[:frbfiles_menu.value.index('_')]
     state_dict['nickname'] = frbfiles_menu.value[frbfiles_menu.value.index('_')+1:]
-    state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
-    state_dict['DEC'] = FRB_DEC[FRB_IDS.index(state_dict['ids'])]
+    if not (FRB_loc[FRB_IDS.index(state_dict['ids'])] is None):
+        state_dict['RA'] = FRB_loc[FRB_IDS.index(state_dict['ids'])].ra.value
+        state_dict['DEC'] = FRB_loc[FRB_IDS.index(state_dict['ids'])].dec.value
+    else:
+        state_dict['RA'] = FRB_RA[FRB_IDS.index(state_dict['ids'])]
+        state_dict['DEC'] = FRB_DEC[FRB_IDS.index(state_dict['ids'])]
     state_dict['ibeam'] = int(FRB_BEAM[FRB_IDS.index(state_dict['ids'])])
     state_dict['DM0'] = FRB_DM[FRB_IDS.index(state_dict['ids'])]
     state_dict['DM'] = state_dict['DM0'] + state_dict['dDM']

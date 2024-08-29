@@ -513,6 +513,8 @@ def RM_host_limits(RMobs,RMobserr,
     """
     RM_axis = np.linspace(RMmin,RMmax,res)
 
+    
+
     #print("RMobs: " + str(RMobs))
     #print("RMmw: " + str(RMmw))
     #print("RMion: " + str(RMion))
@@ -523,6 +525,10 @@ def RM_host_limits(RMobs,RMobserr,
     if np.isnan(RMobserr):
         #use default 0.1 rad/m^2
         RMobserr = 0.1
+    elif RMobserr < (RMmax-RMmin)/res:
+        RMobserr = (RMmax-RMmin)/res
+    
+    
     Pobs = gaus(RM_axis,RMobs,RMobserr)
     Pobs = Pobs/np.sum(Pobs*(RM_axis[1]-RM_axis[0]))
     #MW RM
@@ -622,6 +628,8 @@ def RM_host_dist(RMobs,RMobserr,
     #observed RM
     if np.isnan(RMobserr):
         RMobserr = 0.1
+    elif RMobserr < (RMmax-RMmin)/res:
+        RMobserr = (RMmax-RMmin)/res
     Pobs = gaus(RM_axis,RMobs,RMobserr)
     Pobs = Pobs/np.sum(Pobs*(RM_axis[1]-RM_axis[0]))
     #MW RM
