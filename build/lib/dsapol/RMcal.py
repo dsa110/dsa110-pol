@@ -65,7 +65,7 @@ f.close()
 logfile = dirs["logs"] + "RMcal_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/RMcal_logfile.txt"
 
 #function to get ionospheric RM using a file already downloaded from NASA archives
-def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,prefixes=['COD0','CODG','IGSG','CORG','C1PG','UPCG']):
+def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,prefixes=['CKMG','GPSG','COD0','CODG','IGSG','CORG','C1PG','UPCG']):
 
     """
     This function uses the RMextract library (added this 2024/05/04) to get
@@ -96,11 +96,25 @@ def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,
             with open(logfile,"w") as f:
                 with contextlib.redirect_stdout(f):
                     #print("Trying " + prefix + " with new format")
-                    RMdict = gt.getRM(ionexPath='./IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,newformat=True)
+                    RMdict = gt.getRM(ionexPath=dirs['FRBtables'] + 'IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,server="ftp://gssc.esa.int/gnss/products/ionex/",ondisk=True)#'ftp://ftp.aiub.unibe.ch/CODE/IONO/')#,newformat=True)
             f.close()
-            break
-        except:
-                
+            print("Retrieved Ionospheric RM")
+            
+            #logger.disabled = False           
+            #print("success! " + prefix)
+            #get mean and standard dev 
+            RMs = RMdict['RM']['st1'].flatten()
+            RMion = np.nanmedian(RMs)
+            RMionerr = np.nanstd(RMs)
+            return RMion,RMionerr
+            
+        except Exception as exc:
+            print("Failed to Retrieve Ionospheric RM, see logs")
+            print(exc)
+            with open(logfile,"w") as f:
+                f.write(str(exc))
+            
+            """    
             try:                    
                 #print("Trying " + prefix + " with old format")
                 RMdict = gt.getRM(ionexPath='./IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,newformat=False)
@@ -109,14 +123,8 @@ def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,
                 if prefix == prefixes[-1]: 
                     #logger.disabled = False
                     return np.nan,np.nan
-    #logger.disabled = False           
-    #print("success! " + prefix)
-    #get mean and standard dev 
-    RMs = RMdict['RM']['st1'].flatten()
-    RMion = np.nanmedian(RMs)
-    RMionerr = np.nanstd(RMs)
-    return RMion,RMionerr
-    
+            """
+    return np.nan,np.nan 
 #function to run RM tools
 def get_RM_tools(I_fcal,Q_fcal,U_fcal,V_fcal,Ical,Qcal,Ucal,Vcal,freq_test,n_t,maxRM_num_tools=1e6,dRM_tools=10000,n_off=2000):
     """

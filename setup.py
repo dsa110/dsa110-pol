@@ -63,6 +63,7 @@ os.system("mkdir ../dsapol_polcal/polcal_bfweights")
 #os.system("mkdir interface/.current_state")
 os.system("mkdir ../dsapol_cache")
 os.system("mkdir ../dsapol_tables")
+os.system("mkdir ../dsapol_tables/IONEXdata")
 import numpy as np
 #np.save("../dsapol_logfiles/RM_files/input_spectrum.npy",np.zeros((0,0)))
 #np.save("../dsapol_logfiles/RM_files/output_spectrum.npy",np.zeros((2,0)))

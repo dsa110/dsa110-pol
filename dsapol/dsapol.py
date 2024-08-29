@@ -6136,7 +6136,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
     ax4.set_xlabel(r'$RM\,(rad/m^2)$')
     ax4.set_ylabel(r'$F(\phi)$')
     if np.all(~np.isnan(trial_RM1)):
-        ax4.set_xlim(np.min(trial_RM1),np.max(trial_RM1))
+        ax4.set_xlim(np.nanmin(trial_RM1),np.nanmax(trial_RM1))
 
     #zoom range plot
     lns = []
@@ -6158,7 +6158,7 @@ def RM_summary_plot(ids,nickname,RMsnrs,RMzoomsnrs,RM,RMerror,trial_RM1,trial_RM
         lns.append(l2[0])
         labs.append("RM Tools")
     if np.all(~np.isnan(trial_RM2)):
-        ax5.set_xlim(np.min(trial_RM2),np.max(trial_RM2))
+        ax5.set_xlim(np.nanmin(trial_RM2),np.nanmax(trial_RM2))
     l6 = ax5.axhline(threshold,color="purple",linestyle="--",label=r'${t}\sigma$ threshold'.format(t=threshold),linewidth=2)
     lns.append(l6)
     ax5_1.set_ylabel(r'$F(\phi)$')
@@ -6328,7 +6328,7 @@ def pol_summary_plot(I,Q,U,V,ids,nickname,width_native,t_samp,n_t,n_f,freq_test,
         #ax6.set_xlabel("degrees")
         ax6.set_xlim(-1.1*95,1.1*95)
         ax6.set_xlim(-1.4*95,1.1*95)
-        ax6.set_ylim(np.min(freq_test[0]),np.max(freq_test[0]))
+        ax6.set_ylim(np.nanmin(freq_test[0]),np.nanmax(freq_test[0]))
         #ax6.tick_params(axis='x', labelrotation = 45)
 
     #pol fracs

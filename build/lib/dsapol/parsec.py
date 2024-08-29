@@ -1045,18 +1045,23 @@ def update_wdict(objects,labels,param='value',skipdict=False):
         if state_dict['n_comps'] > 1:
             for i in range(state_dict['n_comps']):
                 if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RM_tools'][0]):
+                    if 'Component ' + str(i) not in RMcaldict['RM-Tools']['coarse'].keys(): RMcaldict['RM-Tools']['coarse']['Component ' + str(i)] = dict()
                     RMcaldict['RM-Tools']['coarse']['Component '+str(i)]['RM'] = state_dict['comps'][i]['RMcalibrated']['RM_tools'][0]
                     RMcaldict['RM-Tools']['coarse']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM_tools'][1]
                 if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'][0]):
+                    if 'Component ' + str(i) not in RMcaldict['RM-Tools']['zoom'].keys(): RMcaldict['RM-Tools']['zoom']['Component '+str(i)] = dict()
                     RMcaldict['RM-Tools']['zoom']['Component '+str(i)]['RM'] = state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'][0]
                     RMcaldict['RM-Tools']['zoom']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM_toolszoom'][1]
                 if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RM1'][0]):
+                    if 'Component ' + str(i) not in RMcaldict['1D-Synth']['coarse'].keys(): RMcaldict['1D-Synth']['coarse']['Component '+str(i)] = dict()
                     RMcaldict['1D-Synth']['coarse']['Component '+str(i)]['RM'] = state_dict['comps'][i]['RMcalibrated']['RM1'][0]
                     RMcaldict['1D-Synth']['coarse']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM1'][1]
                 if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RM1zoom'][0]):
+                    if 'Component ' + str(i) not in RMcaldict['1D-Synth']['zoom'].keys(): RMcaldict['1D-Synth']['zoom']['Component '+str(i)] = dict()
                     RMcaldict['1D-Synth']['zoom']['Component '+str(i)]['RM'] = state_dict['comps'][i]['RMcalibrated']['RM1zoom'][0]
                     RMcaldict['1D-Synth']['zoom']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM1zoom'][1]
                 if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RM2'][0]):
+                    if 'Component ' + str(i) not in RMcaldict['2D-Synth'].keys(): RMcaldict['2D-Synth']['Component '+str(i)] = dict()
                     RMcaldict['2D-Synth']['Component '+str(i)]['RM'] = state_dict['comps'][i]['RMcalibrated']['RM2'][0]
                     RMcaldict['2D-Synth']['Component '+str(i)]['Error'] = state_dict['comps'][i]['RMcalibrated']['RM2'][1]
 
@@ -4172,7 +4177,7 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
                         res = np.load(dirs['logs'] + "RM_files/" + state_dict['comps'][i]['RMcalibrated']['dname_1D'] + "result.npy")
                         RM = res[0]
                         RMerr = res[1]
-                        state_dict['comps'][i]['RMcalibrated']["RMcalibrated"]["RM1"] = [RM,RMerr]
+                        state_dict['comps'][i]["RMcalibrated"]["RM1"] = [RM,RMerr]
                         RMdf.loc[str(i), '1D-Synth'] = RM
                         RMdf.loc[str(i), '1D-Synth Error'] = RMerr
 
