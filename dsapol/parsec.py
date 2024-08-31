@@ -304,6 +304,7 @@ state_map = {'load':0,
              'summarize':6
              }
 state_dict['polcaldataloaded'] = False
+state_dict['polcalfile'] = ""
 state_dict['comps'] = dict()
 state_dict['current_comp'] = 0
 state_dict['n_comps'] = 1
@@ -343,7 +344,9 @@ state_dict['DEC'] = 0
 state_dict['ibeam'] =np.nan
 state_dict['DM0'] =np.nan 
 state_dict['datadir'] ="./"
-state_dict['buff'] = [0,0]
+state_dict['buff'] = [1,1]
+state_dict['intL'] = 1
+state_dict['intR'] = 1
 state_dict['width_native'] = 1 
 state_dict['mjd'] = 0 
 state_dict['base_I'] = ma(np.nan*np.ones((6144,5120)),np.zeros((6144,5120)))
@@ -4662,7 +4665,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
             [(pol_f,pol_t,avg,sigma_frac,snr_frac),
             (L_f,L_t,avg_L,sigma_L,snr_L),
             (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
-            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['tsamp'],
+            (C_f,C_t,avg_C,sigma_C,tmp),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['tsamp'],
                                                                     state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
                                                                     n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
                                                                     buff=state_dict['comps'][i]['buff'],full=False,weighted=weighted,input_weights=weights_use,
@@ -4755,7 +4758,7 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     [(pol_f,pol_t,avg,sigma_frac,snr_frac),
             (L_f,L_t,avg_L,sigma_L,snr_L),
             (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
-            (C_f,C_t,avg_C,sigma_C,snrC),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['tsamp'],
+            (C_f,C_t,avg_C,sigma_C,tmp),snr]= dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['width_native'],state_dict['tsamp'],
                                                                     state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
                                                                     n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
                                                                     buff=state_dict['buff'],full=False,weighted=weighted,input_weights=weights_use,
@@ -4878,10 +4881,10 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
                 (180/np.pi)*state_dict['PA_t'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
                 yerr=(180/np.pi)*state_dict['PA_t_errs'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],
                 fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
-        ax6.errorbar((180/np.pi)*state_dict['PA_f'],state_dict['freq_test'][0],xerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+        ax6.errorbar((180/np.pi)*state_dict['PA_f'],state_dict['freq_test'][0],xerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
 
     ax0.errorbar(state_dict['time_axis'][intL:intR][L_t[intL:intR]>=SNRCUT]*1e-3,(180/np.pi)*state_dict['PA_t'][intL:intR][L_t[intL:intR]>=SNRCUT],yerr=(180/np.pi)*state_dict['PA_t_errs'][intL:intR][L_t[intL:intR]>=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
-    ax6.errorbar((180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],state_dict['freq_test'][0][L_f >=SNRCUT],xerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=5,linewidth=2)
+    ax6.errorbar((180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],state_dict['freq_test'][0][L_f >=SNRCUT],xerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
 
     ax0.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
@@ -5112,9 +5115,9 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
 
     SNRCUT = 3
     if showghostPA.value:
-        ax6.errorbar(state_dict['freq_test'][0],(180/np.pi)*state_dict['PA_f'],yerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=10,linewidth=2,alpha=0.15)
+        ax6.errorbar(state_dict['freq_test'][0],(180/np.pi)*state_dict['PA_f'],yerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
 
-    ax6.errorbar(state_dict['freq_test'][0][L_f >=SNRCUT], (180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],yerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=5,linewidth=2)
+    ax6.errorbar(state_dict['freq_test'][0][L_f >=SNRCUT], (180/np.pi)*state_dict['PA_f'][L_f >=SNRCUT],yerr=(180/np.pi)*state_dict['PA_f_errs'][L_f >=SNRCUT],fmt='o',color="blue",markersize=10,linewidth=2)
 
     ax6.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
     if sigflag:
@@ -5275,7 +5278,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                      "", #upper limit
                      state_dict['absVpol'],
                      state_dict['absVpol_err'],
-                     state_dict['absVclass'],
+                     state_dict['Vclass'],
                      "", #upper limit
                      state_dict['Vpol'],
                      state_dict['Vpol_err'],
@@ -5349,7 +5352,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                      "", #upper limit
                      state_dict['comps'][i]['absVpol'],
                      state_dict['comps'][i]['absVpol_err'],
-                     state_dict['comps'][i]['absVclass'],
+                     state_dict['comps'][i]['class'],
                      "", #upper limit
                      state_dict['comps'][i]['Vpol'],
                      state_dict['comps'][i]['Vpol_err'],
@@ -5387,13 +5390,13 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             f.write("DEC: " + str(state_dict['DEC']) + "\n" )
             f.write("ibeam: " + str(state_dict['ibeam']) + "\n" )
             
-            for i in range(state_dict['n_comps']):
-                if state_dict['n_comps']>1:
+            if state_dict['n_comps'] > 1:
+                for i in range(state_dict['n_comps']):
                     f.write("\nComponent " + str(i)+":")
-                f.write("width: " + str((state_dict['comps'][i]['intR']-state_dict['comps'][i]['intL'])*state_dict['n_t']*32.7e-3) + "ms\n")
-                f.write("buff: " + str(state_dict['comps'][i]['buff']) + "\n")
-                f.write("sf_window_weights:" + str(state_dict['comps'][i]['sf_window_weights']) + "\n")
-                f.write("avger_w" + str(state_dict['comps'][i]['avger_w']))
+                    f.write("width: " + str((state_dict['comps'][i]['intR']-state_dict['comps'][i]['intL'])*state_dict['n_t']*32.7e-3) + "ms\n")
+                    f.write("buff: " + str(state_dict['comps'][i]['buff']) + "\n")
+                    f.write("sf_window_weights:" + str(state_dict['comps'][i]['sf_window_weights']) + "\n")
+                    f.write("avger_w" + str(state_dict['comps'][i]['avger_w']))
             
             f.write("\nbad channels:" + str(state_dict['badchans']) + "\n")
         
@@ -5437,20 +5440,13 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
                 for i in range(state_dict['n_comps']):
                     f.write("Component " + str(i) + " Results:\n")
 
-                    f.write("RM Threshold: 9sigma " + "\n")
-                    f.write("Ionospheric RM: " + str((state_dict['comps'][i]['RM_ion'])) +"+-" + str((state_dict['comps'][i]['RM_ionerr'])) + "\n")
-                    f.write("Galactic RM: " + str((state_dict['comps'][i]['RM_gal'])) + "+-" + str((state_dict['comps'][i]['RM_galerr'])) + "\n")
                     f.write("RM synthesis: " + str(state_dict['comps'][i]['RMcalibrated']["RM1"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM1"][1]) + "\n")
                     f.write("RM synthesis, zoom: " + str(state_dict['comps'][i]['RMcalibrated']["RM1zoom"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM1zoom"][1]) + "\n")
                     f.write("Fine synthesis: " + str(state_dict['comps'][i]['RMcalibrated']["RM2"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM2"][1]) + "\n")
                     f.write("1sigma peak width: " + str(state_dict['comps'][i]['RMcalibrated']['RMFWHM']) + "\n")
-                    f.write("RM Tools: " + str(state_dict['comps'][i]['RMcalibrated']['comps'][i]["RM_tools"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_tools"][1]) + "\n")
+                    f.write("RM Tools: " + str(state_dict['comps'][i]['RMcalibrated']["RM_tools"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_tools"][1]) + "\n")
                     f.write("RM Tools, zoom:  " + str(state_dict['comps'][i]['RMcalibrated']["RM_toolszoom"][0]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RM_toolszoom"][1]) + "\n")
                     f.write("LinSNR: " + str(np.max(state_dict['comps'][i]['RMcalibrated']["RMsnrs2"])) + "\n")
-                    if ~np.isnan(state_dict['comps'][i]['RMcalibrated']['RMcal']):
-                        f.write("RM Not Applied\n")
-                    else:
-                        f.write("Applied RM:  " + str(state_dict['comps'][i]['RMcalibrated']["RMcal"]) + "+-" + str(state_dict['comps'][i]['RMcalibrated']["RMcalerr"]) + "\n")
 
                     #write pol info
                     f.write("\n")

@@ -5,7 +5,7 @@ import json
 import glob
 import ipywidgets
 from IPython.display import display
-
+from traitlets import Unicode
 from mercury import WidgetsManager
 
 """
@@ -44,6 +44,9 @@ class customPassword:
             self.text = ipywidgets.Password(
                 value=WidgetsManager.get_preset_value(url_key, value), description=label, disabled=disabled
             )
+            #self.realvalue = value
+            #self.text._view_name = Unicode('PasswordView').tag(sync=True)
+            #self.text._model_name = Unicode('PasswordModel').tag(sync=True)
             WidgetsManager.add_widget(self.text.model_id, self.code_uid, self.text)
         display(self)
 
