@@ -859,6 +859,7 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'maxtrials':1000,
 
         'showghostPA':True,
+        'showpolfracs':True,
         'intLbuffer_slider':0,
         'intRbuffer_slider':0,
         'polcomp_menu':'All',
@@ -1378,6 +1379,7 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
             if polcalloadbutton.value: 
                 print("Pre-Calibrated Data Not Available, Loading Uncalibrated Stokes Parameters")
         (I,Q,U,V,fobj,timeaxis,freq_test,wav_test,badchans) = dsapol.get_stokes_2D(state_dict['datadir'],state_dict['ids'] + state_dict['suff'],5120,start=12800,n_t=state_dict['base_n_t'],n_f=state_dict['base_n_f'],n_off=int(NOFFDEF//state_dict['base_n_t']),sub_offpulse_mean=sub_offpulse_mean,fixchans=True,verbose=False,fixchansfile=fixchansfile,fixchansfile_overwrite=fixchansfile_overwrite)
+        
 
         #update DM initialization
         wdict['DM_input_display'] = state_dict['DM0']#wdict['DM_init_display']
@@ -2685,10 +2687,11 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
     a0.set_xticks([])
     a0.legend(loc="upper right")
-    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['left_lim']]*1e-3,color='red')
-    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['right_lim']]*1e-3,color='red')
-    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['intL']]*1e-3,color='purple')
-    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['intR']]*1e-3,color='purple')
+    if ncomps_num.value > 1:
+        a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['left_lim']]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red')
+        a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['right_lim']]*1e-3 - 32.7e-3*state_dict['n_t']/2 ,color='red')
+    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['intL']]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple')
+    a0.axvline(state_dict['time_axis'][state_dict['comps'][state_dict['current_comp']]['intR']]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple')
     if multipeaks.value:
         a0.axhline(height,color='purple',linestyle='--')
 
@@ -3333,8 +3336,8 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
             #initial_fit_full += scat.exp_gauss_1(state_dict['time_axis']*1e-3,x0_guess_comps[k].value, amp_guess_comps[k].value, sigma_guess_comps[k].value, tau_guess_comps[k].value)
             #indicate proposed values
-            ax1.axvline(state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3,color='purple',linestyle='--')
-            ax1.axvspan(state_dict['comps'][k]['intL']*state_dict['n_t']*32.7e-3,state_dict['comps'][k]['intR']*state_dict['n_t']*32.7e-3,color='purple',alpha=0.1)
+            ax1.axvline(state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+            ax1.axvspan(state_dict['comps'][k]['intL']*state_dict['n_t']*32.7e-3 - 32.7e-3*state_dict['n_t']/2,state_dict['comps'][k]['intR']*state_dict['n_t']*32.7e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',alpha=0.1)
             ax1.text((state_dict['comps'][k]['peak'] + 5)*state_dict['n_t']*32.7e-3,I_tcal_p[state_dict['comps'][k]['peak']]+5,
                 'Proposed Guess:\n$x_0={a:.2f}$ ms\n$\\sigma = {b:.2f}$ ms\n$\\tau = {c:.2f}$ ms\n amp = {d:.2f}'.format(a=state_dict['comps'][k]['peak']*state_dict['n_t']*32.7e-3 - wdict['x0_guess_shift_' + str(k)],
                                                                                                         b=state_dict['comps'][k]['FWHM']*state_dict['n_t']*32.7e-3,
@@ -4579,7 +4582,9 @@ def Bfield_Budget_screen(getBfieldbutton,Bfield_range,Bfield_res):
     #        ["Bfield_display","Bfield_pos_err_display","Bfield_neg_err_display"],param='data')
     return
 
-def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu):
+def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu,saveplotbutton,showpolfracs):
+    saveplots = saveplotbutton.clicked
+    showfracs = showpolfracs.value
 
     #check if RM calibrated
     if state_dict['RMcalibrated']['RMcalstring'] != "No RM Calibration" and 'IcalRM' in state_dict.keys():
@@ -4867,13 +4872,22 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     #ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
     #ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
     
-    ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
-    ax0_f = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,sharex=ax0)
-    ax1 = plt.subplot2grid(shape=(8, 8), loc=(2, 0), colspan=4,rowspan=2,sharex=ax0)
-    ax2 = plt.subplot2grid(shape=(8, 8), loc=(4, 0), colspan=4, rowspan=4)
-    ax3 = plt.subplot2grid(shape=(8, 8), loc=(4, 4), rowspan=4,colspan=2)
-    ax6 = plt.subplot2grid(shape=(8, 8), loc=(4,7), rowspan=4,colspan=1)
-    ax6_f = plt.subplot2grid(shape=(8, 8), loc=(4,6), rowspan=4,colspan=1)
+    if not showfracs:
+        ax0 = plt.subplot2grid(shape=(7, 7), loc=(0, 0), colspan=4)
+        #ax0_f = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,sharex=ax0)
+        ax1 = plt.subplot2grid(shape=(7, 7), loc=(1, 0), colspan=4,rowspan=2,sharex=ax0)
+        ax2 = plt.subplot2grid(shape=(7, 7), loc=(3, 0), colspan=4, rowspan=4)
+        ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
+        ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
+        #ax6_f = plt.subplot2grid(shape=(8, 8), loc=(4,6), rowspan=4,colspan=1)
+    else:
+        ax0 = plt.subplot2grid(shape=(8, 8), loc=(0, 0), colspan=4)
+        ax0_f = plt.subplot2grid(shape=(8, 8), loc=(1, 0), colspan=4,sharex=ax0)
+        ax1 = plt.subplot2grid(shape=(8, 8), loc=(2, 0), colspan=4,rowspan=2,sharex=ax0)
+        ax2 = plt.subplot2grid(shape=(8, 8), loc=(4, 0), colspan=4, rowspan=4)
+        ax3 = plt.subplot2grid(shape=(8, 8), loc=(4, 4), rowspan=4,colspan=2)
+        ax6 = plt.subplot2grid(shape=(8, 8), loc=(4,7), rowspan=4,colspan=1)
+        ax6_f = plt.subplot2grid(shape=(8, 8), loc=(4,6), rowspan=4,colspan=1)
 
     SNRCUT = 3
     if showghostPA.value:
@@ -4913,23 +4927,24 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax1.legend(loc="upper right",fontsize=16)
     ax1.set_ylabel(r'S/N')
 
-    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+    if showfracs:
+        ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15,where='post')
-    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+        ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15,where='post')
-    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+        ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15,where='post')
-    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+        ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
             100*pol_t[intL:intR],label='T/I',color="green",linewidth=3,where='post')
-    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+        ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
             100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5,where='post')
-    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+        ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
             100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2,where='post')
     
-    ax0_f.set_xticks([])
-    ax0_f.set_ylabel(r'%')
-    ax0_f.set_ylim(-120,120)
-    ax0_f.legend(loc="upper right",fontsize=16)
+        ax0_f.set_xticks([])
+        ax0_f.set_ylabel(r'%')
+        ax0_f.set_ylim(-120,120)
+        ax0_f.legend(loc="upper right",fontsize=16)
 
 
     ax3.step(I_fuse,state_dict['freq_test'][0],color="black",linewidth=3,where='post')
@@ -4939,13 +4954,14 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax3.set_xlabel(r'S/N') 
     ax3.set_yticks([])
     
-    ax6_f.step(100*pol_f,state_dict['freq_test'][0],color="green",linewidth=3,where='post')
-    ax6_f.step(100*(L_f/I_fuse),state_dict['freq_test'][0],color="blue",linewidth=2.5,where='post')
-    ax6_f.step(100*(C_f/I_fuse),state_dict['freq_test'][0],color="orange",linewidth=2,where='post')
-    ax6_f.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
-    ax6_f.set_xlabel(r'%') 
-    ax6_f.set_xlim(-120,120)
-    ax6_f.set_yticks([])
+    if showfracs:
+        ax6_f.step(100*pol_f,state_dict['freq_test'][0],color="green",linewidth=3,where='post')
+        ax6_f.step(100*(L_f/I_fuse),state_dict['freq_test'][0],color="blue",linewidth=2.5,where='post')
+        ax6_f.step(100*(C_f/I_fuse),state_dict['freq_test'][0],color="orange",linewidth=2,where='post')
+        ax6_f.set_ylim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+        ax6_f.set_xlabel(r'%') 
+        ax6_f.set_xlim(-120,120)
+        ax6_f.set_yticks([])
     
     ax2.imshow(I_use[:,state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],aspect='auto',
             extent=[32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
@@ -4956,48 +4972,55 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     
 
     if polcomp_menu.value == "All":
-        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
-        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
-        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
-        ax2.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax2.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        if showfracs:
+            ax0_f.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+            ax0_f.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax2.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax2.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
     else:
-        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
-        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
-        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
-        ax2.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax2.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        if showfracs:
+            ax0_f.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+            ax0_f.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax2.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax2.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
 
     if state_dict['n_comps'] > 1:
         for i in range(state_dict['n_comps']):
             if polcomp_menu.value != "All" and polcomp_menu.value[-1] == str(i):
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
-                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                if showfracs:
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
             else:
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                if showfracs:
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax2.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
 
     plt.subplots_adjust(hspace=0)
     plt.subplots_adjust(wspace=0)
     #plt.show(fig)
+    if saveplots:
+        print("Saving plots to " + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_pol_summary_plot_FORMAT_UPDATE_PAERRFIX" + str("_GHOST" if showghostPA.value else "") + str("_POLFRACTIONS" if showfracs else "") + ".pdf")
+        plt.savefig(state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_pol_summary_plot_FORMAT_UPDATE_PAERRFIX" + str("_GHOST" if showghostPA.value else "") + str("_POLFRACTIONS" if showfracs else "") + ".pdf") 
     plt.close() 
 
     #(Time Domain)
@@ -5008,9 +5031,14 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     #ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
     #ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
 
-    ax0 = plt.subplot2grid(shape=(4, 4), loc=(0, 0), colspan=4)
-    ax0_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax0)
-    ax1 = plt.subplot2grid(shape=(4, 4), loc=(2, 0), colspan=4,rowspan=2)#,sharex=ax0)
+    if showfracs:
+        ax0 = plt.subplot2grid(shape=(4, 4), loc=(0, 0), colspan=4)
+        ax0_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax0)
+        ax1 = plt.subplot2grid(shape=(4, 4), loc=(2, 0), colspan=4,rowspan=2)#,sharex=ax0)
+    else:
+        ax0 = plt.subplot2grid(shape=(3, 4), loc=(0, 0), colspan=4)
+        #ax0_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax0)
+        ax1 = plt.subplot2grid(shape=(3, 4), loc=(1, 0), colspan=4,rowspan=2)#,sharex=ax0)
 
     SNRCUT = 3
     if showghostPA.value:
@@ -5043,61 +5071,69 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax1.set_ylabel(r'S/N')
     ax1.set_xlabel("Time (ms)")
 
-    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+    if showfracs:
+        ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             100*pol_t[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="green",linewidth=3,alpha=0.15,where='post')
-    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+        ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             100*(L_t/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="blue",linewidth=2.5,alpha=0.15,where='post')
-    ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
+        ax0_f.step(state_dict['time_axis'][state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']]*1e-3,
             100*(V_tuse/I_tuse)[state_dict['timestart']-state_dict['window']:state_dict['timestop']+state_dict['window']],color="orange",linewidth=2,alpha=0.15,where='post')
-    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+        ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
             100*pol_t[intL:intR],label='T/I',color="green",linewidth=3,where='post')
-    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+        ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
             100*(L_t/I_tuse)[intL:intR],label='L/I',color="blue",linewidth=2.5,where='post')
-    ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
+        ax0_f.step(state_dict['time_axis'][intL:intR]*1e-3,
             100*(V_tuse/I_tuse)[intL:intR],label='V/I',color="orange",linewidth=2,where='post')
-    ax0_f.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
+        ax0_f.set_xlim(32.7*state_dict['n_t']*state_dict['timestart']*1e-3 - state_dict['window']*32.7*state_dict['n_t']*1e-3,
             32.7*state_dict['n_t']*state_dict['timestop']*1e-3 + state_dict['window']*32.7*state_dict['n_t']*1e-3)
-    ax0_f.set_xticks([])
-    ax0_f.set_ylabel(r'%')
-    ax0_f.set_ylim(-120,120)
-    ax0_f.legend(loc="upper right",fontsize=16)
+        ax0_f.set_xticks([])
+        ax0_f.set_ylabel(r'%')
+        ax0_f.set_ylim(-120,120)
+        ax0_f.legend(loc="upper right",fontsize=16)
 
     if polcomp_menu.value == "All":
-        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
-        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
-        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='red',linestyle='-')
-        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='red',linestyle='-')
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+        if showfracs:
+            ax0_f.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+            ax0_f.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
     else:
-        ax0.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax0.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
-        ax1.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax1.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
-        ax0_f.axvline(state_dict['time_axis'][intL]*1e-3,color='purple',linestyle='--')
-        ax0_f.axvline(state_dict['time_axis'][intR]*1e-3,color='purple',linestyle='--')
+        ax0.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax0.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        ax1.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+        if showfracs:
+            ax0_f.axvline(state_dict['time_axis'][intL]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+            ax0_f.axvline(state_dict['time_axis'][intR]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
 
 
     if state_dict['n_comps'] > 1:
         for i in range(state_dict['n_comps']):
             if polcomp_menu.value != "All" and polcomp_menu.value[-1] == str(i):
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='red',linestyle='-')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='red',linestyle='-')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                if showfracs:
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='red',linestyle='-')
             else:
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3,color='purple',linestyle='--')
-                ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3,color='purple',linestyle='--')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax0.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                ax1.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                if showfracs:
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intL'] - state_dict['comps'][i]['intLbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
+                    ax0_f.axvline(state_dict['time_axis'][int(state_dict['comps'][i]['intR'] - state_dict['comps'][i]['intRbuffer'])]*1e-3 - 32.7e-3*state_dict['n_t']/2,color='purple',linestyle='--')
 
     plt.subplots_adjust(hspace=0)
     plt.subplots_adjust(wspace=0)
     #plt.show(fig)
+    if saveplots:
+        print("Saving plot to " + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_pol_summary_plot_FORMAT_UPDATE_PAERRFIX_TIME" + str("_GHOST" if showghostPA.value else "") + str("_POLFRACTIONS" if showfracs else "") + ".pdf")
+        plt.savefig(state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_pol_summary_plot_FORMAT_UPDATE_PAERRFIX_TIME" + str("_GHOST" if showghostPA.value else "") + str("_POLFRACTIONS" if showfracs else "") + ".pdf")
     plt.close()
 
 
@@ -5109,10 +5145,14 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     #ax3 = plt.subplot2grid(shape=(7, 7), loc=(3, 4), rowspan=4,colspan=2)
     #ax6 = plt.subplot2grid(shape=(7, 7), loc=(3,6), rowspan=4,colspan=1)
 
-    ax6 = plt.subplot2grid(shape=(4, 4), loc=(0, 0), colspan=4)
-    ax6_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax6)
-    ax3 = plt.subplot2grid(shape=(4, 4), loc=(2, 0), colspan=4,rowspan=2)#,sharex=ax6)
-
+    if showfracs:
+        ax6 = plt.subplot2grid(shape=(4, 4), loc=(0, 0), colspan=4)
+        ax6_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax6)
+        ax3 = plt.subplot2grid(shape=(4, 4), loc=(2, 0), colspan=4,rowspan=2)#,sharex=ax6)
+    else:
+        ax6 = plt.subplot2grid(shape=(3, 4), loc=(0, 0), colspan=4)
+        #ax6_f = plt.subplot2grid(shape=(4, 4), loc=(1, 0), colspan=4)#,sharex=ax6)
+        ax3 = plt.subplot2grid(shape=(3, 4), loc=(1, 0), colspan=4,rowspan=2)#,sharex=ax6)
     SNRCUT = 3
     if showghostPA.value:
         ax6.errorbar(state_dict['freq_test'][0],(180/np.pi)*state_dict['PA_f'],yerr=(180/np.pi)*state_dict['PA_f_errs'],fmt='o',color="blue",markersize=5,linewidth=2,alpha=0.15)
@@ -5133,21 +5173,25 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
     ax3.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
     ax3.set_ylabel(r'S/N')
     ax3.set_xlabel("Frequency (MHz)")
-
-    ax6_f.step(state_dict['freq_test'][0],100*pol_f,color="green",linewidth=3,where='post')
-    ax6_f.step(state_dict['freq_test'][0],100*(L_f/I_fuse),color="blue",linewidth=2.5,where='post')
-    ax6_f.step(state_dict['freq_test'][0],100*(C_f/I_fuse),color="orange",linewidth=2,where='post')
-    ax6_f.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
-    ax6_f.set_ylabel(r'%')
-    ax6_f.set_ylim(-120,120)
-    ax6_f.set_xticks([])
+    
+    if showfracs:
+        ax6_f.step(state_dict['freq_test'][0],100*pol_f,color="green",linewidth=3,where='post')
+        ax6_f.step(state_dict['freq_test'][0],100*(L_f/I_fuse),color="blue",linewidth=2.5,where='post')
+        ax6_f.step(state_dict['freq_test'][0],100*(C_f/I_fuse),color="orange",linewidth=2,where='post')
+        ax6_f.set_xlim(np.min(state_dict['freq_test'][0]),np.max(state_dict['freq_test'][0]))
+        ax6_f.set_ylabel(r'%')
+        ax6_f.set_ylim(-120,120)
+        ax6_f.set_xticks([])
 
     plt.subplots_adjust(hspace=0)
     plt.subplots_adjust(wspace=0)
     #plt.show(fig)
+    if saveplots:
+        print("Saving plots to " + state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_pol_summary_plot_FORMAT_UPDATE_PAERRFIX_FREQ" + str("_GHOST" if showghostPA.value else "") + str("_POLFRACTIONS" if showfracs else "") + ".pdf")
+        plt.savefig(state_dict['datadir'] + state_dict['ids'] + "_" + state_dict['nickname'] + "_pol_summary_plot_FORMAT_UPDATE_PAERRFIX_FREQ" + str("_GHOST" if showghostPA.value else "") + str("_POLFRACTIONS" if showfracs else "") + ".pdf")
     plt.close()
 
-    update_wdict([showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu],['showghostPA','intLbuffer_slider','intRbuffer_slider','polcomp_menu'],param='value')
+    update_wdict([showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_menu,showpolfracs],['showghostPA','intLbuffer_slider','intRbuffer_slider','polcomp_menu','showpolfracs'],param='value')
 
     return fig,fig_time,fig_freq
 
@@ -5173,7 +5217,7 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             fs = glob.glob(state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_polcal*fil")
             if len(fs) > 0 and not overwritefils.value:
                 os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_polcal*fil " + state_dict['Level3Dir'])
-    
+                os.system("cp " + state_dict['datadir'] + state_dict['ids'] + state_dict['suff'] + "_filaxes*json " + state_dict['Level3Dir'])    
             else:
             
                 #load data at base resolution
@@ -5390,13 +5434,13 @@ def archive_screen(savebutton,archivebutton,archivepolcalbutton,spreadsheetbutto
             f.write("DEC: " + str(state_dict['DEC']) + "\n" )
             f.write("ibeam: " + str(state_dict['ibeam']) + "\n" )
             
-            if state_dict['n_comps'] > 1:
-                for i in range(state_dict['n_comps']):
-                    f.write("\nComponent " + str(i)+":")
-                    f.write("width: " + str((state_dict['comps'][i]['intR']-state_dict['comps'][i]['intL'])*state_dict['n_t']*32.7e-3) + "ms\n")
-                    f.write("buff: " + str(state_dict['comps'][i]['buff']) + "\n")
-                    f.write("sf_window_weights:" + str(state_dict['comps'][i]['sf_window_weights']) + "\n")
-                    f.write("avger_w" + str(state_dict['comps'][i]['avger_w']))
+            #if state_dict['n_comps'] > 1:
+            for i in range(state_dict['n_comps']):
+                f.write("\nComponent " + str(i)+":\n")
+                f.write("width: " + str((state_dict['comps'][i]['intR']-state_dict['comps'][i]['intL'])*state_dict['n_t']*32.7e-3) + "ms\n")
+                f.write("buff: " + str(state_dict['comps'][i]['buff']) + "\n")
+                f.write("sf_window_weights: " + str(state_dict['comps'][i]['sf_window_weights']) + "\n")
+                f.write("avger_w: " + str(state_dict['comps'][i]['avger_w']))
             
             f.write("\nbad channels:" + str(state_dict['badchans']) + "\n")
         

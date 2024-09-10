@@ -357,7 +357,15 @@ def get_stokes_2D(datadir,fn_prefix,nsamps,n_t=1,n_f=1,n_off=3000,sub_offpulse_m
             print("Bad Channels: " + str(bad_chans))
         
 
-
+        #save channel mask
+        filaxes = dict()
+        filaxes['chanmask'] = [1 if i not in bad_chans else 0 for i in range(len(freq[0]))]
+        filaxes['channel_indices'] = [i for i in range(len(freq[0]))]
+        filaxes['channel_freqs_MHz'] = [freq[0][i] for i in range(len(freq[0]))]
+        filaxes['times_seconds'] = [i for i in timeaxis]
+        f = open(datadir+fn_prefix+"_filaxes" + str("_" + str(n_t) if n_t != 1 else "") + ".json","w")
+        json.dump(filaxes,f)
+        f.close()
 
         #mask
         #mask = np.zeros(I.shape)

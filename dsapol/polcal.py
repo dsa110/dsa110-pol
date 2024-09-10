@@ -707,6 +707,7 @@ def make_polcal_filterbanks(datadir,outputdirs,ids,ibeam,RA,DEC,polcalfile,init_
             dsapol.put_stokes_2D(Ical.data.astype(np.float32),Qcal.data.astype(np.float32),Ucal.data.astype(np.float32),Vcal.data.astype(np.float32),FilReader(datadir+ids + init_suffix + "_0.fil"),outputdirs[0],ids,suffix=new_suffix,alpha=True,verbose=verbose)
             for i in range(1,len(outputdirs)):
                 os.system("cp " + outputdirs[0] + "*" + ids + new_suffix + "*.fil " + outputdirs[i])
+                os.system("cp " + outputdirs[0] + "*" + ids + new_suffix + "*filaxes.json " + outputdirs[i])
 
         
 
