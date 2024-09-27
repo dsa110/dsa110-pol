@@ -478,7 +478,7 @@ def get_RM_2D(Ical,Qcal,Ucal,Vcal,timestart,timestop,width_native,t_samp,buff,n_
 
 
 #plot the 2D RM spectrum
-def plot_RM_2D(I_tcal,Q_tcal,U_tcal,V_tcal,n_off,n_t,timeaxis,timestart,timestop,RM,RMerr,trial_RM2,SNRs_full,Qnoise,show_calibrated=True,RMcal=np.nan,RMcalerr=np.nan,I_tcal_trm=None,Q_tcal_trm=None,U_tcal_trm=None,V_tcal_trm=None,rmbuff=500,cmapname='viridis',wind=5):
+def plot_RM_2D(I_tcal,Q_tcal,U_tcal,V_tcal,n_off,n_t,timeaxis,timestart,timestop,RM,RMerr,trial_RM2,SNRs_full,Qnoise,show_calibrated=True,RMcal=np.nan,RMcalerr=np.nan,I_tcal_trm=None,Q_tcal_trm=None,U_tcal_trm=None,V_tcal_trm=None,rmbuff=500,cmapname='viridis',wind=5,datadir='./',ids='',nickname=''):
     """
     This function plots the RM spectrum and polarization profile
     """
@@ -539,7 +539,7 @@ def plot_RM_2D(I_tcal,Q_tcal,U_tcal,V_tcal,n_off,n_t,timeaxis,timestart,timestop
     ax1.xaxis.set_major_locator(ticker.NullLocator())
     fig.subplots_adjust(hspace=0)
     fig.subplots_adjust(wspace=0)
-    #plt.savefig(datadir + ids + "_" + nickname + "_RMtime_summary_plot.pdf")
+    plt.savefig(datadir + ids + "_" + nickname + "_RMtime_summary_plot_PARSEC.pdf")
     plt.show()
 
     return

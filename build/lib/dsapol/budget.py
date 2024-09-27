@@ -817,7 +817,10 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         WISE
         2MASS
     """
-
+    #round ra, dec to 2 decimal places
+    ra = np.around(ra,2)
+    dec = np.around(dec,2)
+     
     #check catalog inputs
     if len(catalogs)==0:
         catstring = ""
