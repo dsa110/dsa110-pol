@@ -1,4 +1,5 @@
 import numpy as np
+import sys
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
 import pyne2001
@@ -8,6 +9,7 @@ from astropy.cosmology import WMAP1,WMAP3,WMAP5,WMAP7,WMAP9,Planck13,Planck15,Pl
 import astropy.units as u
 from astropy.modeling import physical_models
 from astropy.constants import m_p,m_e
+from astroquery import vizier
 import copy
 from scipy.signal import peak_widths
 from astroquery.simbad import Simbad
@@ -771,6 +773,7 @@ def Bhost_dist(DMhost,dmdist,DMaxis,RMhost,RMhosterr,res=10000,res2=500,siglevel
         
     return Bdist,B_exp,low,upp,Baxis
 
+
 SIMBAD_CATALOG_OPTIONS = [
         'DELS', #DESI Legacy Imaging Survey = DECaLS + BASS + MzLS
         'NGC', #New General Catalog
@@ -779,8 +782,70 @@ SIMBAD_CATALOG_OPTIONS = [
         'PS1',#PANSTARRS
         'SDSS',#SLOAN
         'WISE',#WISE
+        'WISEA',#ALLWISE (WISE All Sky Survey)
+        'WISEU',#unWISE
         '2MASS',#2MASS
         ]
+VIZIER_CODES = {
+        'LEDA':"VII/238",
+        'NGC':"VII/118",
+        'GAIA':"I/350",
+        'PS1':"II/349",
+        'SDSS':"V/139",
+        'WISE':"II/311",
+        'WISEA':"II/328",
+        'WISEU':"II/363"
+        }
+VIZIER_NAMEFIELDS = {
+        'LEDA':"PGC",
+        'NGC':"Name",
+        'GAIA':"EDR3Name",
+        'PS1':"objID",
+        'SDSS':"SDSS9",
+        'WISE':"WISE",
+        'WISEA':"AllWISE",
+        'WISEU':"objID"
+        }
+def get_VIZIER_cols(qdat,lf=sys.stdout):
+    """
+    Helper function to query vizier catalogs for a given source and 
+    append to qdat SIMBAD table
+    """
+    id_lists = list(qdat['IDS'])
+
+    vz = vizier.Vizier(columns=["**"])
+    vz.ROW_LIMIT = -1
+    for i in range(len(id_lists)):
+        id_list_str = id_lists[i]
+        id_list = id_list_str.split("|")
+        for objname in id_list:
+            print(objname,file=lf)
+            sname = objname.split()
+            catalog = sname[0]
+            ID = "".join(sname[1:] if catalog != 'GAIA' else sname[2:])
+            #catalog,ID = objname.split()
+            
+            #query for ID name
+            if catalog in VIZIER_NAMEFIELDS.keys() and catalog in VIZIER_CODES.keys():
+                vz_tables = vz.query_constraints(**{VIZIER_NAMEFIELDS[catalog]:ID},catalog=VIZIER_CODES[catalog])
+                try:
+                    for vz_table in vz_tables:
+                        for col in vz_table.columns:
+                            #add column if not present
+                            if col not in qdat.columns:
+                                if vz_table[col].dtype != str:
+                                    qdat.add_column(np.array(np.nan*np.ones(len(qdat)),dtype=vz_table[col].dtype),name=col)
+                                else:
+                                    qdat.add_column([""]*len(qdat),name=col)
+                            #update object with new column value
+                            qdat[col][i] = vz_table[col][0]
+                except TypeError as exc:
+                    print("Empty table:",exc,file=lf)
+    return qdat
+
+
+
+
 SIMBAD_GALAXY_OPTIONS = [
         '(G),Galaxy',
         '(IG),Interacting Galaxies',
@@ -815,6 +880,8 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         PS1
         SDSS
         WISE
+        WISEA
+        WISEU
         2MASS
     """
     #round ra, dec to 2 decimal places
@@ -861,6 +928,7 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
     customSimbad.add_votable_fields('otype')
     customSimbad.add_votable_fields('velocity')
     customSimbad.add_votable_fields('morphtype')
+    customSimbad.add_votable_fields('ids')
     #create query that targets (1) galaxies and groups of galaxies (2) within specified radius (3) has redshift in specified range (4) in catalogs specified
     query_string = "region(CIRCLE,icrs,{ra} {s}{dec},{radius}) & rvtype=\'z\' & {ts}{cs}{zs}".format(ra=ra,s="+" if dec>0 else "-",dec=np.abs(dec),radius=radius,ts=typestring,cs=catstring,zs=redstring) 
     lf = open(logfile,"a")
@@ -869,6 +937,9 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
     #send query
     qdat=customSimbad.query_criteria(query_string)
     if qdat is not None:
+        #add vizier columns
+        qdat =get_VIZIER_cols(qdat,lf=lf)
+
         #make column for offset
         c = SkyCoord([qdat['RA'][i] +qdat['DEC'][i] for i in range(len(qdat))],frame='icrs',unit=(u.hourangle,u.deg))
         qdat.add_column(SkyCoord(ra=ra*u.deg,dec=dec*u.deg,frame='icrs').separation(c).to(u.deg).value,name='OFFSET',index=3)
