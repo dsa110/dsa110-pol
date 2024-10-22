@@ -968,6 +968,7 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='M_INPUT_ERROR',index=8)
         qdat['M_INPUT_ERROR'].unit = u.Msun
 
+
         qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_EST',index=9)
         qdat['R_EST'].unit = u.Mpc
         qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_EST_ERROR',index=10)
@@ -1004,6 +1005,13 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='RM_EST_ERROR',index=21)
         qdat['RM_EST_ERROR'].unit = u.rad/u.m**2
 
+
+        #H1 Mass estimate
+        if 'm21' in qdat.columns:
+            qdat.add_column((1/0.2366)*(10**((-15.84 + qdat['m21'])/(-2.5))),name='FLUX_HI',index=22)
+            qdat['FLUX_HI'].unit = u.Jy*u.km/u.s
+            qdat.add_column((2.36e5)*(qdat['COMOVING_DIST_EST']**2)*qdat['FLUX_HI'],name='MASS_HI',index=23)
+            qdat['MASS_HI'].unit = u.Msun
 
         print("Found " + str(len(qdat)) + " sources",file=lf)
     else:
