@@ -3,6 +3,7 @@ import glob
 from datetime import datetime
 from datetime import timedelta
 from astropy.time import Time
+from astropy.coordinates import EarthLocation
 import time
 import os
 import json
@@ -64,6 +65,42 @@ dirs = json.load(f)
 f.close()
 logfile = dirs["logs"] + "RMcal_logfile.txt" #"/media/ubuntu/ssd/sherman/code/dsapol_logfiles/RMcal_logfile.txt"
 
+
+#Credit: Ayush Pandhi (CHIME, University of Toronto)
+def get_RM_AP(mjd, ra, dec, telescope="OVRO"):
+    """
+    Credit: Ayush Pandhi (CHIME, University of Toronto)
+
+    Wrapper for RMextract to get ionospheric RM while reconciling various file formats
+    See e.g. https://github.com/lofar-astron/RMextract/issues/42 and https://github.com/dsa110/dsa110-issues/issues/315
+    """
+    t = Time(mjd, format='mjd', scale ='utc')
+    starttime = t.mjd*24*3600.
+    endtime = starttime+3600.
+    if telescope == 'LOFAR':
+        statpos = [3826577.1095, 461022.900196, 5064892.758] #LOFAR CS002LBA (center) , ITRF xyz in meters
+    elif telescope == 'CHIME':
+        statpos = [-2059168.1737, -3621295.5700, 4814295.1757] #From https://geodesy.noaa.gov/cgi-bin/xyz_getxyz.prl, with N491914.5, W1193725.5, 545.0 (last one from https://en-ca.topographic-map.com/maps/o6et/Area-I-Skaha-West-Kaleden-Apex/)
+    elif telescope == "Westerbork":
+        statpos = [3828445.66, 445223.60, 5064921.57] #http://www3.mpifr-bonn.mpg.de/div/vlbi/evn2002/book/PCharlot.pdf
+    elif telescope == "EVN/Effelsberg":
+        statpos = [4033947.225142, 486990.906449, 4900431.141999] #https://eff100mwiki.mpifr-bonn.mpg.de/doku.php?id=information_for_astronomers:user_guide:antenna
+    elif telescope == "ASKAP":
+        statpos = askap.value
+    elif telescope=="Parkes": # https://www.narrabri.atnf.csiro.au/observing/users_guide/html/chunked/apg.html
+        statpos = [-4554231.533, 2816759.109, -3454036.323]
+    elif telescope=="OVRO" or telescope=="DSA-110":
+        lat=OVRO_lat
+        lon=OVRO_lon
+        height=OVRO_height
+        s = EarthLocation(lat=lat*u.deg,lon=lon*u.deg,height=height*u.m).itrs
+        statpos = s.x.value,s.y.value,s.z.value
+    else:
+        raise NotImplementedError("Telescope name not known")
+    pointing = [np.deg2rad(ra), np.deg2rad(dec)] # R3 Ra, Dec in radians
+    RMdict = gt.getRM(ionexPath=dirs['FRBtables'] + 'IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,])
+    return RMdict['times'][1]/24/3600, RMdict['RM']['st1'][1][0]
+
 #function to get ionospheric RM using a file already downloaded from NASA archives
 def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,prefixes=['CKMG','GPSG','COD0','CODG','IGSG','CORG','C1PG','UPCG']):
 
@@ -109,11 +146,36 @@ def get_rm_ion(RA,DEC,mjd,lat=OVRO_lat,lon=OVRO_lon,height=OVRO_height,window=1,
             return RMion,RMionerr
             
         except Exception as exc:
-            print("Failed to Retrieve Ionospheric RM, see logs")
+            print("Failed to Retrieve Ionospheric RM, from disk, try pulling from server...")
             print(exc)
             with open(logfile,"w") as f:
                 f.write(str(exc))
             
+        try:
+            with open(logfile,"w") as f:
+                with contextlib.redirect_stdout(f):
+                    #print("Trying " + prefix + " with new format")
+                    RMdict = gt.getRM(ionexPath=dirs['FRBtables'] + 'IONEXdata/', radec=pointing, timestep=100, timerange = [starttime, endtime], stat_positions=[statpos,],prefix=prefix,server="ftp://ftp.aiub.unibe.ch/CODE/IONO/")#server="ftp://gssc.esa.int/gnss/products/ionex/")#'ftp://ftp.aiub.unibe.ch/CODE/IONO/')#,newformat=True)
+            f.close()
+            print("Retrieved Ionospheric RM")
+
+            #logger.disabled = False           
+            #print("success! " + prefix)
+            #get mean and standard dev 
+            RMs = RMdict['RM']['st1'].flatten()
+            RMion = np.nanmedian(RMs)
+            RMionerr = np.nanstd(RMs)
+            return RMion,RMionerr
+
+        except Exception as exc:
+            print("Failed to Retrieve Ionospheric RM from server")
+            print(exc)
+            with open(logfile,"w") as f:
+                f.write(str(exc))
+
+
+
+
             """    
             try:                    
                 #print("Trying " + prefix + " with old format")

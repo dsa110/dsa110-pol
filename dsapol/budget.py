@@ -785,6 +785,8 @@ SIMBAD_CATALOG_OPTIONS = [
         'WISEA',#ALLWISE (WISE All Sky Survey)
         'WISEU',#unWISE
         '2MASS',#2MASS
+        'DES',#DARK ENERGY SURVEY
+        'GEMINI',#GEMINI
         ]
 VIZIER_CODES = {
         'LEDA':"VII/238",
@@ -794,7 +796,8 @@ VIZIER_CODES = {
         'SDSS':"V/139",
         'WISE':"II/311",
         'WISEA':"II/328",
-        'WISEU':"II/363"
+        'WISEU':"II/363",
+        'DES':"II/371"
         }
 VIZIER_NAMEFIELDS = {
         'LEDA':"PGC",
@@ -804,7 +807,8 @@ VIZIER_NAMEFIELDS = {
         'SDSS':"SDSS9",
         'WISE':"WISE",
         'WISEA':"AllWISE",
-        'WISEU':"objID"
+        'WISEU':"objID",
+        'DES':"DES"
         }
 def get_VIZIER_cols(qdat,lf=sys.stdout):
     """
@@ -843,7 +847,45 @@ def get_VIZIER_cols(qdat,lf=sys.stdout):
                     print("Empty table:",exc,file=lf)
     return qdat
 
+PSQUERY_TABLES = {
+        'WISE':["allwise.source","catwise2020.main","ls_dr10.wise","ls_dr9.wise","ls_dr8.wise","unwise_dr1.object"],
+        'WISEA':["allwise.source","catwise2020.main","ls_dr10.wise","ls_dr9.wise","ls_dr8.wise","unwise_dr1.object"],
+        'WISEU':["allwise.source","catwise2020.main","ls_dr10.wise","ls_dr9.wise","ls_dr8.wise","unwise_dr1.object"],
+        'DES':["des_dr1.main","des_dr1.galaxies","des_dr1.im3shape","des_dr1.morph","des_dr1.photoz","des_dr2.main","des_dr2.flux"],
+        'DESI':["desi_edr.photometry","desi_edr.target","sga2020.tractor","sga2020.ellipse","sparcl.main","splus_dr1.stripe82","splus_dr1.des_dr1","splus_dr2.main","splus_dr2.photoz"],
+        'GAIA':["gaia_dr1.gaia_source","gaia_dr2.gaia_source","gaia_dr3.gaia_source","gaia_dr3.galaxy_candidates","gaia_dr3.astrophysical_parameters","gaia_dr3.qso_candidates"],
+        'GEMINI':["gnirs_dqs.spec_measurements","gnirs_dqs.spec_measurements_supp","gogreen_dr1.clusters","gogreen_dr1.photo","gogreen_dr1.redshift"],
+        'DELS':["ls_dr10.photo_z","ls_dr10.wise","ls_dr10.tractor","ls_dr9.photo_z","ls_dr9.wise","ls_dr9.tractor","ls_dr8.photo_z","ls_dr8.wise","ls_dr8.tractor","delve_dr1.objects","delve_dr2.objects","delve_dr2.photo_z"],
+        'SDSS':["sdss_dr12.photoplate","sdss_dr12.emissionlinesport","sdss_dr12.dr12q","sdss_dr12q_duplicates","sdss_dr13.galspecline_dr8","sdss_dr16.dr16q","sdss_dr16.dr16q_duplicates","sdss_dr16.dr16q_superset","sdss_dr16.dr16q_superset_duplicates","sdss_dr16.elg_classifier","sdss_dr16.photoplate","sdss_dr17.apogee2_allstar","sdss_dr17.eboss_mcpm","sdss_dr17.photoplate","sparcl.main"],
+        'LEDA':["sga2020.tractor","sga2020.ellipse"],
+        '2MASS':["twomass.esc","ukidss_dr11plus.dxssource","ukidss_dr11plus.udssource","vhs_dr5.vhs_cat_v3"]
 
+        }
+def find_photoz(qdat):
+    """
+    Goes through queryClient catalogs to find photometric redshifts
+    for each source given in qdat
+    """
+    pass
+"""
+    id_lists = list(qdat['IDS'])
+
+    #first see if any of the listed catalogs have photo zs
+    for i in range(len(id_lists)):
+        id_list_str = id_lists[i]
+        id_list = id_list_str.split("|")
+        for objname in id_list:
+            print(objname,file=lf)
+            sname = objname.split()
+            catalog = sname[0]
+            ID = "".join(sname[1:] if catalog != 'GAIA' else sname[2:])
+
+            if catalog in PSQUERY_TABLES.keys():
+                #check if it has a photoz catalog
+                for tab in PSQUERY_TABLES[catalog]:
+                    if 'photo_z' in tab or 'phot_z' in tab or 'photz' in tab or 'photoz' in tab or 'redshift' in tab or 'specz' in tab or 'spec_z' in tab:
+                        qdat_qc = qc.query("select * from " + tab + " where " + tab + "." + VIZIER
+"""
 
 
 SIMBAD_GALAXY_OPTIONS = [
@@ -883,6 +925,11 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         WISEA
         WISEU
         2MASS
+        DES
+        GEMINI
+        UKIDSS
+        VHS
+
     """
     #round ra, dec to 2 decimal places
     ra = np.around(ra,2)
