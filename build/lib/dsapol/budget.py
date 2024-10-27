@@ -1,4 +1,5 @@
 import numpy as np
+from astropy.table import Table
 import sys
 from matplotlib import pyplot as plt
 from matplotlib.patches import Ellipse
@@ -16,6 +17,7 @@ from astroquery.simbad import Simbad
 from dsapol.RMcal import logfile
 import os
 import json
+from dl import queryClient as qc
 f = open(os.environ['DSAPOLDIR'] + "directories.json","r")
 dirs = json.load(f)
 f.close()
@@ -861,31 +863,104 @@ PSQUERY_TABLES = {
         '2MASS':["twomass.esc","ukidss_dr11plus.dxssource","ukidss_dr11plus.udssource","vhs_dr5.vhs_cat_v3"]
 
         }
-def find_photoz(qdat):
+PSQUERY_PHOTOZ_TABLES = {#'DES': {'des_dr1.photo_z': ('median_z', 'z_sigma', 'photometric')}, 
+                        'DESI': {'splus_dr2.photoz': ('zml', 'zml_err', 'photometric')}, 
+                        'GEMINI': {'gogreen_dr1.redshift': ('redshift', '', 'spectroscopic')}, 
+                        'DELS': {'ls_dr10.photo_z': ('z_phot_median', 'z_phot_std', 'photometric'), 
+                                'ls_dr9.photo_z': ('z_phot_median', 'z_phot_std', 'photometric'), 
+                                'ls_dr8.photo_z': ('z_phot_median', 'z_phot_std', 'photometric'), 
+                                'delve_dr2.photoz': ('z', 'zerr', 'photometric')}
+                        }
+PSQUERY_PHOTOZ_TABLES_NORADEC = ['ls_dr10.photo_z',
+                                #'des_dr1.photo_z',
+                                'ls_dr9.photo_z',
+                                'ls_dr8.photo_z']
+def find_redshift(qdat,lf=sys.stdout,radius=1/60):
     """
     Goes through queryClient catalogs to find photometric redshifts
     for each source given in qdat
     """
-    pass
-"""
-    id_lists = list(qdat['IDS'])
 
-    #first see if any of the listed catalogs have photo zs
+    ra_list = qdat['RA']
+    dec_list = qdat['DEC']
+    id_lists = list(qdat['IDS'])
+    zcols = ["RVZ_RADVEL"]*len(id_lists) #default is SIMBAD redshift
+    zerrcols = ["RVZ_ERROR"]*len(id_lists)
+    qdat.add_column(qdat['RVZ_RADVEL'],name='BEST_Z')
+    qdat.add_column(qdat['RVZ_ERROR'],name='BEST_Z_ERROR')
+
     for i in range(len(id_lists)):
         id_list_str = id_lists[i]
         id_list = id_list_str.split("|")
+        coord = SkyCoord(ra_list[i] +" "+ dec_list[i],frame='icrs',unit=(u.hourangle,u.deg))
+        ra = coord.ra.value
+        dec = coord.dec.value
+        
+        allcatalogs = list(PSQUERY_PHOTOZ_TABLES.keys())
+        """
+        #check if any catalogs in SIMBAD have photozs
         for objname in id_list:
-            print(objname,file=lf)
+            print(objname)
             sname = objname.split()
             catalog = sname[0]
             ID = "".join(sname[1:] if catalog != 'GAIA' else sname[2:])
+            
+            if catalog in allcatalogs:
+                allcatalogs = [catalog]
+        """
+        print(allcatalogs,file=lf)
+        ztable = None
+        for catalog in allcatalogs:
+            #query within 1 arcsecond of source
+            for tab in PSQUERY_PHOTOZ_TABLES[catalog]:
+                ztable= None
+                if tab not in PSQUERY_PHOTOZ_TABLES_NORADEC:
+                    cols = PSQUERY_PHOTOZ_TABLES[catalog][tab][0]
+                    cols += "" if PSQUERY_PHOTOZ_TABLES[catalog][tab][1]=="" else ","+PSQUERY_PHOTOZ_TABLES[catalog][tab][1]
+                    cols += ",ra,dec"
+                    ztable = Table.from_pandas(qc.query("select " + cols + " from " + tab + " where q3c_radial_query(ra, dec, {ra}, {dec}, {radius})".format(ra=ra,dec=dec,radius=radius),fmt='pandas'))
+                else:
+                    #use psquery to get source ids
+                    itable = Table.from_pandas(qc.query("select ra,dec,ls_id from " + tab[:-7] + "tractor where q3c_radial_query(ra, dec, {ra}, {dec}, {radius})".format(ra=ra,dec=dec,radius=radius),fmt='pandas'))
+                        
+                    #get nearest one
+                    if len(itable) > 0:
+                        idx = np.argmin(SkyCoord(ra=ra*u.deg,dec=dec*u.deg,frame='icrs').separation(SkyCoord(ra=itable['ra'].value*u.deg,dec=itable['dec'].value*u.deg,frame='icrs')).value)
+                        ls_id = itable['ls_id'][idx]
 
-            if catalog in PSQUERY_TABLES.keys():
-                #check if it has a photoz catalog
-                for tab in PSQUERY_TABLES[catalog]:
-                    if 'photo_z' in tab or 'phot_z' in tab or 'photz' in tab or 'photoz' in tab or 'redshift' in tab or 'specz' in tab or 'spec_z' in tab:
-                        qdat_qc = qc.query("select * from " + tab + " where " + tab + "." + VIZIER
-"""
+                        cols = PSQUERY_PHOTOZ_TABLES[catalog][tab][0]
+                        cols += "" if PSQUERY_PHOTOZ_TABLES[catalog][tab][1]=="" else ","+PSQUERY_PHOTOZ_TABLES[catalog][tab][1]
+                        ztable = Table.from_pandas(qc.query("select " + cols + " from " + tab + " where " + tab + ".ls_id=" + str(ls_id),fmt='pandas'))
+                        
+                        if len(ztable)>0:
+                            ztable.add_column(itable['ra'][idx:idx+1],name='ra')
+                            ztable.add_column(itable['dec'][idx:idx+1],name='dec')
+                        else:
+                            ztable = None
+                if ztable is not None and len(ztable)>0: 
+                    print(PSQUERY_PHOTOZ_TABLES[catalog][tab][0],file=lf)
+                    zcols[i] = PSQUERY_PHOTOZ_TABLES[catalog][tab][0]
+                    zerrcols[i] = PSQUERY_PHOTOZ_TABLES[catalog][tab][1]
+                    break
+            if ztable is not None and len(ztable)>0: break
+        print("None" if ztable is None else ztable.columns,file=lf)
+        if ztable is not None and len(ztable)>0:
+            for col in ztable.columns:
+                #add column if not present
+                if col not in qdat.columns and col != 'ra' and col != 'dec':
+                    if ztable[col].dtype != str:
+                        qdat.add_column(np.array(np.nan*np.ones(len(qdat)),dtype=ztable[col].dtype),name=col)
+                    else:
+                        qdat.add_column([""]*len(qdat),name=col)
+                if col != 'ra' and col != 'dec':
+                    #update object with new column value
+                    qdat[col][i] = ztable[col][np.argmin(SkyCoord(ra=ra*u.deg,dec=dec*u.deg,frame='icrs').separation(SkyCoord(ra=ztable['ra'].value*u.deg,dec=ztable['dec'].value*u.deg,frame='icrs')).value)]
+            print(zcols,file=lf)
+            #save to best col
+            qdat['BEST_Z'][i] = qdat[zcols[i]][i]
+            qdat['BEST_Z_ERROR'][i] = qdat[zerrcols[i]][i]
+
+    return qdat
 
 
 SIMBAD_GALAXY_OPTIONS = [
@@ -987,12 +1062,16 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         #add vizier columns
         qdat =get_VIZIER_cols(qdat,lf=lf)
 
+        #look for redshifts
+        qdat = find_redshift(qdat,lf=lf,radius=1/60)
+
         #make column for offset
         c = SkyCoord([qdat['RA'][i] +qdat['DEC'][i] for i in range(len(qdat))],frame='icrs',unit=(u.hourangle,u.deg))
         qdat.add_column(SkyCoord(ra=ra*u.deg,dec=dec*u.deg,frame='icrs').separation(c).to(u.deg).value,name='OFFSET',index=3)
         qdat['OFFSET'].unit = u.deg
 
         #make column for impact parameter
+        """
         qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']).data*qdat['OFFSET'].data*np.pi/180,name='IMPACT',index=4)
         qdat['IMPACT'].unit = u.Mpc
         arr = COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']+qdat['RVZ_ERROR']).data*qdat['OFFSET'].data*np.pi/180 - qdat['IMPACT']
@@ -1000,6 +1079,17 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         qdat.add_column(arr,name='IMPACT_POSERR',index=5)
         arr = qdat['IMPACT'] - COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']-qdat['RVZ_ERROR']).data*qdat['OFFSET'].data*np.pi/180
         arr[qdat['RVZ_ERROR'].mask] = np.nan
+        qdat.add_column(arr,name='IMPACT_NEGERR',index=6)
+        qdat['IMPACT_POSERR'].unit = u.Mpc
+        qdat['IMPACT_NEGERR'].unit = u.Mpc
+        """
+        qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['BEST_Z']).data*qdat['OFFSET'].data*np.pi/180,name='IMPACT',index=4)
+        qdat['IMPACT'].unit = u.Mpc
+        arr = COSMOLOGIES[cosmology].comoving_distance(qdat['BEST_Z']+qdat['BEST_Z_ERROR']).data*qdat['OFFSET'].data*np.pi/180 - qdat['IMPACT']
+        arr[qdat['BEST_Z_ERROR'].mask] = np.nan
+        qdat.add_column(arr,name='IMPACT_POSERR',index=5)
+        arr = qdat['IMPACT'] - COSMOLOGIES[cosmology].comoving_distance(qdat['BEST_Z']-qdat['BEST_Z_ERROR']).data*qdat['OFFSET'].data*np.pi/180
+        arr[qdat['BEST_Z_ERROR'].mask] = np.nan
         qdat.add_column(arr,name='IMPACT_NEGERR',index=6)
         qdat['IMPACT_POSERR'].unit = u.Mpc
         qdat['IMPACT_NEGERR'].unit = u.Mpc
@@ -1026,6 +1116,7 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         qdat.add_column(np.nan*np.ones(len(qdat['IMPACT']),dtype=float),name='R_ANGLE_EST_ERROR',index=12)
         qdat['R_ANGLE_EST_ERROR'].unit = u.arcmin
 
+        """
         qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']).data,name='COMOVING_DIST_EST',index=13)
         qdat['COMOVING_DIST_EST'].unit = u.Mpc
         arr = COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']+qdat['RVZ_ERROR']).data-qdat['COMOVING_DIST_EST'].data
@@ -1033,6 +1124,17 @@ def get_SIMBAD_gals(ra,dec,radius,catalogs=[],types=[],cosmology="Planck18",reds
         qdat.add_column(arr,name='COMOVING_DIST_EST_POSERR',index=14)
         arr = qdat['COMOVING_DIST_EST'].data-COSMOLOGIES[cosmology].comoving_distance(qdat['RVZ_RADVEL']-qdat['RVZ_ERROR']).data
         arr[qdat['RVZ_ERROR'].mask] = np.nan
+        qdat.add_column(arr,name='COMOVING_DIST_EST_NEGERR',index=15)
+        qdat['COMOVING_DIST_EST_POSERR'].unit = u.Mpc
+        qdat['COMOVING_DIST_EST_NEGERR'].unit = u.Mpc
+        """
+        qdat.add_column(COSMOLOGIES[cosmology].comoving_distance(qdat['BEST_Z']).data,name='COMOVING_DIST_EST',index=13)
+        qdat['COMOVING_DIST_EST'].unit = u.Mpc
+        arr = COSMOLOGIES[cosmology].comoving_distance(qdat['BEST_Z']+qdat['BEST_Z_ERROR']).data-qdat['COMOVING_DIST_EST'].data
+        arr[qdat['BEST_Z_ERROR'].mask] = np.nan
+        qdat.add_column(arr,name='COMOVING_DIST_EST_POSERR',index=14)
+        arr = qdat['COMOVING_DIST_EST'].data-COSMOLOGIES[cosmology].comoving_distance(qdat['BEST_Z']-qdat['BEST_Z_ERROR']).data
+        arr[qdat['BEST_Z_ERROR'].mask] = np.nan
         qdat.add_column(arr,name='COMOVING_DIST_EST_NEGERR',index=15)
         qdat['COMOVING_DIST_EST_POSERR'].unit = u.Mpc
         qdat['COMOVING_DIST_EST_NEGERR'].unit = u.Mpc
@@ -1116,13 +1218,18 @@ def plot_galaxies(ra,dec,radius,cosmology,redshift=-1,qdat=None,figsize=(18,12),
 
     #ax2.set_ylim(0,1.5*np.abs(redshift))
     ax3.set_ylim(0,1.5*np.abs(redshift))
+    zcol = 'BEST_Z'
+    zcolerr = 'BEST_Z_ERROR'
+    if qdat is not None and 'BEST_Z' not in qdat.columns:
+        zcol = 'RVZ_RADVEL'
+        zcolerr = 'RVZ_RADVEL_ERROR'
     if qdat is not None:
         for i in range(len(qdat)):
-            if ~qdat['RA'].mask[i] and ~qdat['DEC'].mask[i] and ~qdat['RVZ_RADVEL'].mask[i]:
+            if ~qdat['RA'].mask[i] and ~qdat['DEC'].mask[i] and ~qdat[zcol].mask[i]:
                 c = SkyCoord(qdat['RA'][i]+qdat['DEC'][i],frame='icrs',unit=(u.hourangle,u.deg))
                 #offset = np.sqrt((c.ra.value-ra)**2 + (c.dec.value-dec)**2)
                 sign = ((c.ra.value-ra)/np.abs(c.ra.value-ra))*((c.dec.value-dec)/np.abs(c.dec.value-dec))
-                z = qdat['RVZ_RADVEL'][i]
+                z = qdat[zcol][i]
                 #ax2.plot(sign*offset,z,'x',markersize=20,color='blue')
                 #ax2.plot([0,sign*offset],[z,z],color='blue',linewidth=3)
 
@@ -1147,13 +1254,19 @@ def DM_int_vals(qdat_row,mass_low,mass_high,cosmology,mass_type):
     ,redshift, impact parameter, and angular size
     """
 
+    zcol = 'BEST_Z'
+    zcolerr = 'BEST_Z_ERROR'
+    if qdat_row is not None and 'BEST_Z' not in qdat_row.columns:
+        zcol = 'RVZ_RADVEL'
+        zcolerr = 'RVZ_RADVEL_ERROR'
+ 
     #make NFW profile
-    if ~np.isnan(qdat_row['RVZ_ERROR']) and ~np.isnan(qdat_row['IMPACT_NEGERR']):
-        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row['RVZ_RADVEL']-qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    if ~np.isnan(qdat_row[zcolerr]) and ~np.isnan(qdat_row['IMPACT_NEGERR']):
+        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row[zcol]-qdat_row[zcolerr],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT']-qdat_row['IMPACT_NEGERR'])*u.Mpc
     else:
-        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row[zcol],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT'])*u.Mpc
 
@@ -1171,12 +1284,12 @@ def DM_int_vals(qdat_row,mass_low,mass_high,cosmology,mass_type):
     rvir1 = nfw.r_virial.to(u.Mpc).value
 
     #make NFW profile
-    if ~np.isnan(qdat_row['RVZ_ERROR']) and ~np.isnan(qdat_row['IMPACT_POSERR']):
-        nfw = physical_models.NFW(mass=mass_high*u.Msun,redshift=qdat_row['RVZ_RADVEL']+qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    if ~np.isnan(qdat_row[zcolerr]) and ~np.isnan(qdat_row['IMPACT_POSERR']):
+        nfw = physical_models.NFW(mass=mass_high*u.Msun,redshift=qdat_row[zcol]+qdat_row[zcolerr],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT']+qdat_row['IMPACT_POSERR'])*u.Mpc
     else:
-        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+        nfw = physical_models.NFW(mass=mass_low*u.Msun,redshift=qdat_row[zcol],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT'])*u.Mpc
 
@@ -1213,14 +1326,19 @@ def RM_int_vals(qdat_row,bfield_low,bfield_high,cosmology,mass_type,bfield_types
     """
     This function uses NFW profile and B field estiamtes to get RM and error
     """
-    
+    zcol = 'BEST_Z'
+    zcolerr = 'BEST_Z_ERROR'
+    if qdat_row is not None and 'BEST_Z' not in qdat_row.columns:
+        zcol = 'RVZ_RADVEL'
+        zcolerr = 'RVZ_RADVEL_ERROR'
+
     #make NFW profile
-    if ~np.isnan(qdat_row['RVZ_ERROR']) and ~np.isnan(qdat_row['IMPACT_NEGERR']):
-        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']-qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL']-qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    if ~np.isnan(qdat_row[zcolerr]) and ~np.isnan(qdat_row['IMPACT_NEGERR']):
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']-qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row[zcol]-qdat_row[zcolerr],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT']-qdat_row['IMPACT_NEGERR'])*u.Mpc
     else:
-        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']-qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']-qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row[zcol],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT'])*u.Mpc
         
@@ -1250,12 +1368,12 @@ def RM_int_vals(qdat_row,bfield_low,bfield_high,cosmology,mass_type,bfield_types
     RM_low = (0.81*((u.rad/u.m**2)*(u.cm**3/u.pc)/u.uG)*bf_low*ne*l).value #rad/m^2
 
     #make NFW profile
-    if ~np.isnan(qdat_row['RVZ_ERROR']) and ~np.isnan(qdat_row['IMPACT_POSERR']):
-        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']+qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL']+qdat_row['RVZ_ERROR'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+    if ~np.isnan(qdat_row[zcolerr]) and ~np.isnan(qdat_row['IMPACT_POSERR']):
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']+qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row[zcol]+qdat_row[zcolerr],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT']+qdat_row['IMPACT_POSERR'])*u.Mpc
     else:
-        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']+qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row['RVZ_RADVEL'],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
+        nfw = physical_models.NFW(mass=(qdat_row['M_INPUT']+qdat_row['M_INPUT_ERROR'])*u.Msun,redshift=qdat_row[zcol],massfactor=mass_type,cosmo=COSMOLOGIES[cosmology])
         #get impact parameter
         b = (qdat_row['IMPACT'])*u.Mpc
 
