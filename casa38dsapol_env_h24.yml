@@ -10,12 +10,14 @@ dependencies:
   - argon2-cffi-bindings=21.2.0=py38h7f8727e_0
   - arviz=0.12.1=pyhd8ed1ab_1
   - astroid=3.2.2=py38h06a4308_0
-  - astropy=5.0.4=py38hce1f21e_0
   - astropy-healpix=0.5=py38h0b5ebd8_1
+  - astroquery=0.4.7=pyhd8ed1ab_0
   - asttokens=2.0.5=pyhd3eb1b0_0
-  - attrs=23.2.0=pyh71513ae_0
   - babel=2.11.0=py38h06a4308_0
   - backcall=0.2.0=pyhd3eb1b0_0
+  - backports=1.0=pyhd8ed1ab_4
+  - backports.tarfile=1.0.0=pyhd8ed1ab_1
+  - bcrypt=3.2.0=py38h7b6447c_0
   - beautifulsoup4=4.11.1=py38h06a4308_0
   - bilby=1.2.1=pyhd8ed1ab_1
   - blas=1.0=mkl
@@ -28,10 +30,11 @@ dependencies:
   - bzip2=1.0.8=h7f98852_4
   - c-ares=1.18.1=h7f8727e_0
   - ca-certificates=2024.7.4=hbcca054_0
-  - certifi=2024.7.4=pyhd8ed1ab_0
+  - certifi=2024.7.4=py38h06a4308_0
   - cffi=1.15.0=py38hd667e15_1
   - cftime=1.5.1.1=py38hce1f21e_0
   - charset-normalizer=2.0.4=pyhd3eb1b0_0
+  - click=8.1.7=py38h06a4308_0
   - cloudpickle=2.0.0=pyhd3eb1b0_0
   - colorcet=3.1.0=py38h06a4308_0
   - corner=2.2.2=pyhd8ed1ab_0
@@ -72,23 +75,34 @@ dependencies:
   - heapdict=1.0.1=pyhd3eb1b0_0
   - hiplot=0.1.33=pyhd8ed1ab_0
   - holoviews=1.17.1=py38h06a4308_0
+  - html5lib=1.1=pyh9f0ad1d_0
   - hvplot=0.10.0=py38h06a4308_0
   - icu=58.2=he6710b0_3
   - idna=3.7=pyhd8ed1ab_0
   - importlib-metadata=8.0.0=pyha770c72_0
+  - importlib_metadata=8.0.0=hd8ed1ab_0
   - importlib_resources=6.4.0=py38h06a4308_0
   - intel-openmp=2021.4.0=h06a4308_3561
   - ipython_genutils=0.2.0=pyhd3eb1b0_1
   - isort=5.9.3=pyhd3eb1b0_0
   - itsdangerous=2.0.1=pyhd3eb1b0_0
+  - jaraco.classes=3.4.0=pyhd8ed1ab_1
+  - jaraco.context=5.3.0=pyhd8ed1ab_1
+  - jaraco.functools=4.0.0=pyhd8ed1ab_0
   - jedi=0.18.1=py38h06a4308_1
+  - jeepney=0.8.0=pyhd8ed1ab_0
   - jinja2=3.1.4=py38h06a4308_0
   - jpeg=9d=h7f8727e_0
   - json5=0.9.6=pyhd3eb1b0_0
   - jupyter=1.0.0=py38h06a4308_9
+  - jupyter_client=7.2.2=py38h06a4308_0
   - jupyter_console=6.4.4=py38h06a4308_0
+  - jupyter_core=5.7.2=py38h06a4308_0
+  - jupyter_server=1.23.4=py38h06a4308_0
   - jupyterlab_pygments=0.1.2=py_0
   - jupyterlab_server=2.22.0=py38h06a4308_0
+  - jupyterlab_widgets=3.0.10=py38h06a4308_0
+  - keyring=25.2.1=pyha804496_0
   - kiwisolver=1.3.2=py38h295c915_0
   - krb5=1.19.2=hcc1bbae_0
   - lazy-object-proxy=1.6.0=py38h27cfd23_0
@@ -134,14 +148,15 @@ dependencies:
   - mkl_fft=1.3.1=py38hd3c417c_0
   - mkl_random=1.2.2=py38h51133e4_0
   - mock=4.0.3=py38h578d9bd_3
+  - more-itertools=10.3.0=pyhd8ed1ab_0
   - mpc=1.1.0=h10f8cd9_1
   - mpfr=4.0.2=hb69a4c5_1
   - mpmath=1.3.0=py38h06a4308_0
-  - msgpack-python=1.0.3=py38hd09550d_0
   - munkres=1.1.4=py_0
   - nbclassic=1.1.0=py38h06a4308_0
   - nbclient=0.5.13=py38h06a4308_0
   - nbconvert-pandoc=6.5.3=pyhd8ed1ab_0
+  - nbformat=5.9.2=py38h06a4308_0
   - ncurses=6.3=h7f8727e_2
   - nest-asyncio=1.5.5=py38h06a4308_0
   - netcdf4=1.5.7=py38h0a24e14_0
@@ -163,7 +178,6 @@ dependencies:
   - pkgutil-resolve-name=1.3.10=pyhd8ed1ab_1
   - prometheus_client=0.14.1=py38h06a4308_0
   - prompt_toolkit=3.0.20=hd3eb1b0_0
-  - psutil=5.8.0=py38h27cfd23_1
   - ptyprocess=0.7.0=pyhd3eb1b0_2
   - pure_eval=0.2.2=pyhd3eb1b0_0
   - pycparser=2.21=pyhd3eb1b0_0
@@ -183,11 +197,13 @@ dependencies:
   - python_abi=3.8=2_cp38
   - pytz=2021.3=pyhd3eb1b0_0
   - pyviz_comms=2.0.2=pyhd3eb1b0_0
+  - pyvo=1.5.2=pyhd8ed1ab_0
   - pyyaml=6.0=py38h7f8727e_1
   - qt=5.9.7=h5867ecd_1
   - qtpy=2.4.1=py38h06a4308_0
   - readline=8.1.2=h7f8727e_1
   - requests=2.32.3=pyhd8ed1ab_0
+  - secretstorage=3.3.3=py38h578d9bd_2
   - setuptools=70.2.0=pyhd8ed1ab_0
   - sip=4.19.13=py38h295c915_0
   - six=1.16.0=pyhd3eb1b0_1
@@ -232,10 +248,20 @@ dependencies:
       - amqp==5.2.0
       - appdirs==1.4.4
       - arrow==1.3.0
+      - asdf==2.15.0
+      - asdf-astropy==0.4.0
+      - asdf-coordinates-schemas==0.2.0
+      - asdf-standard==1.0.3
+      - asdf-transform-schemas==0.4.0
+      - asdf-unit-schemas==0.2.0
+      - asdf-wcs-schemas==0.3.0
       - asgiref==3.8.1
       - asteval==1.0.0
+      - astropy==5.2.2
       - astunparse==1.6.3
+      - async-lru==2.0.4
       - async-timeout==4.0.3
+      - attrs==23.2.0
       - autobahn==23.1.2
       - automat==22.10.0
       - backports-zoneinfo==0.2.1
@@ -249,9 +275,12 @@ dependencies:
       - casadata==2024.5.22
       - casatasks==6.6.4.34
       - casatools==6.6.4.34
+      - casjobs==0.0.2
+      - category-encoders==2.6.3
       - celery==5.4.0
+      - cfod==2021.6.4
       - channels==4.1.0
-      - click==8.1.7
+      - chardet==5.2.0
       - click-didyoumean==0.3.1
       - click-plugins==1.1.1
       - click-repl==0.3.0
@@ -263,6 +292,11 @@ dependencies:
       - cryptography==42.0.8
       - cython==3.0.10
       - daphne==4.1.0
+      - dash==2.17.1
+      - dash-core-components==2.0.0
+      - dash-html-components==2.0.0
+      - dash-table==5.0.0
+      - deprecated==1.2.14
       - deprecation==2.1.0
       - dj-rest-auth==3.0.0
       - django==4.2.7
@@ -280,10 +314,12 @@ dependencies:
       - dsa110-meridian-fs==1.6.5
       - dsa110-pyutils==3.6.1
       - dsa110-syshealth==0.1+11.g19f194b.dirty
+      - dustmaps==1.0.13
       - dynesty==2.1.4
       - etcd3==0.12.0
       - exceptiongroup==1.2.1
       - execnb==0.1.6
+      - extinction==0.4.6
       - fastcore==1.5.51
       - finufft==2.2.0
       - flatbuffers==24.3.25
@@ -296,8 +332,15 @@ dependencies:
       - google-pasta==0.2.0
       - greenlet==3.0.3
       - grpcio==1.65.0
+      - gwcs==0.18.3
+      - h11==0.14.0
+      - healpy==1.16.5
       - hera-librarian==0.1.6
+      - httpcore==1.0.5
+      - httplib2==0.22.0
+      - httpx==0.27.0
       - hyperlink==21.0.0
+      - imbalanced-learn==0.12.3
       - incremental==22.10.0
       - influxdb==5.3.2
       - iniconfig==2.0.0
@@ -307,75 +350,107 @@ dependencies:
       - isoduration==20.11.0
       - itables==2.0.0
       - jmespath==1.0.1
+      - joblib==1.4.2
       - jsonpointer==3.0.0
       - jsonschema==4.23.0
       - jsonschema-specifications==2023.12.1
       - jupyter-client==7.4.9
-      - jupyter-core==5.7.2
       - jupyter-events==0.10.0
+      - jupyter-lsp==2.2.5
       - jupyter-server==2.12.4
       - jupyter-server-terminals==0.5.3
+      - jupyterlab==4.2.4
+      - jupyterlab-server==2.27.3
       - jupyterlab-widgets==3.0.11
+      - kaleido==0.2.1
       - keras==2.11.0
       - kombu==5.3.7
       - libclang==18.1.1
+      - lightgbm==4.5.0
       - llvmlite==0.41.1
       - lmfit==1.3.1
       - markdown==3.3.6
+      - mastcasjobs==0.0.6
       - mercury==2.4.3
       - mistune==3.0.2
+      - msgpack-python==0.5.6
       - multidict==6.0.5
       - nbconvert==7.14.1
-      - nbformat==5.9.2
-      - notebook==6.4.12
+      - ndcube==2.1.4
+      - noaodatalab==2.20.0
+      - notebook==7.2.1
       - numba==0.58.1
-      - numpy==1.21.5
+      - numpy==1.24.4
       - oauthlib==3.2.2
       - opt-einsum==3.3.0
+      - orjson==3.10.6
       - overrides==7.7.0
       - pandas==1.4.1
+      - patsy==0.5.6
       - platformdirs==4.2.2
+      - plotly==5.23.0
+      - plotly-resampler==0.10.0
       - pluggy==1.5.0
+      - pmdarima==2.0.4
       - polspectra==1.1.0
+      - progressbar2==4.5.0
       - prompt-toolkit==3.0.47
       - protobuf==3.19.6
+      - psquery-astro==0.6.11
       - psrqpy==1.2.10
+      - psutil==6.0.0
       - pyasn1==0.6.0
       - pyasn1-modules==0.4.0
       - pybind11==2.13.1
+      - pycaret==3.2.0
+      - pycurl==7.45.3
+      - pycurl-requests==0.5.0
       - pyee==8.2.2
       - pyjwt==2.8.0
       - pyne2001==0.1.3
-      - pyopenssl==24.1.0
+      - pyod==2.0.1
+      - pyopenssl==22.0.0
       - pyppeteer==1.0.2
       - pytest==8.2.2
       - python-casacore==3.5.2
       - python-dotenv==1.0.1
       - python-json-logger==2.0.7
+      - python-utils==3.8.2
       - python3-openid==3.2.0
       - pyzmq==26.0.3
       - qtconsole==5.3.2
       - referencing==0.35.1
       - requests-oauthlib==2.0.0
+      - retrying==1.3.4
       - rfc3339-validator==0.1.4
       - rfc3986-validator==0.1.1
       - rm-tools==1.4.6
-      - rmextract==0.4.4
+      - rmextract==0.5.1
       - rmtable==1.2.1
       - rpds-py==0.19.0
       - rsa==4.9
       - s3transfer==0.6.2
+      - schemdraw==0.15
+      - scikit-base==0.5.2
+      - scikit-learn==1.2.2
+      - scikit-plot==0.3.7
       - scipy==1.10.1
+      - sedpy==1.0.0
+      - semantic-version==2.10.0
       - send2trash==1.8.3
       - service-identity==24.1.0
       - shortuuid==1.0.13
       - sigpyproc==0.5.5
+      - sktime==0.21.1
       - slack==0.0.2
       - slack-sdk==3.31.0
       - slackclient==2.9.4
+      - specutils==1.16.0
       - sqlalchemy==1.4.27
       - sqlparse==0.5.0
+      - statsmodels==0.14.1
       - structlog==24.2.0
+      - tbats==1.1.3
       - tdqm==0.0.1
       - tenacity==8.5.0
       - tensorboard==2.11.2
@@ -385,8 +460,10 @@ dependencies:
       - tensorflow-estimator==2.11.0
       - tensorflow-io-gcs-filesystem==0.34.0
       - termcolor==2.4.0
+      - threadpoolctl==3.5.0
       - tornado==6.4.1
       - traitlets==5.9.0
+      - tsdownsample==0.1.3
       - twisted==24.3.0
       - txaio==23.1.1
       - types-python-dateutil==2.9.0.20240316
@@ -400,7 +477,10 @@ dependencies:
       - whitenoise==6.7.0
       - widgetsnbextension==4.0.11
       - wrapt==1.16.0
+      - wurlitzer==3.1.1
+      - xxhash==3.4.1
       - yarl==1.9.4
+      - yellowbrick==1.5
       - zope-event==5.0
       - zope-interface==6.4.post2
 prefix: /home/ubuntu/msherman_nsfrb/miniconda/envs/casa38dsapol
