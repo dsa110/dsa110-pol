@@ -1436,7 +1436,7 @@ def find_peak(I,width_native,t_samp,n_t,peak_range=None,pre_calc_tf=False,buff=0
     return (peak, timestart, timestop)
 
 #Calculate polarization angle vs frequency and time from 2D I Q U V arrays
-def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=0.03,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1,intL=None,intR=None):
+def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,plot=False,datadir=DEFAULT_DATADIR,label='',calstr='',ext=ext,pre_calc_tf=False,show=False,normalize=True,buff=0,full=False,weighted=False,n_t_weight=1,timeaxis=None,fobj=None,sf_window_weights=45,multipeaks=False,height=None,window=30,unbias=True,input_weights=[],allowed_err=1,unbias_factor=1,intL=None,intR=None):
     """
     This function calculates and plots the polarization fraction averaged over both time and 
     frequency, the total an polarized signal-to-noise, and the average polarization fraction within the peak.
@@ -1620,6 +1620,7 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
 
 
         if multipeaks and (intL == None or intR == None):
+            if height is None: height = np.nanmax(I_t_weights)/2
             pks,props = find_peaks(I_t_weights,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t_weights,pks)
             intL = intL[0]
@@ -1710,15 +1711,17 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         
 
     else:
+        """
         if input_weights == []:
             I_t_weights=get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights)
             I_t_weights_unpadded = get_weights(I,Q,U,V,width_native,t_samp,n_f,n_t,freq_test,timeaxis,fobj,n_off=n_off,buff=buff,n_t_weight=n_t_weight,sf_window_weights=sf_window_weights,padded=False)
         else:
             I_t_weights = input_weights
             I_t_weights_unpadded = np.trim_zeros(input_weights)
-
+        """
 
         if multipeaks and (intL == None or intR == None):
+            if height is None: height = np.nanmax(I_t)/2
             pks,props = find_peaks(I_t,height=height)
             FWHM,heights,intL,intR = peak_widths(I_t,pks)
             intL = intL[0]
@@ -1751,44 +1754,57 @@ def get_pol_fraction(I,Q,U,V,width_native,t_samp,n_t,n_f,freq_test,n_off=3000,pl
         sigma_L = (sigma_L[intL:intR])[np.abs(pol_t)[intL:intR] < 1+allowed_err]
         sigma_L = np.sqrt(np.nansum((sigma_L)**2))/len(sigma_L)
 
-        sigma_C_abs = np.sqrt((off_pulse_V/I_t)**2  + (V_t*off_pulse_I/((I_t)**2))**2)
+        sigma_C = np.sqrt((off_pulse_V/I_t)**2  + (V_t*off_pulse_I/((I_t)**2))**2)
+        sigma_C = (sigma_C[intL:intR])[np.abs(pol_t)[intL:intR] < 1+allowed_err]
+        sigma_C = np.sqrt(np.nansum((sigma_C)**2))/len(sigma_C)
+
+        sigma_C_abs = np.sqrt((off_pulse_V/I_t)**2  + (V_t*off_pulse_I/((I_t)**2))**2)*np.abs(V_t/np.abs(V_t))
         sigma_C_abs = (sigma_C_abs[intL:intR])[np.abs(pol_t)[intL:intR] < 1+allowed_err]
         sigma_C_abs = np.sqrt(np.nansum((sigma_C_abs)**2))/len(sigma_C_abs)
         sigma_C = sigma_C_abs
-
+        print("off-pulse:",off_pulse_I,off_pulse_Q,off_pulse_U,off_pulse_V)
         #SNR
         sig0 = np.nanmean(I_t[timestart:timestop])
         I_t_cut1 = I_t[timestart%(timestop-timestart):]
         I_t_cut = I_t_cut1[:(len(I_t_cut1)-(len(I_t_cut1)%(timestop-timestart)))]
-        I_t_binned = I_t_cut.reshape(len(I_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
+        I_t_binned = np.nanmean(I_t_cut.reshape(len(I_t_cut)//(timestop-timestart),timestop-timestart),axis=1)
         sigbin = np.argmax(I_t_binned)
-        noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
+        noise = np.nanstd(np.concatenate([I_t_binned[:sigbin-2],I_t_binned[sigbin+2:]]))#noise = (np.nanstd(np.concatenate([I_t_cut[:sigbin],I_t_cut[sigbin+1:]])))
         snr = sig0/noise
+        #print("intensity:",sig0,noise,I_t_binned)
 
         sig0 = np.nanmean((pol_t*I_t)[timestart:timestop])
         pol_t_cut1 = (pol_t*I_t)[timestart%(timestop-timestart):]
         pol_t_cut = pol_t_cut1[:(len(pol_t_cut1)-(len(pol_t_cut1)%(timestop-timestart)))]
-        pol_t_binned = pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
-        sigbin = np.argmax(pol_t_binned)
-        noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
+        pol_t_binned = np.nanmean(pol_t_cut.reshape(len(pol_t_cut)//(timestop-timestart),timestop-timestart),axis=1)
+        #sigbin = np.argmax(pol_t_binned)
+        Q_t_cut1 = (Q_t*I_t)[timestart%(timestop-timestart):]
+        Q_t_cut = Q_t_cut1[:(len(Q_t_cut1)-(len(Q_t_cut1)%(timestop-timestart)))]
+        Q_t_binned = np.nanmean(Q_t_cut.reshape(len(Q_t_cut)//(timestop-timestart),timestop-timestart),axis=1)
+        noise = np.nanstd(np.concatenate([Q_t_binned[:sigbin-2],Q_t_binned[sigbin+2:]]))#noise = (np.nanstd(np.concatenate([pol_t_cut[:sigbin],pol_t_cut[sigbin+1:]])))
         snr_frac = sig0/noise
+        #print("pol:",sig0,noise)
 
         sig0 = np.nanmean((L_t*I_t)[timestart:timestop])
         L_t_cut1 = (L_t*I_t)[timestart%(timestop-timestart):]
         L_t_cut = L_t_cut1[:(len(L_t_cut1)-(len(L_t_cut1)%(timestop-timestart)))]
-        L_t_binned = L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
-        sigbin = np.argmax(L_t_binned)
-        noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
+        L_t_binned = np.nanmean(L_t_cut.reshape(len(L_t_cut)//(timestop-timestart),timestop-timestart),axis=1)
+        #sigbin = np.argmax(L_t_binned)
+        noise = np.nanstd(np.concatenate([Q_t_binned[:sigbin-2],Q_t_binned[sigbin+2:]]))#noise = (np.nanstd(np.concatenate([L_t_cut[:sigbin],L_t_cut[sigbin+1:]])))
         snr_L = sig0/noise
+        #print("Lpol:",sig0,noise)
 
         sig0 = np.nanmean((np.abs(C_t)*I_t)[timestart:timestop])
         C_t_cut1 = (np.abs(C_t)*I_t)[timestart%(timestop-timestart):]
         C_t_cut = C_t_cut1[:(len(C_t_cut1)-(len(C_t_cut1)%(timestop-timestart)))]
         C_t_binned = C_t_cut.reshape(len(C_t_cut)//(timestop-timestart),timestop-timestart).mean(1)
-        sigbin = np.argmax(C_t_binned)
-        noise = (np.nanstd(np.concatenate([C_t_cut[:sigbin],C_t_cut[sigbin+1:]])))
+        #sigbin = np.argmax(C_t_binned)
+        V_t_cut1 = (C_t*I_t)[timestart%(timestop-timestart):]
+        V_t_cut = V_t_cut1[:(len(V_t_cut1)-(len(V_t_cut1)%(timestop-timestart)))]
+        V_t_binned = np.nanmean(V_t_cut.reshape(len(V_t_cut)//(timestop-timestart),timestop-timestart),axis=1)
+        noise = np.nanstd(np.concatenate([V_t_binned[:sigbin-2],V_t_binned[sigbin+2:]]))#noise = (np.nanstd(np.concatenate([C_t_cut[:sigbin],C_t_cut[sigbin+1:]])))
         snr_C = sig0/noise
-
+        #print("Cpol:",sig0,noise)
 
 
     #snr_frac = np.nanmean(pol_t[timestart:timestop])/np.nanstd(pol_t[:n_off])

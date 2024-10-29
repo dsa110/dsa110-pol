@@ -70,8 +70,4 @@ scripts/process_all_FRBs.py
 scripts/process_all_FRBs_V2.py
 scripts/process_all_FRBs_V3.py
 scripts/tmpfile.txt
-tests/calibration_test.py
-tests/faraday_test.py
-tests/freq_test.py
 tests/polarization_test.py
-tests/time_test.py

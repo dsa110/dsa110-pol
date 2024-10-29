@@ -1,855 +1,274 @@
-from dsapol import dsapol
+import pytest
+from matplotlib import pyplot as plt
 import numpy as np
+from dsapol import dsapol
 from scipy.stats import norm
 
-#ideal PF, unpolarized
-def test_PF_ideal_test_1():
-    print("Testing ideal unpolarized source...")
-    #unpolarized, continuous in time, not normalzed
 
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = -1#w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = -1
+"""
+Last Updated 2024-10-28
+This script contains unit tests for polarization fraction and PA estimates, updated
+since the PARSEC V1 release.
+"""
 
 
-    freq_test = [np.linspace(1300,1500,nchans)]*4
 
-    I = np.ones((nchans,nsamples))
-    Q = U = V = np.zeros((nchans,nsamples))
+def test_pol_auto_weighted():
+    #tolerances
+    pol_tolerance = 0.05
+    pa_tolerance = 5*np.pi/180 #rad
+    snr_tolerance = 0.3 #fraction of snr_test
+    Lpol_true = 0.5
+    Vpol_true = 0.5
+    Tpol_true = np.sqrt(Lpol_true**2 + Vpol_true**2)
+    PA = 0
 
-    (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg) < 1e-10)
-    assert(np.all(np.abs(pol_f) < 1e-10))
-    assert(np.all(np.abs(pol_t) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
+    nsamps = 5120
+    nchans = 6144
+    loc = int(nsamps//2)
 
-    #unpolarized, pulse in time, not normalzed
+    for width in [50]:
+        width_native = int(np.ceil((32.7e-6/256e-6)*width)) #because internally converted to 32.7 microseconds
+        for snr_true in [10000]:
+            I = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            I[:,loc:loc+width] += snr_true
+            #I += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))
+            Q = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            Q[:,loc:loc+width] += snr_true*Lpol_true*np.cos(2*PA)
+            #Q += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Lpol_true*np.cos(2*PA)
+            U = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            U[:,loc:loc+width] += snr_true*Lpol_true*np.sin(2*PA)
+            #U += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Lpol_true*np.sin(2*PA)
+            V = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            V[:,loc:loc+width] += snr_true*Vpol_true
+            #V += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Vpol_true
+            tsamp = 32.7e-6
+            n_t = 1
+            n_f = 1
+            freq_test = [np.linspace(1250,1520,6144)]*4
+            NOFFDEF = 2000
+            buff=0
 
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = 30
-    timestart = 50 - w//2
-    timestop = 50 + w//2
+            #weight params
+            n_t_weight = 2
+            sf_window_weights = 7
+            timeaxis = np.arange(nsamps)
+
+            #weighted
+            [(pol_f,pol_t,avg,sigma_frac,snr_frac),
+            (L_f,L_t,avg_L,sigma_L,snr_L),
+            (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
+            (C_f,C_t,avg_C,sigma_C,tmp),snr]=dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,
+                                                                    int(NOFFDEF/n_t),plot=False,normalize=True,buff=buff,
+                                                                    full=False,weighted=True,n_t_weight=n_t_weight,
+                                                                    sf_window_weights=sf_window_weights,timeaxis=timeaxis)
+
+            print("Testing pulse width=",width,"(native=",width_native,"),S/N=",snr_true,"...")
+            #peak,timestart,timestop = dsapol.find_peak(I,width_native,tsamp,n_t,pre_calc_tf=False,buff=buff)
+            #print(peak,timestart,timestop)
+            print(avg,avg_L,avg_C,avg_C_abs)
+            print(sigma_frac,sigma_L,sigma_C,sigma_C_abs)
+            print(snr,snr_frac,snr_L,snr_C)
+            assert(np.abs(avg - Tpol_true)<pol_tolerance)#*sigma_frac)
+            assert(np.abs(avg_L - Lpol_true)<pol_tolerance)#*sigma_L)
+            assert(np.abs(avg_C - Vpol_true) <pol_tolerance)#*sigma_C)
+            assert(np.abs(avg_C_abs - Vpol_true) < pol_tolerance)#*sigma_C_abs)
+            assert(np.abs(snr - snr_true) < snr_tolerance*snr_true)
+            assert(np.abs(snr_frac - snr_true*Tpol_true) < snr_tolerance*snr_true*Tpol_true)
+            assert(np.abs(snr_L - snr_true*Lpol_true) < snr_tolerance*snr_true*Lpol_true)
+            assert(np.abs(snr_C - snr_true*Vpol_true) < snr_tolerance*snr_true*Vpol_true)
+            assert(len(pol_f) == len(L_f) == len(C_f) == len(C_f_unbiased) == nchans)
+            assert(len(pol_t) == len(L_t) == len(C_t) == len(C_t_unbiased) == nsamps)
+            assert(np.all(pol_t[loc:loc+width]>=0))
+            assert(np.all(L_t[loc:loc+width]>=0))
+            assert(np.all(C_t[loc:loc+width]>=0))
+            assert(np.all(pol_f[loc:loc+width]>=0))
+            assert(np.all(L_f[loc:loc+width]>=0))
+            assert(np.all(C_f[loc:loc+width]>=0))
+
+            PA_f,PA_t,PA_f_errs,PA_t_errs,PA_avg,PA_err = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,
+                                                                               n_off=int(NOFFDEF/n_t),normalize=True,buff=buff,
+                                                                               weighted=True,n_t_weight=n_t_weight,
+                                                                    sf_window_weights=sf_window_weights,timeaxis=timeaxis)
+            assert(np.abs(PA_avg - PA)<pol_tolerance)#*PA_err)
+            assert(len(PA_t) == len(PA_t_errs) == nsamps)
+            assert(len(PA_f) == len(PA_f_errs) == nchans)
+            assert(np.all((np.abs(PA_t-PA)<pa_tolerance)[loc:loc+width]))#PA_t_errs)[loc:loc+width])) 
 
 
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-
-    I = np.zeros((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.zeros((nchans,nsamples))
-    V = np.zeros((nchans,nsamples))
-    I[:,timestart:timestop] = np.ones((nchans,w))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg) < 1e-10)
-    assert(np.all(np.abs(pol_f) < 1e-10))
-    assert(np.all(np.abs(pol_t[timestart:timestop]) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    print("Ideal unpolarized test successful!")
-
-    print("Done!")
+            
     return
 
-#ideal PF, 50% polarized
-def test_PF_ideal_test_2():
-    print("Testing ideal 50% polarized source...")
-    #50% polarized, continuous in time, not normalized
+def test_pol_custom_weighted():
+    #tolerances
+    pol_tolerance = 0.05
+    pa_tolerance = 5*np.pi/180 #rad
+    snr_tolerance = 0.3 #fraction of snr_test
+    Lpol_true = 0.5
+    Vpol_true = 0.5
+    Tpol_true = np.sqrt(Lpol_true**2 + Vpol_true**2)
+    PA = 0
 
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = -1#w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = -1
+    nsamps = 5120
+    nchans = 6144
+    loc = int(nsamps//2)
 
-    true_pol = 0.5
+    for width in [50]:
+        width_native = int(np.ceil((32.7e-6/256e-6)*width)) #because internally converted to 32.7 microseconds
+        for snr_true in [10000]:
+            I = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            I[:,loc:loc+width] += snr_true
+            #I += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))
+            Q = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            Q[:,loc:loc+width] += snr_true*Lpol_true*np.cos(2*PA)
+            #Q += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Lpol_true*np.cos(2*PA)
+            U = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            U[:,loc:loc+width] += snr_true*Lpol_true*np.sin(2*PA)
+            #U += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Lpol_true*np.sin(2*PA)
+            V = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            V[:,loc:loc+width] += snr_true*Vpol_true
+            #V += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Vpol_true
+            tsamp = 32.7e-6
+            n_t = 1
+            n_f = 1
+            freq_test = [np.linspace(1250,1520,6144)]*4
+            NOFFDEF = 2000
+            buff=0
 
-    freq_test = [np.linspace(1300,1500,nchans)]*4
+            #input weights
+            input_weights = np.zeros(nsamps)
+            input_weights[loc:loc+width] = 1
+            input_weights = input_weights/np.sum(input_weights)
 
-    I = np.ones((nchans,nsamples))
-    Q = U = V = np.sqrt((true_pol**2)/3)*np.ones((nchans,nsamples))
+            #weighted
+            [(pol_f,pol_t,avg,sigma_frac,snr_frac),
+            (L_f,L_t,avg_L,sigma_L,snr_L),
+            (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
+            (C_f,C_t,avg_C,sigma_C,tmp),snr]=dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,
+                                                                    int(NOFFDEF/n_t),plot=False,normalize=True,buff=buff,
+                                                                    full=False,weighted=True,input_weights=input_weights)
+            print("Testing pulse width=",width,"(native=",width_native,"),S/N=",snr_true,"...")
+            #peak,timestart,timestop = dsapol.find_peak(I,width_native,tsamp,n_t,pre_calc_tf=False,buff=buff)
+            #print(peak,timestart,timestop)
+            print(avg,avg_L,avg_C,avg_C_abs)
+            print(sigma_frac,sigma_L,sigma_C,sigma_C_abs)
+            print(snr,snr_frac,snr_L,snr_C)
+            assert(np.abs(avg - Tpol_true)<pol_tolerance)#*sigma_frac)
+            assert(np.abs(avg_L - Lpol_true)<pol_tolerance)#*sigma_L)
+            assert(np.abs(avg_C - Vpol_true) <pol_tolerance)#*sigma_C)
+            assert(np.abs(avg_C_abs - Vpol_true) < pol_tolerance)#*sigma_C_abs)
+            assert(np.abs(snr - snr_true) < snr_tolerance*snr_true)
+            assert(np.abs(snr_frac - snr_true*Tpol_true) < snr_tolerance*snr_true*Tpol_true)
+            assert(np.abs(snr_L - snr_true*Lpol_true) < snr_tolerance*snr_true*Lpol_true)
+            assert(np.abs(snr_C - snr_true*Vpol_true) < snr_tolerance*snr_true*Vpol_true)
+            assert(len(pol_f) == len(L_f) == len(C_f) == len(C_f_unbiased) == nchans)
+            assert(len(pol_t) == len(L_t) == len(C_t) == len(C_t_unbiased) == nsamps)
+            assert(np.all(pol_t[loc:loc+width]>=0))
+            assert(np.all(L_t[loc:loc+width]>=0))
+            assert(np.all(C_t[loc:loc+width]>=0))
+            assert(np.all(pol_f[loc:loc+width]>=0))
+            assert(np.all(L_f[loc:loc+width]>=0))
+            assert(np.all(C_f[loc:loc+width]>=0))
 
-    (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_pol) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_pol) < 1e-10))
-    assert(np.all(np.abs(pol_t - true_pol) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
+            PA_f,PA_t,PA_f_errs,PA_t_errs,PA_avg,PA_err = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,
+                                                                               n_off=int(NOFFDEF/n_t),normalize=True,buff=buff,
+                                                                               weighted=True,input_weights=input_weights)
+            assert(np.abs(PA_avg - PA)<pol_tolerance)#*PA_err)
+            assert(len(PA_t) == len(PA_t_errs) == nsamps)
+            assert(len(PA_f) == len(PA_f_errs) == nchans)
+            assert(np.all((np.abs(PA_t-PA)<pa_tolerance)[loc:loc+width]))#PA_t_errs)[loc:loc+width])) 
 
-    #50% polarized, pulse in time, not normalized
 
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = 30
-    timestart = 50 - w//2
-    timestop = 50 + w//2
 
-    true_pol = 0.5
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.zeros((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.zeros((nchans,nsamples))
-    V = np.zeros((nchans,nsamples))
-    I[:,timestart:timestop] = np.ones((nchans,w))
-    Q[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-    U[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-    V[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_pol) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_pol) < 1e-10))
-    assert(np.all(np.abs(pol_t[timestart:timestop] - true_pol) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    print("Ideal 50% test successful!")
-
-    print("Done!")
 
     return
+def test_pol_unweighted():
 
-#ideal PF, 100% polarized
-def test_PF_ideal_test_3():
-    print("Testing ideal 100% polarized source...")
-    #100% polarized, continuous in time, not normalized
+    #tolerances
+    pol_tolerance = 0.05
+    pa_tolerance = 5*np.pi/180 #rad
+    snr_tolerance = 0.3 #fraction of snr_test
+    Lpol_true = 0.5
+    Vpol_true = 0.5
+    Tpol_true = np.sqrt(Lpol_true**2 + Vpol_true**2)
+    PA = 0
 
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = -1#w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = -1
+    nsamps = 5120
+    nchans = 6144
+    loc = int(nsamps//2)
+    for width in [50]:
+        width_native = int(np.ceil((32.7e-6/256e-6)*width)) #because internally converted to 32.7 microseconds
+        for snr_true in [10000]:
+            I = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps)) 
+            I[:,loc:loc+width] += snr_true
+            #I += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))
+            Q = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            Q[:,loc:loc+width] += snr_true*Lpol_true*np.cos(2*PA)
+            #Q += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Lpol_true*np.cos(2*PA)
+            U = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            U[:,loc:loc+width] += snr_true*Lpol_true*np.sin(2*PA)
+            #U += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Lpol_true*np.sin(2*PA)
+            V = np.zeros((nchans,nsamps)) + norm.rvs(loc=0,scale=1*np.sqrt(nchans)*np.sqrt(width),size=(nchans,nsamps))
+            V[:,loc:loc+width] += snr_true*Vpol_true
+            #V += (snr_true*norm.pdf(np.arange(nsamps),loc=loc,scale=width)/np.max(norm.pdf(np.arange(nsamps),loc=loc,scale=width)))*Vpol_true
+            tsamp = 32.7e-6
+            n_t = 1
+            n_f = 1
+            freq_test = [np.linspace(1250,1520,6144)]*4
+            NOFFDEF = 2000
+            buff=0
 
-    true_pol = 1
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.ones((nchans,nsamples))
-    Q = U = V = np.sqrt((true_pol**2)/3)*np.ones((nchans,nsamples))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_pol) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_pol) < 1e-10))
-    assert(np.all(np.abs(pol_t - true_pol) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    #100% polarized, pulse in time, not normalized
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = 30
-    timestart = 50 - w//2
-    timestop = 50 + w//2
-
-    true_pol = 1
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.zeros((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.zeros((nchans,nsamples))
-    V = np.zeros((nchans,nsamples))
-    I[:,timestart:timestop] = np.ones((nchans,w))
-    Q[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-    U[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-    V[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_pol) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_pol) < 1e-10))
-    assert(np.all(np.abs(pol_t[timestart:timestop] - true_pol) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    print("Ideal 100% test successful!")
-
-    print("Done!")
-    return
-
-#noisy PF, unpolarized
-def test_PF_noisy_test_1():
-    print("Testing noisy unpolarized source...")
-    trial_sigmas = 1/(10**np.arange(1,5))
-    for sigma_noise in trial_sigmas:
-        print("Trial SNR = " + str(1/sigma_noise))
-        #unpolarized, pulse in time, not normalzed
-
-        nchans = 100
-        nsamples = 200
-        tsamp=1
-        w = 10
-        width_native = w*tsamp/(256e-6)
-        n_t = 1
-        n_f = 1
-        n_off = 30
-        timestart = 50 - w//2
-        timestop = 50 + w//2
-        err_max = np.sqrt(2*3)*((sigma_noise/np.sqrt(nchans))**2)
+            #unweighted
+            [(pol_f,pol_t,avg,sigma_frac,snr_frac),
+            (L_f,L_t,avg_L,sigma_L,snr_L),
+            (C_f_unbiased,C_t_unbiased,avg_C_abs,sigma_C_abs,snr_C),
+            (C_f,C_t,avg_C,sigma_C,tmp),snr]=dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,
+                                                                    int(NOFFDEF/n_t),plot=False,normalize=True,buff=buff,
+                                                                    full=False,weighted=False)
+            print("Testing pulse width=",width,"(native=",width_native,"),S/N=",snr_true,"...")
+            #peak,timestart,timestop = dsapol.find_peak(I,width_native,tsamp,n_t,pre_calc_tf=False,buff=buff)
+            #print(peak,timestart,timestop)
+            print(avg,avg_L,avg_C,avg_C_abs)
+            print(sigma_frac,sigma_L,sigma_C,sigma_C_abs)
+            print(snr,snr_frac,snr_L,snr_C)
+            assert(np.abs(avg - Tpol_true)<pol_tolerance)#*sigma_frac)
+            assert(np.abs(avg_L - Lpol_true)<pol_tolerance)#*sigma_L)
+            assert(np.abs(avg_C - Vpol_true) <pol_tolerance)#*sigma_C)
+            assert(np.abs(avg_C_abs - Vpol_true) < pol_tolerance)#*sigma_C_abs)
+            assert(np.abs(snr - snr_true) < snr_tolerance*snr_true)
+            assert(np.abs(snr_frac - snr_true*Tpol_true) < snr_tolerance*snr_true*Tpol_true)
+            assert(np.abs(snr_L - snr_true*Lpol_true) < snr_tolerance*snr_true*Lpol_true)
+            assert(np.abs(snr_C - snr_true*Vpol_true) < snr_tolerance*snr_true*Vpol_true)
+            assert(len(pol_f) == len(L_f) == len(C_f) == len(C_f_unbiased) == nchans)
+            assert(len(pol_t) == len(L_t) == len(C_t) == len(C_t_unbiased) == nsamps)
+            assert(np.all(pol_t[loc:loc+width]>=0))
+            assert(np.all(L_t[loc:loc+width]>=0))
+            assert(np.all(C_t[loc:loc+width]>=0))
+            assert(np.all(pol_f[loc:loc+width]>=0))
+            assert(np.all(L_f[loc:loc+width]>=0))
+            assert(np.all(C_f[loc:loc+width]>=0))
 
 
-        freq_test = [np.linspace(1300,1500,nchans)]*4
+            PA_f,PA_t,PA_f_errs,PA_t_errs,PA_avg,PA_err = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,
+                                                                               n_off=int(NOFFDEF/n_t),normalize=True,buff=buff,
+                                                                               weighted=False)
+            assert(np.abs(PA_avg - PA)<pol_tolerance)#*PA_err)
+            assert(len(PA_t) == len(PA_t_errs) == nsamps)
+            assert(len(PA_f) == len(PA_f_errs) == nchans)
+            assert(np.all((np.abs(PA_t-PA)<pa_tolerance)[loc:loc+width]))#PA_t_errs)[loc:loc+width])) 
 
 
-        I = np.zeros((nchans,nsamples))
-        Q = np.zeros((nchans,nsamples))
-        U = np.zeros((nchans,nsamples))
-        V = np.zeros((nchans,nsamples))
-        I[:,timestart:timestop] = np.ones((nchans,w))
-
-
-        I += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        Q += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        U += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        V += np.random.normal(0,sigma_noise,(nchans,nsamples))
-
-        (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=False,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        assert(np.abs(avg) < sigma_noise ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop]) < sigma_noise))
-        assert(np.all(np.abs(pol_f) < 10*sigma_noise))
-
-        #normalized
-        (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=True,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        assert(np.abs(avg) < 10) 
-        assert(np.all(np.abs(pol_t[timestart:timestop]) < 10))
-        assert(np.all(np.abs(pol_f) < 10))
-
-    print("Noisy unpolarized test successful!")
-
-    print("Done!")
-    return
-
-#noisy PF, 50% polarized
-def test_PF_noisy_test_2():
-    print("Testing noisy 50% source...")
-    trial_sigmas = 1/(10**np.arange(1,5))
-    for sigma_noise in trial_sigmas:
-        print("Trial SNR = " + str(1/sigma_noise))
-        #50% polarized, pulse in time, not normalzed
-
-
-        nchans = 100
-        nsamples = 200
-        tsamp=1
-        w = 10
-        width_native = w*tsamp/(256e-6)
-        n_t = 1
-        n_f = 1
-        n_off = 30
-        timestart = 50 - w//2
-        timestop = 50 + w//2
-
-        true_pol = 0.5
-
-        freq_test = [np.linspace(1300,1500,nchans)]*4
-
-        I = np.zeros((nchans,nsamples))
-        Q = np.zeros((nchans,nsamples))
-        U = np.zeros((nchans,nsamples))
-        V = np.zeros((nchans,nsamples))
-        I[:,timestart:timestop] = np.ones((nchans,w))
-        Q[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-        U[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-        V[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-
-
-        I += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        Q += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        U += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        V += np.random.normal(0,sigma_noise,(nchans,nsamples))
-
-        (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=False,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise)
-        assert(np.abs(avg-true_pol) < sigma_noise ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_pol) < sigma_noise))
-        assert(np.all(np.abs(pol_f - true_pol) < 10*sigma_noise))
-
-        #normalized
-        (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=True,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise/(sigma_noise/np.sqrt(nchans)))
-        assert(np.abs(avg-true_pol) < 10 ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_pol) < 10))
-        assert(np.all(np.abs(pol_f - true_pol) < 10))
-    print("Noisy 50% test successful!")
-
-    print("Done!")
-
-    return
-
-#noisy PF, 100% polarized
-def test_PF_noisy_test_3():
-    print("Testing noisy 100% source...")
-    trial_sigmas = 1/(10**np.arange(1,5))
-    for sigma_noise in trial_sigmas:
-        print("Trial SNR = " + str(1/sigma_noise))
-        #100% polarized, pulse in time, not normalzed
-
-
-        nchans = 100
-        nsamples = 200
-        tsamp=1
-        w = 10
-        width_native = w*tsamp/(256e-6)
-        n_t = 1
-        n_f = 1
-        n_off = 30
-        timestart = 50 - w//2
-        timestop = 50 + w//2
-
-        true_pol = 1
-
-        freq_test = [np.linspace(1300,1500,nchans)]*4
-
-        I = np.zeros((nchans,nsamples))
-        Q = np.zeros((nchans,nsamples))
-        U = np.zeros((nchans,nsamples))
-        V = np.zeros((nchans,nsamples))
-        I[:,timestart:timestop] = np.ones((nchans,w))
-        Q[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-        U[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-        V[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-
-
-        I += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        Q += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        U += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        V += np.random.normal(0,sigma_noise,(nchans,nsamples))
-
-        (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=False,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        #print(np.abs(pol_t[timestart:timestop] - avg),10*np.std(pol_t[timestart:timestop]))
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise)
-        assert(np.abs(avg-true_pol) < sigma_noise ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_pol) < sigma_noise))
-        assert(np.all(np.abs(pol_f - true_pol) < 10*sigma_noise))
-
-        #normalized
-        (pol_f,pol_t,avg) = dsapol.get_pol_fraction(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=True,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(np.abs(pol_t[timestart:timestop] - avg),10*np.std(pol_t[timestart:timestop]))
-        assert(np.abs(avg-true_pol) < 10 ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_pol) < 10))
-        assert(np.all(np.abs(pol_f - true_pol) < 10))
-    print("Noisy 100% test successful!")
-
-    print("Done!")
-
+    """
+    dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['tsamp'],
+                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
+                                                                    n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
+                                                                    buff=state_dict['comps'][i]['buff'],full=False,weighted=weighted,input_weights=weights_use,
+                                                                    fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_" + str("I" if state_dict['alpha'] else "0") + ".fil"),
+                                                                    intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
+                                                                    intR=state_dict['comps'][i]['intR']+state_dict['comps'][i]['intRbuffer'])
+    """
     return
 
 
-#ideal PA=0
-def test_PA_ideal_test_1():
-    print("Testing ideal PA=0  source...")
-
-    #PA=0, continuous in time, not normalzed
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = -1#w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = -1
-
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.ones((nchans,nsamples))
-    Q = U = V = np.zeros((nchans,nsamples))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg) < 1e-10)
-    assert(np.all(np.abs(pol_f) < 1e-10))
-    assert(np.all(np.abs(pol_t) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    #PA=0, pulse in time, not normalzed
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = 30
-    timestart = 50 - w//2
-    timestop = 50 + w//2
-
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-
-    I = np.zeros((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.zeros((nchans,nsamples))
-    V = np.zeros((nchans,nsamples))
-    I[:,timestart:timestop] = np.ones((nchans,w))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg) < 1e-10)
-    assert(np.all(np.abs(pol_f) < 1e-10))
-    assert(np.all(np.abs(pol_t[timestart:timestop]) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-    print("Ideal PA=0 test successful!")
-
-    print("Done!")
-
-    return
-
-#ideal PA=pi/4
-def test_PA_ideal_test_2():
-    print("Testing ideal PA=pi/4  source...")
-    #PA=pi/4, continuous in time, not normalized
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = -1#w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = -1
-
-    true_PA = np.pi/4
-    true_pol = 1
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.ones((nchans,nsamples))
-    Q = np.sqrt((true_pol**2)/3)*np.ones((nchans,nsamples))
-    U = np.sqrt((true_pol**2)/3)*np.ones((nchans,nsamples))
-    V = np.sqrt((true_pol**2)/3)*np.ones((nchans,nsamples))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_PA) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_PA) < 1e-10))
-    assert(np.all(np.abs(pol_t - true_PA) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    #PA=pi/4, pulse in time, not normalized
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = 30
-    timestart = 50 - w//2
-    timestop = 50 + w//2
-
-    true_PA = np.pi/4
-    true_pol = 1
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.zeros((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.zeros((nchans,nsamples))
-    V = np.zeros((nchans,nsamples))
-    I[:,timestart:timestop] = np.ones((nchans,w))
-    Q[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-    U[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-    V[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_PA) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_PA) < 1e-10))
-    assert(np.all(np.abs(pol_t[timestart:timestop] - true_PA) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-    print("Ideal PA=pi/4 test successful!")
-
-    print("Done!")
-    
-    return
-
-#ideal PA=pi/2
-def test_PA_ideal_test_3():
-    print("Testing ideal PA=pi/2  source...")
-    #PA=pi/2, continuous in time, not normalized
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = -1#w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = -1
-
-    true_PA = np.pi/2
-    true_pol = 1
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.ones((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.sqrt((true_pol**2)/2)*np.ones((nchans,nsamples))
-    V = np.sqrt((true_pol**2)/2)*np.ones((nchans,nsamples))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_PA) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_PA) < 1e-10))
-    assert(np.all(np.abs(pol_t - true_PA) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-    
-    #PA=pi/2, pulse in time, not normalized
-
-    nchans = 100
-    nsamples = 200
-    tsamp=1
-    w = 10
-    width_native = w*tsamp/(256e-6)
-    n_t = 1
-    n_f = 1
-    n_off = 30
-    timestart = 50 - w//2
-    timestop = 50 + w//2
-
-    true_PA = np.pi/2
-    true_pol = 1
-
-    freq_test = [np.linspace(1300,1500,nchans)]*4
-
-    I = np.zeros((nchans,nsamples))
-    Q = np.zeros((nchans,nsamples))
-    U = np.zeros((nchans,nsamples))
-    V = np.zeros((nchans,nsamples))
-    I[:,timestart:timestop] = np.ones((nchans,w))
-    Q[:,timestart:timestop] = np.zeros((nchans,w))
-    U[:,timestart:timestop] = np.sqrt((true_pol**2)/2)*np.ones((nchans,w))
-    V[:,timestart:timestop] = np.sqrt((true_pol**2)/2)*np.ones((nchans,w))
-
-    (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,normalize=False,buff=0)
-    assert(np.abs(avg - true_PA) < 1e-10)
-    assert(np.all(np.abs(pol_f - true_PA) < 1e-10))
-    assert(np.all(np.abs(pol_t[timestart:timestop] - true_PA) < 1e-10))
-    assert(len(pol_f)==nchans)
-    assert(len(pol_t)==nsamples)
-
-    print("Ideal PA=pi/2 test successful!")
-
-    print("Done!")
-    return
-
-#noisy PA=pi/4
-def test_PA_noisy_test_1():
-    print("Testing noisy PA=pi/4  source...")
-    trial_sigmas = 1/(10**np.arange(1,5))
-    for sigma_noise in trial_sigmas:
-        print("Trial SNR = " + str(1/sigma_noise))
-        #PA=pi/4, pulse in time, not normalzed
-
-    
-        nchans = 100
-        nsamples = 200
-        tsamp=1
-        w = 10
-        width_native = w*tsamp/(256e-6)
-        n_t = 1
-        n_f = 1
-        n_off = 30
-        timestart = 50 - w//2
-        timestop = 50 + w//2
-
-        true_PA = np.pi/4
-        true_pol = 1
-
-        freq_test = [np.linspace(1300,1500,nchans)]*4
-
-        I = np.zeros((nchans,nsamples))
-        Q = np.zeros((nchans,nsamples))
-        U = np.zeros((nchans,nsamples))
-        V = np.zeros((nchans,nsamples))
-        I[:,timestart:timestop] = np.ones((nchans,w))
-        Q[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-        U[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-        V[:,timestart:timestop] = np.sqrt((true_pol**2)/3)*np.ones((nchans,w))
-
-
-        I += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        Q += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        U += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        V += np.random.normal(0,sigma_noise,(nchans,nsamples))
-
-        (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=False,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-    
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise)
-        assert(np.abs(avg-true_PA) < sigma_noise ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_PA) < sigma_noise))
-        assert(np.all(np.abs(pol_f - true_PA) < 10*sigma_noise))
-    
-        #normalized
-        (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=True,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-    
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise/(sigma_noise/np.sqrt(nchans)))
-        assert(np.abs(avg-true_PA) < 10 ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_PA) < 10))
-        assert(np.all(np.abs(pol_f - true_PA) < 10))
-    print("Noisy PA=pi/4 test successful!")
-
-    print("Done!")
-
-    return
-
-#noisy PA=pi/2
-def test_PA_noisy_test_2():
-    print("Testing noisy PA=pi/2  source...")
-    trial_sigmas = 1/(10**np.arange(1,5))
-    for sigma_noise in trial_sigmas:
-        print("Trial SNR = " + str(1/sigma_noise))
-        #PA=pi/2, pulse in time, not normalzed
-
-    
-        nchans = 100
-        nsamples = 200
-        tsamp=1
-        w = 10
-        width_native = w*tsamp/(256e-6)
-        n_t = 1
-        n_f = 1
-        n_off = 30
-        timestart = 50 - w//2
-        timestop = 50 + w//2
-
-        true_PA = np.pi/2
-        true_pol = 1
-
-        freq_test = [np.linspace(1300,1500,nchans)]*4
-
-        I = np.zeros((nchans,nsamples))
-        Q = np.zeros((nchans,nsamples))
-        U = np.zeros((nchans,nsamples))
-        V = np.zeros((nchans,nsamples))
-        I[:,timestart:timestop] = np.ones((nchans,w))
-        Q[:,timestart:timestop] = np.zeros((nchans,w))
-        U[:,timestart:timestop] = np.sqrt((true_pol**2)/2)*np.ones((nchans,w))
-        V[:,timestart:timestop] = np.sqrt((true_pol**2)/2)*np.ones((nchans,w))
-
-
-        I += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        Q += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        U += np.random.normal(0,sigma_noise,(nchans,nsamples))
-        V += np.random.normal(0,sigma_noise,(nchans,nsamples))
-
-        (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=False,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-    
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise)
-        assert(np.abs(avg-true_PA) < sigma_noise ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_PA) < sigma_noise))
-        assert(np.all(np.abs(pol_f - true_PA) < 10*sigma_noise))
-    
-        #normalized
-        (pol_f,pol_t,avg) = dsapol.get_pol_angle(I,Q,U,V,width_native,tsamp,n_t,n_f,freq_test,n_off=n_off,normalize=True,buff=0)
-        """
-        plt.figure()
-        plt.plot(pol_t)
-        plt.xlim(timestart,timestop)
-        plt.ylim(0,1)
-        plt.figure()
-        plt.plot(pol_f)
-        plt.ylim(0,1)
-        """
-        assert(len(pol_f)==nchans)
-        assert(len(pol_t)==nsamples)
-        assert(np.all(np.abs(pol_t[timestart:timestop] - avg) < 10*np.std(pol_t[timestart:timestop])))
-        assert(np.all(np.abs(pol_f - avg) < 10*np.std(pol_f)))
-    
-        #just an estimate, no closed form solution for distribution of pol fraction to compare to
-        #print(avg-true_pol,sigma_noise/(sigma_noise/np.sqrt(nchans)))
-        assert(np.abs(avg-true_PA) < 10 ) 
-        assert(np.all(np.abs(pol_t[timestart:timestop] - true_PA) < 10))
-        assert(np.all(np.abs(pol_f - true_PA) < 10))
-
-    print("Noisy PA=pi/2 test successful!")
-
-    print("Done!")
-    return
-
-def main():
-    print("Running polarization and PA tests...")
-    PF_ideal_test_1()
-    PF_ideal_test_2()
-    PF_ideal_test_3()
-    PF_noisy_test_1()
-    PF_noisy_test_2()
-    PF_noisy_test_3()
-
-    PA_ideal_test_1()
-    PA_ideal_test_2()
-    PA_ideal_test_3()
-    PA_noisy_test_1()
-    PA_noisy_test_2()
-
-    print("All Tests Passed!")
-
-if __name__ == "__main__":
-    main()
+if __name__=="__main__":
+    pytest.main()
