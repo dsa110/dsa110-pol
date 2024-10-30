@@ -258,15 +258,6 @@ def test_pol_unweighted():
             assert(np.all((np.abs(PA_t-PA)<pa_tolerance)[loc:loc+width]))#PA_t_errs)[loc:loc+width])) 
 
 
-    """
-    dsapol.get_pol_fraction(I_use,Q_use,U_use,V_use,state_dict['comps'][i]['width_native'],state_dict['tsamp'],
-                                                                    state_dict['n_t'],state_dict['n_f'],state_dict['freq_test'],
-                                                                    n_off=int(NOFFDEF/state_dict['n_t']),plot=False,normalize=True,
-                                                                    buff=state_dict['comps'][i]['buff'],full=False,weighted=weighted,input_weights=weights_use,
-                                                                    fobj=FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_" + str("I" if state_dict['alpha'] else "0") + ".fil"),
-                                                                    intL=state_dict['comps'][i]['intL']-state_dict['comps'][i]['intLbuffer'],
-                                                                    intR=state_dict['comps'][i]['intR']+state_dict['comps'][i]['intRbuffer'])
-    """
     return
 
 

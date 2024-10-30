@@ -133,6 +133,7 @@ unauthorized = "This device is not authorized to use PARSEC in ADMIN mode. Pleas
 incorrect = "Incorrect ADMIN password"
 dsapoladminkey = "DSAPOLADMIN"
 
+decimal_places = 4
 
 """
 Read FRB parameters
@@ -821,10 +822,10 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
         'nRM_num_zoom':5000,
         'RM_window_zoom':1000,
         'dRM_tools_zoom':0.4,
-        'RM_gal_display':np.around(RM_gal_init,2),
-        'RM_galerr_display':np.around(RM_galerr_init,2),
-        'RM_ion_display':np.around(RM_ion_init,2),
-        'RM_ionerr_display':np.around(RM_ionerr_init,2),
+        'RM_gal_display':np.around(RM_gal_init,decimal_places),
+        'RM_galerr_display':np.around(RM_galerr_init,decimal_places),
+        'RM_ion_display':np.around(RM_ion_init,decimal_places),
+        'RM_ionerr_display':np.around(RM_ionerr_init,decimal_places),
         'rmcomp_menu':'All',
         'rmcomp_menu_choices':['All',''],
         'rmcal_menu':'No RM Calibration',
@@ -933,20 +934,20 @@ poldf = pd.DataFrame(
 def make_rmcal_menu_choices():
     choices = ["No RM Calibration"]
     if  ~np.isnan(state_dict['RMinput']):
-        choices.append("Previous RM Estimate: " + str(np.around(state_dict['RMinput'],2)) + "+-" + str(np.around(state_dict['RMinputerr'],2)) + r'rad/m^2')
+        choices.append("Previous RM Estimate: " + str(np.around(state_dict['RMinput'],decimal_places)) + "+-" + str(np.around(state_dict['RMinputerr'],decimal_places)) + r'rad/m^2')
     for k in RMcaldict.keys():
         for j in RMcaldict[k].keys():
             if j in ['coarse','zoom']:
                 for l in RMcaldict[k][j].keys():
                     if ~np.isnan(RMcaldict[k][j][l]['RM']):
-                        choice = str(k) + ' ' + '[' + str(j) + '] ' + str(l) + ': ' + str(np.around(RMcaldict[k][j][l]['RM'],2)) + r'+-' + str(np.around(RMcaldict[k][j][l]['Error'],2)) + r'rad/m^2'
+                        choice = str(k) + ' ' + '[' + str(j) + '] ' + str(l) + ': ' + str(np.around(RMcaldict[k][j][l]['RM'],decimal_places)) + r'+-' + str(np.around(RMcaldict[k][j][l]['Error'],decimal_places)) + r'rad/m^2'
                         choices.append(choice)
                     else: continue
             
             
             else:
                 if ~np.isnan(RMcaldict[k][j]['RM']):
-                    choice = str(k) + ' ' + str(j) + ': ' + str(np.around(RMcaldict[k][j]['RM'],2)) + r'+-' + str(np.around(RMcaldict[k][j]['Error'],2)) + r'rad/m^2'
+                    choice = str(k) + ' ' + str(j) + ': ' + str(np.around(RMcaldict[k][j]['RM'],decimal_places)) + r'+-' + str(np.around(RMcaldict[k][j]['Error'],decimal_places)) + r'rad/m^2'
                     choices.append(choice)
                 else: continue
     choices.append("Input RM (ENTER VALUE BELOW)")
@@ -1898,7 +1899,7 @@ def polcal_screen(polcaldate_menu,polcaldate_create_menu,polcaldate_bf_menu,polc
 
         #parallactic angle calibration
         state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_" + str("I" if state_dict['alpha'] else "0") + ".fil"),state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
-        ParA_display.data = np.around(state_dict['ParA']*180/np.pi,2)
+        ParA_display.data = np.around(state_dict['ParA']*180/np.pi,decimal_places)
         print("done ParA calibrating...",file=f)
         #get downsampled versions
         state_dict['Ical'] = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
@@ -2131,7 +2132,7 @@ def polcal_screen_USER(polcaldate_menu,
 
         #parallactic angle calibration
         state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],state_dict['ParA'] = dsapol.calibrate_angle(state_dict['base_Ical'],state_dict['base_Qcal'],state_dict['base_Ucal'],state_dict['base_Vcal'],FilReader(state_dict['datadir']+state_dict['ids'] + state_dict['suff'] + "_" + str("I" if state_dict['alpha'] else "0") + ".fil"),state_dict['ibeam'],state_dict['RA'],state_dict['DEC'])
-        ParA_display.data = np.around(state_dict['ParA']*180/np.pi,2)
+        ParA_display.data = np.around(state_dict['ParA']*180/np.pi,decimal_places)
         print("done ParA calibrating...",file=f)
         #get downsampled versions
         state_dict['Ical'] = dsapol.avg_time(state_dict['base_Ical'],state_dict['rel_n_t'])
@@ -2828,10 +2829,10 @@ def filter_screen(logwindow_slider,logibox_slider,buff_L_slider,buff_R_slider,nc
                                                     state_dict['base_Ucal_unnormalized']**2 + 
                                                     state_dict['base_Vcal_unnormalized']**2),axis=0)[maxidx]/state_dict['base_Ical_unnormalized'].shape[0]
 
-        Iflux_display.data = np.around(state_dict['Iflux'],2)
-        Qflux_display.data = np.around(state_dict['Qflux'],2)
-        Uflux_display.data = np.around(state_dict['Uflux'],2)
-        Vflux_display.data = np.around(state_dict['Vflux'],2)
+        Iflux_display.data = np.around(state_dict['Iflux'],decimal_places)
+        Qflux_display.data = np.around(state_dict['Qflux'],decimal_places)
+        Uflux_display.data = np.around(state_dict['Uflux'],decimal_places)
+        Vflux_display.data = np.around(state_dict['Vflux'],decimal_places)
 
 
         #also get vs freq
@@ -2997,20 +2998,20 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                                                                 resume=scatterresume.value)
 
 
-                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
                                                     "","","",
-                                                    str(np.around(state_dict['scatter_BIC'],2))]
+                                                    str(np.around(state_dict['scatter_BIC'],decimal_places))]
 
                 """
                 
@@ -3078,22 +3079,22 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
                 state_dict['scatter_params_best_upperr'] = state_dict['scatter_params_best_upperr'][:-1]*scaler
                 state_dict['scatter_params_best_lowerr'] = state_dict['scatter_params_best_lowerr'][:-1]*scaler
 
-                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    str(np.around(state_dict['scatter_params_best_f'],2)),
-                                                    str(np.around(state_dict['scatter_params_best_upperr_f'],2)),
-                                                    str(np.around(state_dict['scatter_params_best_lowerr_f'],2)),
-                                                    str(np.around(state_dict['scatter_BIC'],2))]
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    str(np.around(state_dict['scatter_params_best_f'],decimal_places)),
+                                                    str(np.around(state_dict['scatter_params_best_upperr_f'],decimal_places)),
+                                                    str(np.around(state_dict['scatter_params_best_lowerr_f'],decimal_places)),
+                                                    str(np.around(state_dict['scatter_BIC'],decimal_places))]
 
 
 
@@ -3143,18 +3144,18 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
 
             # Print or output the fit report for display
-            df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+            df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
                                                     "","","",""]
 
             """
@@ -3216,18 +3217,18 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             state_dict['scatter_params_best_upperr'] = np.sqrt(state_dict['scatter_params_best_upperr'])*scaler
             state_dict['scatter_params_best_lowerr'] = np.sqrt(state_dict['scatter_params_best_upperr'])*scaler
 
-            df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+            df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
                                                     "","","",""]
 
 
@@ -3262,20 +3263,20 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
             
                 state_dict['scatter_BIC'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_bilby_dname_BIC'])
 
-                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
                                                     "","","",
-                                                    str(np.around(state_dict['scatter_BIC'],2))]
+                                                    str(np.around(state_dict['scatter_BIC'],decimal_places))]
                 
                 """
                 df_scat.loc[",".join(scattermenu.value)] = np.concatenate([[np.around(state_dict['scatter_params_best'][4*i]) for i in range(len(scattermenu.value))],
@@ -3308,22 +3309,22 @@ def scatter_screen(scattermenu,scatfitmenu,x0_guess_comps,sigma_guess_comps,tau_
 
                 state_dict['scatter_BIC'] = np.load(dirs['logs'] + "scat_files/" + state_dict['scatter_MCMC_dname_BIC'])
 
-                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],2)) for i in range(len(scattermenu.value))]),
-                                                    str(np.around(state_dict['scatter_params_best_f'],2)),
-                                                    str(np.around(state_dict['scatter_params_best_upperr_f'],2)),
-                                                    str(np.around(state_dict['scatter_params_best_lowerr_f'],2)),
-                                                    str(np.around(state_dict['scatter_BIC'],2))]
+                df_scat.loc[",".join(scattermenu.value)] = [",".join([str(np.around(state_dict['scatter_params_best'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 1],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 2],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_upperr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    ",".join([str(np.around(state_dict['scatter_params_best_lowerr'][4*i + 3],decimal_places)) for i in range(len(scattermenu.value))]),
+                                                    str(np.around(state_dict['scatter_params_best_f'],decimal_places)),
+                                                    str(np.around(state_dict['scatter_params_best_upperr_f'],decimal_places)),
+                                                    str(np.around(state_dict['scatter_params_best_lowerr_f'],decimal_places)),
+                                                    str(np.around(state_dict['scatter_BIC'],decimal_places))]
 
 
                 
@@ -3835,22 +3836,22 @@ def RM_screen(useRMTools,maxRM_num_tools,dRM_tools,useRMsynth,nRM_num,minRM_num,
     #update RM displays
     if getRMgal_button.clicked:#state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
         state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=dirs['FRBtables'] + "faraday2020v2.hdf5")
-        state_dict['RM_gal'] = np.around(state_dict['RM_gal'],2)
-        state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],2)
+        state_dict['RM_gal'] = np.around(state_dict['RM_gal'],decimal_places)
+        state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],decimal_places)
         state_dict['RM_galRA'] = state_dict['RA']
         state_dict['RM_galDEC'] = state_dict['DEC']
-    RM_gal_display.data = np.around(state_dict['RM_gal'],2)
-    RM_galerr_display.data = np.around(state_dict['RM_galerr'],2)
+    RM_gal_display.data = np.around(state_dict['RM_gal'],decimal_places)
+    RM_galerr_display.data = np.around(state_dict['RM_galerr'],decimal_places)
     
     if getRMion_button.clicked:#state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd'] or getRMion_button.clicked:
         state_dict['RM_ion'],state_dict['RM_ionerr'] = RMcal.get_rm_ion(state_dict['RA'],state_dict['DEC'],state_dict['mjd'])
-        state_dict['RM_ion'] = np.around(state_dict['RM_ion'],2)
-        state_dict['RM_ionerr'] = np.around(state_dict['RM_ionerr'],2)
+        state_dict['RM_ion'] = np.around(state_dict['RM_ion'],decimal_places)
+        state_dict['RM_ionerr'] = np.around(state_dict['RM_ionerr'],decimal_places)
         state_dict['RM_ionRA'] = state_dict['RA']
         state_dict['RM_ionDEC'] = state_dict['DEC']
         state_dict['RM_ionmjd'] = state_dict['mjd']
-    RM_ion_display.data = np.around(state_dict['RM_ion'],2)
-    RM_ionerr_display.data = np.around(state_dict['RM_ionerr'],2)
+    RM_ion_display.data = np.around(state_dict['RM_ion'],decimal_places)
+    RM_ionerr_display.data = np.around(state_dict['RM_ionerr'],decimal_places)
 
 
 
@@ -4307,7 +4308,7 @@ def RM_screen_plot(rmcal_menu,RMcalibratebutton,RMdisplay,RMerrdisplay,rmcal_inp
         
         #convert menu option to RM value in dict
         RM,err = RM_from_menu(rmcal_menu.value,rmcal_input)
-        RMdisplay.data,RMerrdisplay.data = np.around(RM),np.around(err)
+        RMdisplay.data,RMerrdisplay.data = np.around(RM,decimal_places),np.around(err,decimal_places)
     
         #add to state dict
         state_dict['RMcalibrated']['RMcal'] = RM
@@ -4398,7 +4399,27 @@ def galquery_Budget_screen(catalog_selection,galtype_selection,queryradius,runqu
     return state_dict['qdat']
 
 
-def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runquery,limitzrange,zrange,trialz,cosmo_selection,galaxy_masses,galaxy_selection,mass_type,galaxy_bfields):
+def galplot_Budget_screen(catalog_selection,galtype_selection,queryradius,runquery,limitzrange,zrange,trialz,cosmo_selection,galaxy_masses,galaxy_selection,mass_type,galaxy_bfields,getRMgal_button,getRMion_button):
+
+    #update RM displays
+    if getRMgal_button.clicked:#state_dict['RM_galRA'] != state_dict['RA'] or state_dict['RM_galDEC'] != state_dict['DEC'] or getRMgal_button.clicked:
+        state_dict['RM_gal'],state_dict['RM_galerr'] = get_rm(radec=(state_dict['RA'],state_dict['DEC']),filename=dirs['FRBtables'] + "faraday2020v2.hdf5")
+        state_dict['RM_gal'] = np.around(state_dict['RM_gal'],decimal_places)
+        state_dict['RM_galerr'] = np.around(state_dict['RM_galerr'],decimal_places)
+        state_dict['RM_galRA'] = state_dict['RA']
+        state_dict['RM_galDEC'] = state_dict['DEC']
+    #RM_gal_display.data = np.around(state_dict['RM_gal'],2)
+    #RM_galerr_display.data = np.around(state_dict['RM_galerr'],2)
+
+    if getRMion_button.clicked:#state_dict['RM_ionRA'] != state_dict['RA'] or state_dict['RM_ionDEC'] != state_dict['DEC'] or state_dict['RM_ionmjd'] != state_dict['mjd'] or getRMion_button.clicked:
+        state_dict['RM_ion'],state_dict['RM_ionerr'] = RMcal.get_rm_ion(state_dict['RA'],state_dict['DEC'],state_dict['mjd'])
+        state_dict['RM_ion'] = np.around(state_dict['RM_ion'],decimal_places)
+        state_dict['RM_ionerr'] = np.around(state_dict['RM_ionerr'],decimal_places)
+        state_dict['RM_ionRA'] = state_dict['RA']
+        state_dict['RM_ionDEC'] = state_dict['DEC']
+        state_dict['RM_ionmjd'] = state_dict['mjd']
+    #RM_ion_display.data = np.around(state_dict['RM_ion'],2)
+    #RM_ionerr_display.data = np.around(state_dict['RM_ionerr'],2)
 
     #get DM estimates for interveners
     state_dict['intervener_DMs'] = []
@@ -4506,13 +4527,13 @@ def DM_Budget_screen(trialz):
 
 
     #update table
-    df_DM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['DM'],2),b=0.1),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['MW'],2),b=np.around(state_dict['dmbudgetdict']['MWerr'],2)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['halo'],2),b=np.around(state_dict['dmbudgetdict']['haloerr'],2)),
-                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['dmbudgetdict']["IGM"],2),b=np.around(state_dict['dmbudgetdict']["IGMupperr"],2),c=np.around(state_dict['dmbudgetdict']["IGMlowerr"],2)),
-                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],2),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,2)) for n in range(len(state_dict['intervener_names_DM']))]),
-                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost'],2),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost']),2),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit']),2)),
-                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost']/(1+trialz.value),2),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost'])/(1+trialz.value),2),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit'])/(1+trialz.value),2))
+    df_DM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['DM'],decimal_places),b=0.1),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['MW'],decimal_places),b=np.around(state_dict['dmbudgetdict']['MWerr'],decimal_places)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['halo'],decimal_places),b=np.around(state_dict['dmbudgetdict']['haloerr'],decimal_places)),
+                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['dmbudgetdict']["IGM"],decimal_places),b=np.around(state_dict['dmbudgetdict']["IGMupperr"],decimal_places),c=np.around(state_dict['dmbudgetdict']["IGMlowerr"],decimal_places)),
+                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],decimal_places),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,decimal_places)) for n in range(len(state_dict['intervener_names_DM']))]),
+                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost'],decimal_places),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost']),decimal_places),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit']),decimal_places)),
+                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost']/(1+trialz.value),decimal_places),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost'])/(1+trialz.value),decimal_places),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit'])/(1+trialz.value),decimal_places))
                                  ]
 
     return df_DM_budget
@@ -4566,12 +4587,12 @@ def RM_Budget_screen(trialz):
 
 
     #update table
-    df_RM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(rmobs,2),b=np.around(rmobserr,2)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_gal'],2),b=np.around(state_dict['RM_galerr'],2)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_ion'],2),b=np.around(state_dict['RM_ionerr'],2)),
-                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],2),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,2)) for n in range(len(state_dict['intervener_names_RM']))]),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost'],2),b=np.around(state_dict['RMhost_upper_limit']-state_dict['RMhost'],2)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost']/((1+trialz.value)**2),2),b=np.around((state_dict['RMhost_upper_limit']-state_dict['RMhost'])/((1+trialz.value)**2),2))
+    df_RM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(rmobs,decimal_places),b=np.around(rmobserr,decimal_places)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_gal'],decimal_places),b=np.around(state_dict['RM_galerr'],decimal_places)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_ion'],decimal_places),b=np.around(state_dict['RM_ionerr'],decimal_places)),
+                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],decimal_places),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,decimal_places)) for n in range(len(state_dict['intervener_names_RM']))]),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost'],decimal_places),b=np.around(state_dict['RMhost_upper_limit']-state_dict['RMhost'],decimal_places)),
+                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost']/((1+trialz.value)**2),decimal_places),b=np.around((state_dict['RMhost_upper_limit']-state_dict['RMhost'])/((1+trialz.value)**2),decimal_places))
                                  ]
 
     return df_RM_budget
@@ -4590,9 +4611,9 @@ def Bfield_Budget_screen(getBfieldbutton,Bfield_range,Bfield_res):
                                                                                                                                                     RMhosterr=(state_dict['RMhost_upper_limit']
                                                                                                                                                             -state_dict['RMhost']),
                                                                                                                                                     res2=int(Bfield_range.value//Bfield_res.value),plot=True,buff=Bfield_range.value,save=True,savedir=state_dict['datadir'])
-            wdict['Bfield_display'] = np.around(state_dict['Bhost'],2)
-            wdict['Bfield_pos_err_display'] = np.around(state_dict['Bhost_upper_limit']-state_dict['Bhost'],2)
-            wdict['Bfield_neg_err_display'] = np.around(state_dict['Bhost']-state_dict['Bhost_lower_limit'],2)
+            wdict['Bfield_display'] = np.around(state_dict['Bhost'],decimal_places)
+            wdict['Bfield_pos_err_display'] = np.around(state_dict['Bhost_upper_limit']-state_dict['Bhost'],decimal_places)
+            wdict['Bfield_neg_err_display'] = np.around(state_dict['Bhost']-state_dict['Bhost_lower_limit'],decimal_places)
 
     update_wdict([Bfield_range,Bfield_res],['Bfield_range','Bfield_res'],param='value')
     #update_wdict([Bfield_display,Bfield_pos_err_display,Bfield_neg_err_display],
@@ -4738,23 +4759,23 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
                 state_dict['comps'][i]['Vclass'] = "unconstrained"
 
             #upate dataframe
-            poldf.loc['Component ' + str(i)] = [np.around(state_dict['comps'][i]['snr'],2),
-                        np.around(100*state_dict['comps'][i]['Tpol'],2),
-                        np.around(100*state_dict['comps'][i]['Tpol_err'],2),
-                        np.around(state_dict['comps'][i]['Tsnr'],2),
+            poldf.loc['Component ' + str(i)] = [np.around(state_dict['comps'][i]['snr'],decimal_places),
+                        np.around(100*state_dict['comps'][i]['Tpol'],decimal_places),
+                        np.around(100*state_dict['comps'][i]['Tpol_err'],decimal_places),
+                        np.around(state_dict['comps'][i]['Tsnr'],decimal_places),
                         state_dict['comps'][i]['Tclass'],
-                        np.around(100*state_dict['comps'][i]['Lpol'],2),
-                        np.around(100*state_dict['comps'][i]['Lpol_err'],2),
-                        np.around(state_dict['comps'][i]['Lsnr'],2),
+                        np.around(100*state_dict['comps'][i]['Lpol'],decimal_places),
+                        np.around(100*state_dict['comps'][i]['Lpol_err'],decimal_places),
+                        np.around(state_dict['comps'][i]['Lsnr'],decimal_places),
                         state_dict['comps'][i]['Lclass'],
-                        np.around(100*state_dict['comps'][i]['Vpol'],2),
-                        np.around(100*state_dict['comps'][i]['Vpol_err'],2),
-                        np.around(100*state_dict['comps'][i]['absVpol'],2),
-                        np.around(100*state_dict['comps'][i]['absVpol_err'],2),
-                        np.around(state_dict['comps'][i]['Vsnr'],2),
+                        np.around(100*state_dict['comps'][i]['Vpol'],decimal_places),
+                        np.around(100*state_dict['comps'][i]['Vpol_err'],decimal_places),
+                        np.around(100*state_dict['comps'][i]['absVpol'],decimal_places),
+                        np.around(100*state_dict['comps'][i]['absVpol_err'],decimal_places),
+                        np.around(state_dict['comps'][i]['Vsnr'],decimal_places),
                         state_dict['comps'][i]['Vclass'],
-                        np.around((180/np.pi)*state_dict['comps'][i]['avg_PA'],2),
-                        np.around((180/np.pi)*state_dict['comps'][i]['PA_err'],2)]
+                        np.around((180/np.pi)*state_dict['comps'][i]['avg_PA'],decimal_places),
+                        np.around((180/np.pi)*state_dict['comps'][i]['PA_err'],decimal_places)]
         
     
     weighted = 'weights' in state_dict.keys()
@@ -4857,23 +4878,23 @@ def polanalysis_screen(showghostPA,intLbuffer_slider,intRbuffer_slider,polcomp_m
 
 
     #upate dataframe
-    poldf.loc['All'] = [np.around(state_dict['snr'],2),
-                        np.around(100*state_dict['Tpol'],2),
-                        np.around(100*state_dict['Tpol_err'],2),
-                        np.around(state_dict['Tsnr'],2),
+    poldf.loc['All'] = [np.around(state_dict['snr'],decimal_places),
+                        np.around(100*state_dict['Tpol'],decimal_places),
+                        np.around(100*state_dict['Tpol_err'],decimal_places),
+                        np.around(state_dict['Tsnr'],decimal_places),
                         state_dict['Tclass'],
-                        np.around(100*state_dict['Lpol'],2),
-                        np.around(100*state_dict['Lpol_err'],2),
-                        np.around(state_dict['Lsnr'],2),
+                        np.around(100*state_dict['Lpol'],decimal_places),
+                        np.around(100*state_dict['Lpol_err'],decimal_places),
+                        np.around(state_dict['Lsnr'],decimal_places),
                         state_dict['Lclass'],
-                        np.around(100*state_dict['Vpol'],2),
-                        np.around(100*state_dict['Vpol_err'],2),
-                        np.around(100*state_dict['absVpol'],2),
-                        np.around(100*state_dict['absVpol_err'],2),
-                        np.around(state_dict['Vsnr'],2),
+                        np.around(100*state_dict['Vpol'],decimal_places),
+                        np.around(100*state_dict['Vpol_err'],decimal_places),
+                        np.around(100*state_dict['absVpol'],decimal_places),
+                        np.around(100*state_dict['absVpol_err'],decimal_places),
+                        np.around(state_dict['Vsnr'],decimal_places),
                         state_dict['Vclass'],
-                        np.around((180/np.pi)*state_dict['avg_PA'],2),
-                        np.around((180/np.pi)*state_dict['PA_err'],2)]
+                        np.around((180/np.pi)*state_dict['avg_PA'],decimal_places),
+                        np.around((180/np.pi)*state_dict['PA_err'],decimal_places)]
 
 
     #plot --> we're creating 3 separate plots: full summary, time domain, frequency domain
