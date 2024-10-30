@@ -650,13 +650,13 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'logibox_slider_init':0,
          'buff_L_slider_init':1,
          'buff_R_slider_init':1,
-         'RA_display':RA,
-         'DEC_display':DEC,
+         'RA_display':np.around(RA,decimal_places),
+         'DEC_display':np.around(DEC,decimal_places),
          'ibeam_display':ibeam,
          'ibox_display':ibox,
-         'mjd_display':mjd,
-         'DM_init_display':DMinit,
-         'z_display':zinit,
+         'mjd_display':np.around(mjd,decimal_places),
+         'DM_init_display':np.around(DMinit,decimal_places),
+         'z_display':np.around(zinit,decimal_places),
          'showlog':True,
          'polcalloadbutton':False,
          'logwindow_slider_dynspec':5,
@@ -665,8 +665,8 @@ wdict = {'toggle_menu':'(0) Load Data', ############### (0) Load Data ##########
          'logn_f_slider':5,
          'logwindow_slider_init':5,
          'ddm_num':0,
-         'DM_input_display':DMinit,
-         'DM_new_display':DMinit,
+         'DM_input_display':np.around(DMinit,decimal_places),
+         'DM_new_display':np.around(DMinit,decimal_places),
          'DM_showerrs':False,
          'updateDM':False,
          #'DMINITIALIZED':False,
@@ -1180,13 +1180,13 @@ def ADMIN_makefil_screen(frbfiles_menu,
     state_dict['suff'] = "_dev"
 
     #update displays
-    RA_display.data = state_dict['RA']
-    DEC_display.data = state_dict['DEC']
+    RA_display.data = np.around(state_dict['RA'],decimal_places)
+    DEC_display.data = np.around(state_dict['DEC'],decimal_places)
     ibeam_display.data = state_dict['ibeam']
     ibox_display.data = state_dict['width_native']
-    mjd_display.data = state_dict['mjd']
-    DM_init_display.data = state_dict['DM0']
-    z_display.data = state_dict['z']
+    mjd_display.data = np.around(state_dict['mjd'],decimal_places)
+    DM_init_display.data = np.around(state_dict['DM0'],decimal_places)
+    z_display.data = np.around(state_dict['z'],decimal_places)
 
     #see if filterbanks exist
     state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
@@ -1341,13 +1341,13 @@ def load_screen(frbfiles_menu,n_t_slider,logn_f_slider,#logibox_slider,buff_L_sl
     state_dict['suff'] = "_dev"
 
     #update displays
-    RA_display.data = state_dict['RA']
-    DEC_display.data = state_dict['DEC']
+    RA_display.data = np.around(state_dict['RA'],decimal_places)
+    DEC_display.data = np.around(state_dict['DEC'],decimal_places)
     ibeam_display.data = state_dict['ibeam']
     ibox_display.data = state_dict['width_native']
-    mjd_display.data = state_dict['mjd']
-    DM_init_display.data = state_dict['DM0']
-    z_display.data = state_dict['z']
+    mjd_display.data = np.around(state_dict['mjd'],decimal_places)
+    DM_init_display.data = np.around(state_dict['DM0'],decimal_places)
+    z_display.data = np.around(state_dict['z'],decimal_places)
 
     #see if filterbanks exist
     state_dict['fils'] = polbeamform.get_fils(state_dict['ids'],state_dict['nickname'])
@@ -3605,12 +3605,12 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
                 # Print or output the fit report for display
                 #print(result.fit_report())
 
-                df_scint.loc[str(scintmenu.value)] = [result.params['gamma1'].value,
-                               result.params['gamma1'].stderr,
-                               result.params['m1'].value,
-                               result.params['m1'].stderr,
-                               result.params['c'].value,
-                               result.params['c'].stderr]
+                df_scint.loc[str(scintmenu.value)] = [np.around(result.params['gamma1'].value,decimal_places),
+                               np.around(result.params['gamma1'].stderr,decimal_places),
+                               np.around(result.params['m1'].value,decimal_places),
+                               np.around(result.params['m1'].stderr,decimal_places),
+                               np.around(result.params['c'].value,decimal_places),
+                               np.around(result.params['c'].stderr,decimal_places)]
                 if str(scintmenu.value) == 'All':
                     state_dict['gamma_best'] = [result.params['gamma1'].value,result.params['gamma1'].stderr]
                     state_dict['m_best'] = [result.params['m1'].value,result.params['m1'].stderr]
@@ -3631,12 +3631,12 @@ def scint_screen(scintfitmenu,calc_bw_button,gamma_guess,m_guess,c_guess,scintme
 
                 popt,pcov = curve_fit(scint.lorentz,lags_for_fit[~np.isnan(acf_for_fit)],acf_for_fit[~np.isnan(acf_for_fit)],p0=[gamma_guess.value,m_guess.value,c_guess.value])
 
-                df_scint.loc[str(scintmenu.value)] = [popt[0],
-                               np.sqrt(pcov[0,0]),
-                               popt[1],
-                               np.sqrt(pcov[1,1]),
-                               popt[2],
-                               np.sqrt(pcov[2,2])]
+                df_scint.loc[str(scintmenu.value)] = [np.around(popt[0],decimal_places),
+                               np.around(np.sqrt(pcov[0,0]),decimal_places),
+                               np.around(popt[1],decimal_places),
+                               np.around(np.sqrt(pcov[1,1]),decimal_places),
+                               np.around(popt[2],decimal_places),
+                               np.around(np.sqrt(pcov[2,2]),decimal_places)]
 
 
                 if str(scintmenu.value) == 'All':
@@ -3748,10 +3748,10 @@ def specidx_screen(specidxfitmenu,calc_specidx_button,specidx_guess,F0_guess,spe
             # Execute the fit
             result = gmodel.fit(spec_for_fit, x = freq_for_fit, Gamma=specidx_guess.value,F0=F0_guess.value,weights=weights_for_fit)
 
-            df_specidx.loc[str(specidxmenu.value)] = [result.params['Gamma'].value,
-                               result.params['Gamma'].stderr,
-                               result.params['F0'].value,
-                               result.params['F0'].stderr]
+            df_specidx.loc[str(specidxmenu.value)] = [np.around(result.params['Gamma'].value,decimal_places),
+                               np.around(result.params['Gamma'].stderr,decimal_places),
+                               np.around(result.params['F0'].value,decimal_places),
+                               np.around(result.params['F0'].stderr,decimal_places)]
                                
             if str(specidxmenu.value) == 'All':
                 state_dict['specidx_best'] = [result.params['Gamma'].value,result.params['Gamma'].stderr]
@@ -3768,10 +3768,10 @@ def specidx_screen(specidxfitmenu,calc_specidx_button,specidx_guess,F0_guess,spe
 
             popt,pcov = curve_fit(scatscint.specidx_fit_fn,freq_for_fit,spec_for_fit,p0=[specidx_guess.value,F0_guess.value],sigma=sigma_for_fit)
 
-            df_specidx.loc[str(specidxmenu.value)] = [popt[0],
-                               np.sqrt(pcov[0,0]),
-                               popt[1],
-                               np.sqrt(pcov[1,1])]
+            df_specidx.loc[str(specidxmenu.value)] = [np.around(popt[0],decimal_places),
+                               np.around(np.sqrt(pcov[0,0]),decimal_places),
+                               np.around(popt[1],decimal_places),
+                               np.around(np.sqrt(pcov[1,1]),decimal_places)]
                                
 
             if str(specidxmenu.value) == 'All':
@@ -4527,13 +4527,13 @@ def DM_Budget_screen(trialz):
 
 
     #update table
-    df_DM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['DM'],decimal_places),b=0.1),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['MW'],decimal_places),b=np.around(state_dict['dmbudgetdict']['MWerr'],decimal_places)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['dmbudgetdict']['halo'],decimal_places),b=np.around(state_dict['dmbudgetdict']['haloerr'],decimal_places)),
-                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['dmbudgetdict']["IGM"],decimal_places),b=np.around(state_dict['dmbudgetdict']["IGMupperr"],decimal_places),c=np.around(state_dict['dmbudgetdict']["IGMlowerr"],decimal_places)),
-                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],decimal_places),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,decimal_places)) for n in range(len(state_dict['intervener_names_DM']))]),
-                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost'],decimal_places),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost']),decimal_places),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit']),decimal_places)),
-                                  r'${a:.2f}^{{+{b:.2f}}}_{{-{c:.2f}}}$'.format(a=np.around(state_dict['DMhost']/(1+trialz.value),decimal_places),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost'])/(1+trialz.value),decimal_places),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit'])/(1+trialz.value),decimal_places))
+    df_DM_budget.loc['Budget'] = [r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['DM'],decimal_places),b=0.1,prec=decimal_places),
+                                  r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['dmbudgetdict']['MW'],decimal_places),b=np.around(state_dict['dmbudgetdict']['MWerr'],decimal_places),prec=decimal_places),
+                                  r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['dmbudgetdict']['halo'],decimal_places),b=np.around(state_dict['dmbudgetdict']['haloerr'],decimal_places),prec=decimal_places),
+                                  r'${a:.{prec}f}^{{+{b:.{prec}f}}}_{{-{c:.{prec}f}}}$'.format(a=np.around(state_dict['dmbudgetdict']["IGM"],decimal_places),b=np.around(state_dict['dmbudgetdict']["IGMupperr"],decimal_places),c=np.around(state_dict['dmbudgetdict']["IGMlowerr"],decimal_places),prec=decimal_places),
+                                  "|".join([r'{NAME}:${a:.{prec}f}\pm{b:.{prec}f}$'.format(NAME=state_dict['intervener_names_DM'][n],a=np.around(state_dict['intervener_DMs'][n],decimal_places),b=np.around(state_dict['intervener_DM_errs'][n] if np.isnan(state_dict['intervener_DM_errs'][n]) else 0.4,decimal_places),prec=decimal_places) for n in range(len(state_dict['intervener_names_DM']))]),
+                                  r'${a:.{prec}f}^{{+{b:.{prec}f}}}_{{-{c:.{prec}f}}}$'.format(a=np.around(state_dict['DMhost'],decimal_places),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost']),decimal_places),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit']),decimal_places),prec=decimal_places),
+                                  r'${a:.{prec}f}^{{+{b:.{prec}f}}}_{{-{c:.{prec}f}}}$'.format(a=np.around(state_dict['DMhost']/(1+trialz.value),decimal_places),b=np.around((state_dict['DMhost_upper_limit']-state_dict['DMhost'])/(1+trialz.value),decimal_places),c=np.around((state_dict['DMhost']-state_dict['DMhost_lower_limit'])/(1+trialz.value),decimal_places),prec=decimal_places)
                                  ]
 
     return df_DM_budget
@@ -4587,12 +4587,12 @@ def RM_Budget_screen(trialz):
 
 
     #update table
-    df_RM_budget.loc['Budget'] = [r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(rmobs,decimal_places),b=np.around(rmobserr,decimal_places)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_gal'],decimal_places),b=np.around(state_dict['RM_galerr'],decimal_places)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RM_ion'],decimal_places),b=np.around(state_dict['RM_ionerr'],decimal_places)),
-                                  "|".join([r'{NAME}:${a:.2f}\pm{b:.2f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],decimal_places),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,decimal_places)) for n in range(len(state_dict['intervener_names_RM']))]),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost'],decimal_places),b=np.around(state_dict['RMhost_upper_limit']-state_dict['RMhost'],decimal_places)),
-                                  r'${a:.2f}\pm{b:.2f}$'.format(a=np.around(state_dict['RMhost']/((1+trialz.value)**2),decimal_places),b=np.around((state_dict['RMhost_upper_limit']-state_dict['RMhost'])/((1+trialz.value)**2),decimal_places))
+    df_RM_budget.loc['Budget'] = [r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(rmobs,decimal_places),b=np.around(rmobserr,decimal_places),prec=decimal_places),
+                                  r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['RM_gal'],decimal_places),b=np.around(state_dict['RM_galerr'],decimal_places),prec=decimal_places),
+                                  r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['RM_ion'],decimal_places),b=np.around(state_dict['RM_ionerr'],decimal_places),prec=decimal_places),
+                                  "|".join([r'{NAME}:${a:.{prec}f}\pm{b:.{prec}f}$'.format(NAME=state_dict['intervener_names_RM'][n],a=np.around(state_dict['intervener_RMs'][n],decimal_places),b=np.around(state_dict['intervener_RM_errs'][n] if np.isnan(state_dict['intervener_RM_errs'][n]) else 1,decimal_places),prec=decimal_places) for n in range(len(state_dict['intervener_names_RM']))]),
+                                  r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['RMhost'],decimal_places),b=np.around(state_dict['RMhost_upper_limit']-state_dict['RMhost'],decimal_places),prec=decimal_places),
+                                  r'${a:.{prec}f}\pm{b:.{prec}f}$'.format(a=np.around(state_dict['RMhost']/((1+trialz.value)**2),decimal_places),b=np.around((state_dict['RMhost_upper_limit']-state_dict['RMhost'])/((1+trialz.value)**2),decimal_places),prec=decimal_places)
                                  ]
 
     return df_RM_budget
